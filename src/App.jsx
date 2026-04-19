@@ -29,11 +29,11 @@ function fmtFull(iso) {
 
 function dbToSession(row) {
   let gymData = null;
-  if (row.method==="gym-strength" && row.plan_mainset) {
+  if ((row.method==="gym-strength" || row.method==="static") && row.plan_mainset) {
     try { gymData = JSON.parse(row.plan_mainset); } catch(e) { gymData = null; }
   }
   let clientGymData = null;
-  if (row.method==="gym-strength" && row.feedback?.client_notes) {
+  if ((row.method==="gym-strength" || row.method==="static") && row.feedback?.client_notes) {
     try { clientGymData = JSON.parse(row.feedback.client_notes); } catch(e) { clientGymData = null; }
   }
   return {
@@ -160,23 +160,32 @@ function DayModal({ session, role, onClose, onSave }) {
           initialData={(() => {
             const coachPlan = session.plan?.gymData || null;
             const clientLog = session.feedback?.clientGymData || null;
-            if (isClient && coachPlan && clientLog) {
-              // Merge client log back into coach plan exercises
-              return {
-                ...coachPlan,
-                exercises: coachPlan.exercises.map(ex => {
-                  const loggedEx = clientLog.exercises?.find(l => l.id === ex.id);
-                  return loggedEx ? { ...ex, log: loggedEx.log } : ex;
-                }),
-                clientNotes: clientLog.clientNotes || "",
-                rating: clientLog.rating || null,
-              };
+            if (isClient && coachPlan) {
+              // Client sees coach plan merged with their own log
+              if (clientLog && clientLog.exercises) {
+                return {
+                  ...coachPlan,
+                  exercises: coachPlan.exercises.map(ex => {
+                    const loggedEx = clientLog.exercises?.find(l => l.id === ex.id);
+                    return loggedEx ? { ...ex, log: loggedEx.log } : ex;
+                  }),
+                  clientNotes: clientLog.clientNotes || "",
+                  rating: clientLog.rating || null,
+                };
+              }
+              return coachPlan;
             }
+            // Coach sees their own plan for editing
             return coachPlan;
           })()}
           onSave={async (data) => {
             setSaving(true);
-            await onSave({ ...fb, gymData:data, status: isClient ? (fb.status||"completed") : fb.status });
+            if (isClient) {
+              await onSave({ ...fb, gymData:data, status: fb.status||"completed" });
+            } else {
+              // Coach saving plan — store as gymData in feedback save flow
+              await onSave({ ...fb, gymData:data });
+            }
             setSaving(false);
             onClose();
           }}
@@ -579,8 +588,8 @@ export default function ApneaCoach() {
   }
 
   async function handleAssignSave({method,plan}) {
-    // For gym-strength, store the full workout structure as JSON in plan_mainset
-    const mainSetValue = method==="gym-strength" && plan.gymData
+    // For gym-strength and static, store the full workout structure as JSON in plan_mainset
+    const mainSetValue = (method==="gym-strength" || method==="static") && plan.gymData
       ? JSON.stringify(plan.gymData)
       : plan.mainSet||null;
     const {data,error} = await supabase.from("sessions").insert({
@@ -597,7 +606,7 @@ export default function ApneaCoach() {
   }
 
   async function handleFeedbackSave(sessionId, fb) {
-    // Store gym workout log as JSON in client_notes field
+    // Store gym/static workout log as JSON in client_notes field
     const clientNotesValue = fb.gymData
       ? JSON.stringify(fb.gymData)
       : fb.clientNotes||null;
