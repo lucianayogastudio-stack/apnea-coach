@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
 import GymStrengthBuilder from "./GymStrengthBuilder";
+import StaticBuilder from "./StaticBuilder";
 
 const METHODS = [
   { key:"gym-strength",   label:"Gym Strength",   emoji:"🏋️", bg:"#fff0e6", border:"#f4a96a", text:"#b85c00", dot:"#f4803a" },
@@ -136,13 +137,37 @@ function Spinner() {
 // ── Day Modal ─────────────────────────────────────────────────────────────────
 function DayModal({ session, role, onClose, onSave }) {
   const m = gm(session.method);
-  const isGym = session.method==="gym-strength";
+  const isGym    = session.method==="gym-strength";
+  const isStatic = session.method==="static";
   const isDepth = session.method==="depth";
   const isClient = role==="client";
   const [fb, setFb] = useState({...session.feedback});
   const [saving, setSaving] = useState(false);
 
   async function handleSave() { setSaving(true); await onSave(fb); setSaving(false); }
+
+  // Static sessions use the dedicated builder
+  if (isStatic) {
+    return (
+      <Modal onClose={onClose} wide>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+          <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`}}>{m.emoji} {m.label}</span>
+          <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?"Athlete View":"Coach View"}</span>
+        </div>
+        <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
+        <StaticBuilder
+          isClient={isClient}
+          initialData={isClient ? (session.feedback?.clientGymData || session.plan?.gymData || null) : (session.plan?.gymData || null)}
+          onSave={async (data) => {
+            setSaving(true);
+            await onSave({ ...fb, gymData:data, status: isClient ? (fb.status||"completed") : fb.status });
+            setSaving(false);
+            onClose();
+          }}
+        />
+      </Modal>
+    );
+  }
 
   // Gym strength sessions use the dedicated builder
   if (isGym) {
@@ -230,7 +255,8 @@ function AssignModal({ date, clientName, onClose, onSave }) {
   const [plan, setPlan] = useState({warmup:"",mainSet:"",cooldown:"",targetDepth:"",openLine:false,coachNotes:""});
   const [saving, setSaving] = useState(false);
   const isDepth = method==="depth";
-  const isGym = method==="gym-strength";
+  const isGym    = method==="gym-strength";
+  const isStatic = method==="static";
 
   async function handleSave() { setSaving(true); await onSave({method, plan:{...plan, targetDepth:plan.targetDepth?Number(plan.targetDepth):null}}); setSaving(false); }
 
@@ -246,6 +272,20 @@ function AssignModal({ date, clientName, onClose, onSave }) {
           </button>
         );})}
       </div>
+      {/* Static — full builder */}
+      {isStatic && (
+        <StaticBuilder
+          isClient={false}
+          initialData={null}
+          onSave={async (data) => {
+            setSaving(true);
+            await onSave({ method, plan:{ ...plan, gymData: data } });
+            setSaving(false);
+            onClose();
+          }}
+        />
+      )}
+
       {/* Gym strength — full builder */}
       {isGym && (
         <GymStrengthBuilder
@@ -261,7 +301,7 @@ function AssignModal({ date, clientName, onClose, onSave }) {
       )}
 
       {/* All other methods — text fields */}
-      {!isGym && (<>
+      {!isGym && !isStatic && (<>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
           <div><div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:8}}>Warm-up</div><textarea style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,background:"#fff",outline:"none",resize:"vertical",minHeight:80,fontFamily:"inherit",color:"#1a1a1a"}} placeholder="e.g. 3×FRC to 20m..." value={plan.warmup} onChange={e=>setPlan(p=>({...p,warmup:e.target.value}))} /></div>
           <div><div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:8}}>Cool-down</div><textarea style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,background:"#fff",outline:"none",resize:"vertical",minHeight:80,fontFamily:"inherit",color:"#1a1a1a"}} placeholder="e.g. 2 easy hangs..." value={plan.cooldown} onChange={e=>setPlan(p=>({...p,cooldown:e.target.value}))} /></div>
