@@ -27,17 +27,27 @@ function fmtFull(iso) {
 }
 
 function dbToSession(row) {
+  let gymData = null;
+  if (row.method==="gym-strength" && row.plan_mainset) {
+    try { gymData = JSON.parse(row.plan_mainset); } catch(e) { gymData = null; }
+  }
+  let clientGymData = null;
+  if (row.method==="gym-strength" && row.feedback?.client_notes) {
+    try { clientGymData = JSON.parse(row.feedback.client_notes); } catch(e) { clientGymData = null; }
+  }
   return {
     id: row.id, clientId: row.client_id, date: row.date, method: row.method,
     plan: {
-      warmup: row.plan_warmup||"", mainSet: row.plan_mainset||"", cooldown: row.plan_cooldown||"",
+      warmup: row.plan_warmup||"", mainSet: gymData?null:row.plan_mainset||"", cooldown: row.plan_cooldown||"",
       targetDepth: row.plan_target_depth||null, openLine: row.plan_open_line||false, coachNotes: row.plan_coach_notes||"",
+      gymData,
     },
     feedback: row.feedback ? {
       status: row.feedback.status||null, actualDepth: row.feedback.actual_depth||"",
       earlyTurn: row.feedback.early_turn||false, earlyTurnDepth: row.feedback.early_turn_depth||"",
       feeling: row.feedback.feeling||"", limitingFactor: row.feedback.limiting_factor||"",
-      clientNotes: row.feedback.client_notes||"", coachComment: row.feedback.coach_comment||"",
+      clientNotes: clientGymData?null:row.feedback.client_notes||"",
+      clientGymData, coachComment: row.feedback.coach_comment||"",
     } : { status:null, actualDepth:"", earlyTurn:false, earlyTurnDepth:"", feeling:"", limitingFactor:"", clientNotes:"", coachComment:"" },
   };
 }
@@ -145,10 +155,14 @@ function DayModal({ session, role, onClose, onSave }) {
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
         <GymStrengthBuilder
           isClient={isClient}
-          initialData={session.plan?.gymData || null}
+          initialData={isClient ? (session.feedback?.clientGymData || session.plan?.gymData || null) : (session.plan?.gymData || null)}
           onSave={async (gymData) => {
             setSaving(true);
-            await onSave({ ...fb, gymData, status: isClient ? (fb.status||"completed") : fb.status });
+            if (isClient) {
+              await onSave({ ...fb, gymData, status: fb.status||"completed" });
+            } else {
+              await onSave({ ...fb, gymData });
+            }
             setSaving(false);
             onClose();
           }}
@@ -488,9 +502,13 @@ export default function ApneaCoach() {
   }
 
   async function handleAssignSave({method,plan}) {
+    // For gym-strength, store the full workout structure as JSON in plan_mainset
+    const mainSetValue = method==="gym-strength" && plan.gymData
+      ? JSON.stringify(plan.gymData)
+      : plan.mainSet||null;
     const {data,error} = await supabase.from("sessions").insert({
       client_id:activeClient.id, date:assignModal, method,
-      plan_warmup:plan.warmup||null, plan_mainset:plan.mainSet||null, plan_cooldown:plan.cooldown||null,
+      plan_warmup:plan.warmup||null, plan_mainset:mainSetValue, plan_cooldown:plan.cooldown||null,
       plan_target_depth:plan.targetDepth||null, plan_open_line:plan.openLine||false, plan_coach_notes:plan.coachNotes||null,
     }).select().single();
     if (!error&&data) { setSessions(prev=>[...prev, dbToSession({...data,feedback:null})]); setAssignModal(null); flash("Session planned!"); }
@@ -502,15 +520,18 @@ export default function ApneaCoach() {
   }
 
   async function handleFeedbackSave(sessionId, fb) {
-    const gymDataStr = fb.gymData ? JSON.stringify(fb.gymData) : null;
+    // Store gym workout log as JSON in client_notes field
+    const clientNotesValue = fb.gymData
+      ? JSON.stringify(fb.gymData)
+      : fb.clientNotes||null;
     const {error} = await supabase.from("feedback").upsert({
       session_id:sessionId, status:fb.status||null,
       actual_depth:fb.actualDepth?Number(fb.actualDepth):null,
       early_turn:fb.earlyTurn||false, early_turn_depth:fb.earlyTurnDepth?Number(fb.earlyTurnDepth):null,
       feeling:fb.feeling||null, limiting_factor:fb.limitingFactor||null,
-      client_notes:gymDataStr || fb.clientNotes||null, coach_comment:fb.coachComment||null,
+      client_notes:clientNotesValue, coach_comment:fb.coachComment||null,
     },{onConflict:"session_id"});
-    if (!error) { setSessions(prev=>prev.map(s=>s.id===sessionId?{...s,feedback:fb}:s)); setDayModal(null); flash("Feedback saved!"); }
+    if (!error) { setSessions(prev=>prev.map(s=>s.id===sessionId?{...s,feedback:{...fb}}:s)); setDayModal(null); flash("Feedback saved!"); }
   }
 
   const weekDates = DAYS.map((_,i)=>addDays(weekStart,i));
