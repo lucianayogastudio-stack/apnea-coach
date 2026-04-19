@@ -64,7 +64,18 @@ function makeSet() {
 
 function makeExercise(ex, customName) {
   const trackType = ex?.type || "strength";
-  return { id:uid(), name:customName||ex?.name||"", trackType, sets:[makeSet()], notes:"" };
+  return { id:uid(), name:customName||ex?.name||"", trackType, sets:[makeSet()], notes:"", videoUrl:"" };
+}
+
+function getVideoEmbed(url) {
+  if (!url) return null;
+  // YouTube
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if (ytMatch) return { thumb:`https://img.youtube.com/vi/${ytMatch[1]}/mqdefault.jpg`, embed:`https://www.youtube.com/embed/${ytMatch[1]}`, id:ytMatch[1], type:"youtube" };
+  // Vimeo
+  const vmMatch = url.match(/vimeo\.com\/(\d+)/);
+  if (vmMatch) return { embed:`https://player.vimeo.com/video/${vmMatch[1]}`, id:vmMatch[1], type:"vimeo" };
+  return { type:"link", url };
 }
 
 function makeBlock(type) {
@@ -159,9 +170,13 @@ function ExercisePicker({ onAdd, onClose }) {
 
 // ── Single Exercise Row ───────────────────────────────────────────────────────
 function ExerciseRow({ exercise, onChange, onRemove, isClient, showLabel }) {
-  const [showNotes, setShowNotes] = useState(!!exercise.notes);
+  const [showNotes,  setShowNotes]  = useState(!!exercise.notes);
+  const [showVideo,  setShowVideo]  = useState(false);
+  const [editVideo,  setEditVideo]  = useState(false);
+  const [videoInput, setVideoInput] = useState(exercise.videoUrl||"");
   const isStrength = exercise.trackType==="strength";
   const isDuration = exercise.trackType==="duration";
+  const videoInfo = getVideoEmbed(exercise.videoUrl);
 
   function updateSet(sid, field, val) { onChange({...exercise,sets:exercise.sets.map(s=>s.id===sid?{...s,[field]:val}:s)}); }
   function addSet() { onChange({...exercise,sets:[...exercise.sets,makeSet()]}); }
@@ -195,6 +210,10 @@ function ExerciseRow({ exercise, onChange, onRemove, isClient, showLabel }) {
             </select>
           )}
           <button onClick={()=>setShowNotes(v=>!v)} style={{background:showNotes?"#f0f0ec":"transparent",border:"1.5px solid #e0e0e0",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",color:"#888"}}>📝</button>
+          <button onClick={()=>{ if(isClient&&videoInfo){setShowVideo(v=>!v);}else if(!isClient){setEditVideo(v=>!v);} }}
+            style={{background:(showVideo||editVideo)?"#fff0e0":"transparent",border:`1.5px solid ${exercise.videoUrl?"#f4a96a":"#e0e0e0"}`,borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",color:exercise.videoUrl?"#b85c00":"#888"}}>
+            🎥
+          </button>
           {!isClient&&<button onClick={onRemove} style={{background:"transparent",border:"1.5px solid #e8c5c5",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",color:"#c0392b"}}>✕</button>}
         </div>
       </div>
@@ -287,6 +306,64 @@ function ExerciseRow({ exercise, onChange, onRemove, isClient, showLabel }) {
           <textarea value={exercise.notes} onChange={e=>onChange({...exercise,notes:e.target.value})}
             placeholder="Notes (e.g. slow eccentric, keep core tight...)"
             style={{width:"100%",padding:"8px 10px",border:"1.5px solid #e0e0e0",borderRadius:7,fontSize:12,fontFamily:"inherit",outline:"none",resize:"vertical",minHeight:50,color:"#555",background:"#fafaf8"}} />
+        </div>
+      )}
+
+      {/* Video — coach edit */}
+      {!isClient&&editVideo&&(
+        <div style={{padding:"0 14px 12px"}}>
+          <div style={{fontSize:11,fontWeight:600,color:"#888",marginBottom:5}}>YouTube or Vimeo URL</div>
+          <div style={{display:"flex",gap:8}}>
+            <input value={videoInput} onChange={e=>setVideoInput(e.target.value)}
+              placeholder="https://youtube.com/watch?v=..."
+              style={{flex:1,padding:"8px 10px",border:"1.5px solid #f4a96a",borderRadius:7,fontSize:12,fontFamily:"inherit",outline:"none",color:"#1a1a1a"}} />
+            <button onClick={()=>{ onChange({...exercise,videoUrl:videoInput}); setEditVideo(false); }}
+              style={{background:"#f4803a",color:"#fff",border:"none",borderRadius:7,padding:"8px 14px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+              Save
+            </button>
+            {exercise.videoUrl&&<button onClick={()=>{ setVideoInput(""); onChange({...exercise,videoUrl:""}); setEditVideo(false); }}
+              style={{background:"transparent",border:"1.5px solid #e8c5c5",borderRadius:7,padding:"8px 10px",fontSize:12,cursor:"pointer",color:"#c0392b",fontFamily:"inherit"}}>
+              Remove
+            </button>}
+          </div>
+          {videoInput&&getVideoEmbed(videoInput)?.type==="youtube"&&(
+            <div style={{marginTop:8,fontSize:11,color:"#4caf50"}}>✓ YouTube video detected</div>
+          )}
+          {videoInput&&getVideoEmbed(videoInput)?.type==="vimeo"&&(
+            <div style={{marginTop:8,fontSize:11,color:"#4caf50"}}>✓ Vimeo video detected</div>
+          )}
+        </div>
+      )}
+
+      {/* Video — client view */}
+      {isClient&&exercise.videoUrl&&showVideo&&(
+        <div style={{padding:"0 14px 14px"}}>
+          {videoInfo?.type==="youtube"&&(
+            <div style={{borderRadius:9,overflow:"hidden",aspectRatio:"16/9"}}>
+              <iframe src={videoInfo.embed} style={{width:"100%",height:"100%",border:"none"}} allowFullScreen title={exercise.name} />
+            </div>
+          )}
+          {videoInfo?.type==="vimeo"&&(
+            <div style={{borderRadius:9,overflow:"hidden",aspectRatio:"16/9"}}>
+              <iframe src={videoInfo.embed} style={{width:"100%",height:"100%",border:"none"}} allowFullScreen title={exercise.name} />
+            </div>
+          )}
+          {videoInfo?.type==="link"&&(
+            <a href={videoInfo.url} target="_blank" rel="noopener noreferrer"
+              style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 14px",background:"#f0f0ec",borderRadius:8,fontSize:13,color:"#1a1a1a",textDecoration:"none",fontWeight:500}}>
+              🎥 Watch exercise video ↗
+            </a>
+          )}
+        </div>
+      )}
+
+      {/* Video thumbnail hint for client (when not expanded) */}
+      {isClient&&exercise.videoUrl&&!showVideo&&(
+        <div style={{padding:"0 14px 10px"}}>
+          <button onClick={()=>setShowVideo(true)}
+            style={{display:"flex",alignItems:"center",gap:8,background:"#fff5ee",border:"1px solid #f4a96a",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,color:"#b85c00",cursor:"pointer",fontFamily:"inherit"}}>
+            🎥 Watch how-to video
+          </button>
         </div>
       )}
     </div>
