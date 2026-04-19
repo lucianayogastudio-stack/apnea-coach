@@ -157,7 +157,23 @@ function DayModal({ session, role, onClose, onSave }) {
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
         <StaticBuilder
           isClient={isClient}
-          initialData={isClient ? (session.feedback?.clientGymData || session.plan?.gymData || null) : (session.plan?.gymData || null)}
+          initialData={(() => {
+            const coachPlan = session.plan?.gymData || null;
+            const clientLog = session.feedback?.clientGymData || null;
+            if (isClient && coachPlan && clientLog) {
+              // Merge client log back into coach plan exercises
+              return {
+                ...coachPlan,
+                exercises: coachPlan.exercises.map(ex => {
+                  const loggedEx = clientLog.exercises?.find(l => l.id === ex.id);
+                  return loggedEx ? { ...ex, log: loggedEx.log } : ex;
+                }),
+                clientNotes: clientLog.clientNotes || "",
+                rating: clientLog.rating || null,
+              };
+            }
+            return coachPlan;
+          })()}
           onSave={async (data) => {
             setSaving(true);
             await onSave({ ...fb, gymData:data, status: isClient ? (fb.status||"completed") : fb.status });
@@ -180,7 +196,28 @@ function DayModal({ session, role, onClose, onSave }) {
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
         <GymStrengthBuilder
           isClient={isClient}
-          initialData={isClient ? (session.feedback?.clientGymData || session.plan?.gymData || null) : (session.plan?.gymData || null)}
+          initialData={(() => {
+            const coachPlan = session.plan?.gymData || null;
+            const clientLog = session.feedback?.clientGymData || null;
+            if (isClient && coachPlan && clientLog) {
+              return {
+                ...coachPlan,
+                sections: coachPlan.sections?.map(sec => ({
+                  ...sec,
+                  blocks: sec.blocks?.map(blk => ({
+                    ...blk,
+                    exercises: blk.exercises?.map(ex => {
+                      const loggedEx = clientLog.sections?.flatMap(s=>s.blocks?.flatMap(b=>b.exercises||[])||[]).find(l=>l.id===ex.id);
+                      return loggedEx ? { ...ex, sets: loggedEx.sets } : ex;
+                    }) || [],
+                  })) || [],
+                })) || [],
+                clientNotes: clientLog.clientNotes || "",
+                rating: clientLog.rating || null,
+              };
+            }
+            return coachPlan;
+          })()}
           onSave={async (gymData) => {
             setSaving(true);
             if (isClient) {
