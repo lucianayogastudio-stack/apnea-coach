@@ -457,21 +457,35 @@ export default function StaticBuilder({ initialData, onSave, isClient }) {
   return (
     <div style={{fontFamily:"'DM Sans','Helvetica Neue',sans-serif",color:"#1a1a1a"}}>
 
-      {/* Environment toggle */}
-      <div style={{display:"flex",gap:8,marginBottom:18}}>
-        {[
-          { key:"pool",  label:"🏊 Pool",  color:"#005fa3", bg:"#e6f4ff", border:"#6ab0f4" },
-          { key:"dry",   label:"🏠 Dry",   color:"#7a6200", bg:"#fffbe6", border:"#e8cc4d" },
-        ].map(opt=>{
-          const sel = environment===opt.key;
-          return (
-            <button key={opt.key} onClick={()=>{ if(!isClient) setEnvironment(opt.key); }}
-              style={{flex:1,padding:"11px",borderRadius:10,border:`2px solid ${sel?opt.border:"#e0e0e0"}`,background:sel?opt.bg:"#fff",color:sel?opt.color:"#aaa",fontWeight:sel?700:500,fontSize:14,cursor:isClient?"default":"pointer",fontFamily:"inherit",transition:"all .15s"}}>
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
+      {/* Environment — coach toggles, client sees read-only badge */}
+      {isClient ? (
+        <div style={{marginBottom:18}}>
+          {environment==="pool" ? (
+            <div style={{display:"inline-flex",alignItems:"center",gap:8,padding:"9px 18px",borderRadius:10,background:"#e6f4ff",border:"1.5px solid #6ab0f4",color:"#005fa3",fontWeight:700,fontSize:14}}>
+              🏊 Pool Session
+            </div>
+          ) : (
+            <div style={{display:"inline-flex",alignItems:"center",gap:8,padding:"9px 18px",borderRadius:10,background:"#fffbe6",border:"1.5px solid #e8cc4d",color:"#7a6200",fontWeight:700,fontSize:14}}>
+              🏠 Dry Session
+            </div>
+          )}
+        </div>
+      ) : (
+        <div style={{display:"flex",gap:8,marginBottom:18}}>
+          {[
+            { key:"pool", label:"🏊 Pool", color:"#005fa3", bg:"#e6f4ff", border:"#6ab0f4" },
+            { key:"dry",  label:"🏠 Dry",  color:"#7a6200", bg:"#fffbe6", border:"#e8cc4d" },
+          ].map(opt=>{
+            const sel = environment===opt.key;
+            return (
+              <button key={opt.key} onClick={()=>setEnvironment(opt.key)}
+                style={{flex:1,padding:"11px",borderRadius:10,border:`2px solid ${sel?opt.border:"#e0e0e0"}`,background:sel?opt.bg:"#fff",color:sel?opt.color:"#aaa",fontWeight:sel?700:500,fontSize:14,cursor:"pointer",fontFamily:"inherit",transition:"all .15s"}}>
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Session name */}
       <div style={{marginBottom:14}}>
