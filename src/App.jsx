@@ -45,7 +45,7 @@ function dbToClient(row) {
   return { id:row.id, name:row.name, age:row.age, level:row.level, goal:row.goal, pb:{CWT:row.pb_cwt, STA:row.pb_sta, DYN:row.pb_dyn} };
 }
 
-// ── Login Screen ──────────────────────────────────────────────────────────────
+// ── Login ─────────────────────────────────────────────────────────────────────
 function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -53,8 +53,7 @@ function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   async function handleLogin(e) {
-    e.preventDefault();
-    setLoading(true); setError("");
+    e.preventDefault(); setLoading(true); setError("");
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) setError(error.message);
     setLoading(false);
@@ -73,18 +72,15 @@ function LoginScreen() {
           <div style={{marginBottom:16}}>
             <div style={{fontSize:12,fontWeight:600,color:"#666",marginBottom:6}}>Email</div>
             <input type="email" required value={email} onChange={e=>setEmail(e.target.value)}
-              style={{width:"100%",padding:"11px 14px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,outline:"none",fontFamily:"inherit",color:"#1a1a1a"}}
-              placeholder="your@email.com" />
+              style={{width:"100%",padding:"11px 14px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,outline:"none",fontFamily:"inherit",color:"#1a1a1a"}} placeholder="your@email.com" />
           </div>
           <div style={{marginBottom:24}}>
             <div style={{fontSize:12,fontWeight:600,color:"#666",marginBottom:6}}>Password</div>
             <input type="password" required value={password} onChange={e=>setPassword(e.target.value)}
-              style={{width:"100%",padding:"11px 14px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,outline:"none",fontFamily:"inherit",color:"#1a1a1a"}}
-              placeholder="••••••••" />
+              style={{width:"100%",padding:"11px 14px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,outline:"none",fontFamily:"inherit",color:"#1a1a1a"}} placeholder="••••••••" />
           </div>
           {error && <div style={{background:"#fce4ec",border:"1px solid #ef9a9a",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#c62828",marginBottom:16}}>{error}</div>}
-          <button type="submit" disabled={loading}
-            style={{width:"100%",background:"#1a1a1a",color:"#fff",border:"none",padding:"13px",borderRadius:9,fontSize:15,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:loading?0.6:1}}>
+          <button type="submit" disabled={loading} style={{width:"100%",background:"#1a1a1a",color:"#fff",border:"none",padding:"13px",borderRadius:9,fontSize:15,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:loading?0.6:1}}>
             {loading?"Signing in...":"Sign In"}
           </button>
         </form>
@@ -156,7 +152,6 @@ function DayModal({ session, role, onClose, onSave }) {
       {session.plan?.mainSet&&<div style={{background:"#f8f8f6",borderRadius:10,padding:"13px 16px",marginBottom:10}}><div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#bbb",marginBottom:6}}>Main Set</div><div style={{fontSize:14,color:"#333",lineHeight:1.65}}>{session.plan.mainSet}</div></div>}
       {session.plan?.cooldown&&<div style={{background:"#f8f8f6",borderRadius:10,padding:"13px 16px",marginBottom:10}}><div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#bbb",marginBottom:6}}>Cool-down</div><div style={{fontSize:14,color:"#333",lineHeight:1.65}}>{session.plan.cooldown}</div></div>}
       {session.plan?.coachNotes&&<div style={{background:"#fffbe6",border:"1px solid #ffe082",borderRadius:10,padding:"13px 16px",marginBottom:14}}><div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#a07a00",marginBottom:6}}>📌 Coach Notes</div><div style={{fontSize:14,color:"#5a4800",lineHeight:1.65}}>{session.plan.coachNotes}</div></div>}
-
       <div style={{borderTop:"2px solid #f0f0ec",paddingTop:20,marginTop:4}}>
         <div style={{fontWeight:700,fontSize:15,marginBottom:14}}>{isClient?"Your Feedback":"Client Feedback"}</div>
         <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:9}}>Did you complete this session?</div>
@@ -235,7 +230,7 @@ function AddClientModal({ onClose, onSave }) {
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
-    if (!form.name || !form.email || !form.password) return;
+    if (!form.name||!form.email||!form.password) return;
     setSaving(true); await onSave(form); setSaving(false);
   }
 
@@ -265,6 +260,33 @@ function AddClientModal({ onClose, onSave }) {
         </div>
         <div style={{display:"flex",gap:10,paddingTop:4}}>
           <button onClick={handleSave} disabled={saving} style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"11px 22px",borderRadius:8,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:saving?0.6:1}}>{saving?"Creating...":"Add Client"}</button>
+          <button onClick={onClose} style={{background:"transparent",border:"1.5px solid #ddd",color:"#444",padding:"10px 20px",borderRadius:8,fontSize:14,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Add Coach Modal ───────────────────────────────────────────────────────────
+function AddCoachModal({ onClose, onSave }) {
+  const [form, setForm] = useState({name:"",email:"",password:""});
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    if (!form.email||!form.password) return;
+    setSaving(true); await onSave(form); setSaving(false);
+  }
+
+  return (
+    <Modal onClose={onClose}>
+      <div style={{fontWeight:700,fontSize:18,marginBottom:6,letterSpacing:"-.02em"}}>Add New Coach</div>
+      <div style={{fontSize:13,color:"#999",marginBottom:20}}>Create a coach account — they'll only see their own clients.</div>
+      <div style={{display:"flex",flexDirection:"column",gap:13}}>
+        <div><div style={{fontSize:12,fontWeight:600,color:"#666",marginBottom:6}}>Name</div><input style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,outline:"none",fontFamily:"inherit",color:"#1a1a1a"}} placeholder="Coach name" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} /></div>
+        <div><div style={{fontSize:12,fontWeight:600,color:"#666",marginBottom:6}}>Email</div><input type="email" style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,outline:"none",fontFamily:"inherit",color:"#1a1a1a"}} placeholder="coach@email.com" value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} /></div>
+        <div><div style={{fontSize:12,fontWeight:600,color:"#666",marginBottom:6}}>Password</div><input type="text" style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,outline:"none",fontFamily:"inherit",color:"#1a1a1a"}} placeholder="Set a password" value={form.password} onChange={e=>setForm(p=>({...p,password:e.target.value}))} /></div>
+        <div style={{display:"flex",gap:10,paddingTop:4}}>
+          <button onClick={handleSave} disabled={saving} style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"11px 22px",borderRadius:8,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:saving?0.6:1}}>{saving?"Creating...":"Create Coach Account"}</button>
           <button onClick={onClose} style={{background:"transparent",border:"1.5px solid #ddd",color:"#444",padding:"10px 20px",borderRadius:8,fontSize:14,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
         </div>
       </div>
@@ -318,9 +340,11 @@ function WeekGrid({ weekDates, clientId, sessions, onClickSession, onClickAdd, i
 }
 
 // ── Main App ──────────────────────────────────────────────────────────────────
+const ADMIN_EMAIL = "lucianafreediver@gmail.com"; // only this user can create coaches
+
 export default function ApneaCoach() {
   const [user,     setUser]     = useState(null);
-  const [profile,  setProfile]  = useState(null); // {role, client_id}
+  const [profile,  setProfile]  = useState(null);
   const [clients,  setClients]  = useState([]);
   const [sessions, setSessions] = useState([]);
   const [loading,  setLoading]  = useState(true);
@@ -332,10 +356,10 @@ export default function ApneaCoach() {
   const [assignModal,    setAssignModal]    = useState(null);
   const [dayModal,       setDayModal]       = useState(null);
   const [addClientModal, setAddClientModal] = useState(false);
+  const [addCoachModal,  setAddCoachModal]  = useState(false);
 
   function flash(msg) { setToast(msg); setTimeout(()=>setToast(""),2400); }
 
-  // ── Auth listener ──
   useEffect(()=>{
     supabase.auth.getSession().then(({data:{session}})=>{
       setUser(session?.user||null);
@@ -353,20 +377,26 @@ export default function ApneaCoach() {
   async function loadProfile(u) {
     const {data} = await supabase.from("profiles").select("*").eq("id",u.id).single();
     setProfile(data);
-    await loadAll(data);
+    await loadAll(data, u);
     setLoading(false);
   }
 
-  async function loadAll(prof) {
+  async function loadAll(prof, u) {
     const p = prof||profile;
-    if (!p) return;
+    const currentUser = u||user;
+    if (!p||!currentUser) return;
     if (p.role==="coach") {
-      const {data:cr} = await supabase.from("clients").select("*").order("created_at");
-      const {data:sr} = await supabase.from("sessions").select("*, feedback(*)").order("date");
+      // Load only THIS coach's clients
+      const {data:cr} = await supabase.from("clients").select("*").eq("coach_id",currentUser.id).order("created_at");
+      const clientIds = (cr||[]).map(c=>c.id);
+      let sr = [];
+      if (clientIds.length > 0) {
+        const {data} = await supabase.from("sessions").select("*, feedback(*)").in("client_id", clientIds).order("date");
+        sr = data||[];
+      }
       setClients((cr||[]).map(dbToClient));
-      setSessions((sr||[]).map(dbToSession));
+      setSessions(sr.map(dbToSession));
     } else {
-      // client — only load their own data
       const {data:cr} = await supabase.from("clients").select("*").eq("id",p.client_id).single();
       const {data:sr} = await supabase.from("sessions").select("*, feedback(*)").eq("client_id",p.client_id).order("date");
       if (cr) { setClients([dbToClient(cr)]); setActiveClient(dbToClient(cr)); setView("clientWeek"); }
@@ -379,27 +409,31 @@ export default function ApneaCoach() {
     setClients([]); setSessions([]); setProfile(null); setActiveClient(null); setView("dashboard");
   }
 
-  // ── Client CRUD ──
+  // ── Add Client ──
   async function handleAddClient(form) {
-    // 1. Create auth user for client
-    const {data:authData, error:authError} = await supabase.auth.admin
-      ? supabase.auth.signUp({email:form.email, password:form.password})
-      : supabase.auth.signUp({email:form.email, password:form.password});
-
-    // 2. Create client record
+    const {data:authData} = await supabase.auth.signUp({email:form.email, password:form.password});
     const {data:clientData, error:clientError} = await supabase.from("clients").insert({
       name:form.name, age:form.age?Number(form.age):null, level:form.level, goal:form.goal,
       pb_cwt:form.pb.CWT?Number(form.pb.CWT):null, pb_sta:form.pb.STA||null, pb_dyn:form.pb.DYN?Number(form.pb.DYN):null,
+      coach_id: user.id, // link to current coach!
     }).select().single();
-
-    if (!clientError && clientData) {
-      // 3. Create profile linking user to client
+    if (!clientError&&clientData) {
       if (authData?.user) {
-        await supabase.from("profiles").insert({ id:authData.user.id, email:form.email, role:"client", client_id:clientData.id });
+        await supabase.from("profiles").insert({id:authData.user.id, email:form.email, role:"client", client_id:clientData.id});
       }
       setClients(prev=>[...prev, dbToClient(clientData)]);
       setAddClientModal(false);
       flash(`Client added! They can log in with ${form.email}`);
+    }
+  }
+
+  // ── Add Coach (admin only) ──
+  async function handleAddCoach(form) {
+    const {data:authData, error} = await supabase.auth.signUp({email:form.email, password:form.password});
+    if (!error&&authData?.user) {
+      await supabase.from("profiles").insert({id:authData.user.id, email:form.email, role:"coach"});
+      setAddCoachModal(false);
+      flash(`Coach account created for ${form.email}!`);
     }
   }
 
@@ -410,7 +444,6 @@ export default function ApneaCoach() {
     setActiveClient(null); setView("dashboard");
   }
 
-  // ── Session CRUD ──
   async function handleAssignSave({method,plan}) {
     const {data,error} = await supabase.from("sessions").insert({
       client_id:activeClient.id, date:assignModal, method,
@@ -438,8 +471,8 @@ export default function ApneaCoach() {
 
   const weekDates = DAYS.map((_,i)=>addDays(weekStart,i));
   const isCoach = profile?.role==="coach";
+  const isAdmin = user?.email===ADMIN_EMAIL;
 
-  // ── Render ────────────────────────────────────────────────────────────────
   if (loading) return <Spinner />;
   if (!user)   return <LoginScreen />;
 
@@ -467,6 +500,7 @@ export default function ApneaCoach() {
             <div style={{fontSize:12,color:"#aaa",fontWeight:500}}>{user.email}</div>
             {isCoach&&activeClient&&view!=="dashboard"&&<button onClick={()=>{setActiveClient(null);setView("dashboard");}} style={{background:"transparent",border:"1.5px solid #ddd",color:"#666",padding:"8px 14px",borderRadius:8,fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>← All Clients</button>}
             {isCoach&&<button onClick={()=>setAddClientModal(true)} style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"10px 18px",borderRadius:8,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>+ Add Client</button>}
+            {isAdmin&&<button onClick={()=>setAddCoachModal(true)} style={{background:"#3a8ef4",color:"#fff",border:"none",padding:"10px 18px",borderRadius:8,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>+ Add Coach</button>}
             <button onClick={handleSignOut} style={{background:"transparent",border:"1.5px solid #ddd",color:"#666",padding:"8px 14px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Sign Out</button>
           </div>
         </div>
@@ -474,11 +508,11 @@ export default function ApneaCoach() {
 
       <div style={{maxWidth:1040,margin:"0 auto",padding:"28px 24px"}}>
 
-        {/* DASHBOARD (coach only) */}
+        {/* DASHBOARD */}
         {view==="dashboard"&&isCoach&&(
           <div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,marginBottom:24}}>
-              {[["Clients",clients.length],["Sessions Planned",sessions.length],["Best Depth",Math.max(0,...sessions.map(s=>Number(s.feedback?.actualDepth)).filter(Boolean))||"—"]].map(([l,v])=>(
+              {[["My Clients",clients.length],["Sessions Planned",sessions.length],["Best Depth",Math.max(0,...sessions.map(s=>Number(s.feedback?.actualDepth)).filter(Boolean))||"—"]].map(([l,v])=>(
                 <div key={l} style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:"20px 24px"}}>
                   <div style={{fontSize:28,fontWeight:700,fontFamily:"monospace"}}>{v}</div>
                   <div style={{fontSize:12,color:"#999",marginTop:4,fontWeight:500}}>{l}</div>
@@ -490,7 +524,7 @@ export default function ApneaCoach() {
               {METHODS.map(m=><div key={m.key} style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:9,height:9,borderRadius:"50%",background:m.dot}}/><span style={{fontSize:12,fontWeight:500,color:"#555"}}>{m.emoji} {m.label}</span></div>)}
             </div>
             <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:12}}>Your Clients</div>
-            {clients.length===0&&<div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:40,textAlign:"center",color:"#bbb",fontSize:14}}>No clients yet. Add your first client to get started.</div>}
+            {clients.length===0&&<div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:40,textAlign:"center",color:"#bbb",fontSize:14}}>No clients yet. Click "+ Add Client" to get started.</div>}
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {clients.map(c=>{
                 const cs=sessions.filter(s=>s.clientId===c.id);
@@ -547,7 +581,7 @@ export default function ApneaCoach() {
           </div>
         )}
 
-        {/* CLIENT WEEK (both coach preview and actual client) */}
+        {/* CLIENT WEEK */}
         {view==="clientWeek"&&activeClient&&(
           <div>
             <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:22}}>
@@ -602,6 +636,7 @@ export default function ApneaCoach() {
       {assignModal&&activeClient&&<AssignModal date={assignModal} clientName={activeClient.name} onClose={()=>setAssignModal(null)} onSave={handleAssignSave}/>}
       {dayModal&&<DayModal session={sessions.find(s=>s.id===dayModal.session.id)||dayModal.session} role={dayModal.role} onClose={()=>setDayModal(null)} onSave={fb=>handleFeedbackSave(dayModal.session.id,fb)}/>}
       {addClientModal&&<AddClientModal onClose={()=>setAddClientModal(false)} onSave={handleAddClient}/>}
+      {addCoachModal&&<AddCoachModal onClose={()=>setAddCoachModal(false)} onSave={handleAddCoach}/>}
       {toast&&<div style={{position:"fixed",bottom:24,right:24,background:"#1a1a1a",color:"#fff",padding:"12px 20px",borderRadius:10,fontSize:13,fontWeight:500,zIndex:999,animation:"fi .2s"}}>✓ {toast}<style>{`@keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style></div>}
     </div>
   );
