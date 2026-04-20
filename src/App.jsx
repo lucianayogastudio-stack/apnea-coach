@@ -590,6 +590,7 @@ export default function ApneaCoach() {
   const [addCoachModal,  setAddCoachModal]  = useState(false);
   const [clipboard,      setClipboard]      = useState(null); // copied session plan
   const [pasteModal,     setPasteModal]     = useState(null); // {date, clientId}
+  const [adminData,      setAdminData]      = useState(null); // {coaches, allClients}
 
   function flash(msg) { setToast(msg); setTimeout(()=>setToast(""),2400); }
 
@@ -611,6 +612,7 @@ export default function ApneaCoach() {
     const {data} = await supabase.from("profiles").select("*").eq("id",u.id).single();
     setProfile(data);
     await loadAll(data, u);
+    if (u.email === ADMIN_EMAIL) await loadAdminData();
     setLoading(false);
   }
 
@@ -635,6 +637,13 @@ export default function ApneaCoach() {
       if (cr) { setClients([dbToClient(cr)]); setActiveClient(dbToClient(cr)); setView("clientWeek"); }
       setSessions((sr||[]).map(dbToSession));
     }
+  }
+
+  // ── Admin: load all coaches + their clients ──
+  async function loadAdminData() {
+    const { data: profiles } = await supabase.from("profiles").select("*").eq("role","coach");
+    const { data: allClients } = await supabase.from("clients").select("*").order("created_at");
+    setAdminData({ coaches: profiles||[], allClients: allClients||[] });
   }
 
   async function handleSignOut() {
@@ -768,7 +777,11 @@ export default function ApneaCoach() {
             </div>
             {isCoach&&(
               <div style={{display:"flex",gap:2}}>
-                {[{key:"dashboard",label:"📋 Dashboard"},...(activeClient?[{key:"coachWeek",label:`📅 ${activeClient.name.split(" ")[0]}'s Week`},{key:"clientWeek",label:"🏊 Client View"}]:[])].map(t=>(
+                {[
+                  {key:"dashboard",label:"📋 Dashboard"},
+                  ...(isAdmin?[{key:"adminView",label:"👑 Admin"}]:[]),
+                  ...(activeClient?[{key:"coachWeek",label:`📅 ${activeClient.name.split(" ")[0]}'s Week`},{key:"clientWeek",label:"🏊 Client View"}]:[])
+                ].map(t=>(
                   <button key={t.key} onClick={()=>setView(t.key)} style={{padding:"8px 15px",borderRadius:8,border:"none",fontSize:13,cursor:"pointer",fontFamily:"inherit",transition:"all .15s",background:view===t.key?"#f0f0ec":"transparent",color:view===t.key?"#1a1a1a":"#888",fontWeight:view===t.key?600:500}}>{t.label}</button>
                 ))}
               </div>
@@ -829,6 +842,91 @@ export default function ApneaCoach() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* ADMIN VIEW */}
+        {view==="adminView"&&isAdmin&&(
+          <div>
+            <div style={{marginBottom:24}}>
+              <div style={{fontWeight:700,fontSize:20,letterSpacing:"-.02em",marginBottom:4}}>Admin Dashboard</div>
+              <div style={{fontSize:13,color:"#999"}}>All coaches and their clients on the platform</div>
+            </div>
+
+            {/* Platform stats */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,marginBottom:28}}>
+              {[
+                ["Total Coaches", adminData?.coaches?.length||0],
+                ["Total Clients", adminData?.allClients?.length||0],
+                ["Platform Sessions", sessions.length],
+              ].map(([l,v])=>(
+                <div key={l} style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:"20px 24px"}}>
+                  <div style={{fontSize:28,fontWeight:700,fontFamily:"monospace"}}>{v}</div>
+                  <div style={{fontSize:12,color:"#999",marginTop:4,fontWeight:500}}>{l}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Coaches list */}
+            <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:12}}>Coaches</div>
+            {!adminData&&<div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:40,textAlign:"center",color:"#bbb",fontSize:14}}>Loading...</div>}
+            {adminData&&adminData.coaches.length===0&&<div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:40,textAlign:"center",color:"#bbb",fontSize:14}}>No coaches yet.</div>}
+            <div style={{display:"flex",flexDirection:"column",gap:14}}>
+              {adminData&&adminData.coaches.map(coach=>{
+                const coachClients = adminData.allClients.filter(c=>c.coach_id===coach.id);
+                const isMe = coach.email===ADMIN_EMAIL;
+                return (
+                  <div key={coach.id} style={{background:"#fff",borderRadius:12,border:`1px solid ${isMe?"#ddd":"#ebebeb"}`,overflow:"hidden"}}>
+                    {/* Coach header */}
+                    <div style={{padding:"16px 20px",display:"flex",alignItems:"center",gap:14,borderBottom:coachClients.length>0?"1px solid #f5f5f5":"none",background:isMe?"#f8f8f6":"#fff"}}>
+                      <div style={{width:40,height:40,borderRadius:"50%",background:isMe?"#1a1a1a":"#f0f0ec",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:16,color:isMe?"#fff":"#555"}}>
+                        {coach.email.charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{flex:1}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <div style={{fontWeight:600,fontSize:15,color:"#1a1a1a"}}>{coach.email}</div>
+                          {isMe&&<span style={{background:"#1a1a1a",color:"#fff",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,letterSpacing:".04em"}}>YOU</span>}
+                        </div>
+                        <div style={{fontSize:12,color:"#999",marginTop:2}}>{coachClients.length} client{coachClients.length!==1?"s":""}</div>
+                      </div>
+                      <div style={{fontSize:11,color:"#bbb",fontWeight:600,textTransform:"uppercase",letterSpacing:".05em"}}>Coach</div>
+                    </div>
+                    {/* Coach's clients */}
+                    {coachClients.length>0&&(
+                      <div style={{padding:"8px 0"}}>
+                        {coachClients.map(c=>(
+                          <div key={c.id} style={{padding:"10px 20px 10px 60px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid #f9f9f9"}}>
+                            <div style={{display:"flex",alignItems:"center",gap:10}}>
+                              <div style={{width:28,height:28,borderRadius:"50%",background:"#f0f0ec",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:12,color:"#555"}}>{c.name.charAt(0)}</div>
+                              <div>
+                                <div style={{fontWeight:500,fontSize:13,color:"#1a1a1a"}}>{c.name}</div>
+                                <div style={{fontSize:11,color:"#bbb"}}>{c.level} · {c.goal}</div>
+                              </div>
+                            </div>
+                            <div style={{display:"flex",gap:16}}>
+                              <div style={{textAlign:"right"}}>
+                                <div style={{fontSize:10,color:"#ccc",fontWeight:600,textTransform:"uppercase"}}>Age</div>
+                                <div style={{fontSize:13,fontWeight:600,color:"#555"}}>{c.age||"—"}</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {coachClients.length===0&&(
+                      <div style={{padding:"12px 20px 12px 60px",fontSize:12,color:"#ccc",fontStyle:"italic"}}>No clients yet</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Refresh button */}
+            <div style={{marginTop:20,textAlign:"center"}}>
+              <button onClick={loadAdminData} style={{background:"transparent",border:"1.5px solid #ddd",color:"#666",padding:"9px 20px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+                🔄 Refresh Data
+              </button>
             </div>
           </div>
         )}
