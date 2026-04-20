@@ -538,6 +538,88 @@ function AddCoachModal({ onClose, onSave }) {
   );
 }
 
+// ── Timeline helper components ───────────────────────────────────────────────
+function TimelineBadge({ client }) {
+  const tl = getTimeline(client);
+  if (!tl) return null;
+  return (
+    <div style={{fontSize:12,fontWeight:600,marginTop:4,color:tl.isPast?"#ef5350":tl.type==="competition"?"#3a8ef4":"#4caf50"}}>
+      {tl.isPast ? `${tl.label} ended`
+        : tl.type==="competition" ? `🏆 Week ${tl.currentWeek}${tl.totalWeeks?` of ${tl.totalWeeks}`:""} · ${tl.daysLeft}d to ${tl.label}`
+        : `📆 Week ${tl.currentWeek} of ${tl.totalWeeks} · ${tl.weeksLeft} week${tl.weeksLeft!==1?"s":""} remaining`}
+    </div>
+  );
+}
+
+function TimelineBadgeClient({ client }) {
+  const tl = getTimeline(client);
+  if (!tl || tl.isPast) return null;
+  return (
+    <div style={{marginTop:6,display:"inline-flex",alignItems:"center",gap:8,background:tl.type==="competition"?"#e8f0ff":"#e8f5e9",borderRadius:8,padding:"5px 12px"}}>
+      <span style={{fontSize:12,fontWeight:700,color:tl.type==="competition"?"#1a2fa3":"#2e7d32"}}>
+        {tl.type==="competition" ? `🏆 ${tl.daysLeft} days to ${tl.label}` : `📆 Week ${tl.currentWeek} of ${tl.totalWeeks}`}
+      </span>
+    </div>
+  );
+}
+
+function ClientCard({ client, done, pending, sessions, onClick }) {
+  const tl = getTimeline(client);
+  return (
+    <div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",overflow:"hidden",cursor:"pointer",transition:"box-shadow .15s"}}
+      onClick={onClick}
+      onMouseEnter={e=>e.currentTarget.style.boxShadow="0 2px 12px rgba(0,0,0,.07)"}
+      onMouseLeave={e=>e.currentTarget.style.boxShadow="none"}>
+      {tl && (
+        <div style={{height:4,background:"#f0f0f0",overflow:"hidden"}}>
+          <div style={{height:"100%",width:`${tl.progress||0}%`,background:tl.isPast?"#ef5350":tl.type==="competition"?"#3a8ef4":"#4caf50",transition:"width .3s"}}/>
+        </div>
+      )}
+      <div style={{padding:"16px 22px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          <div style={{width:42,height:42,borderRadius:"50%",background:"#f0f0ec",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:17,color:"#555"}}>{client.name.charAt(0)}</div>
+          <div>
+            <div style={{fontWeight:600,fontSize:15}}>{client.name}</div>
+            <div style={{fontSize:12,color:"#999",marginTop:2}}>{client.level} · {client.goal}</div>
+            {tl && (
+              <div style={{fontSize:11,marginTop:4,fontWeight:600,color:tl.isPast?"#ef5350":tl.type==="competition"?"#3a8ef4":"#4caf50"}}>
+                {tl.isPast ? `${tl.label} — ended`
+                  : tl.type==="competition" ? `🏆 ${tl.label} · ${tl.daysLeft}d left (Week ${tl.currentWeek}${tl.totalWeeks?` of ${tl.totalWeeks}`:""})`
+                  : `📆 Week ${tl.currentWeek} of ${tl.totalWeeks} · ${tl.weeksLeft}w left`}
+              </div>
+            )}
+            <div style={{display:"flex",gap:4,marginTop:5}}>{sessions.slice(0,8).map(s=>{const m=gm(s.method);return<div key={s.id} title={m.label} style={{width:9,height:9,borderRadius:"50%",background:m.dot}}/>;})}</div>
+          </div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:24}}>
+          <div style={{textAlign:"center"}}><div style={{fontSize:11,color:"#bbb",fontWeight:600}}>DONE</div><div style={{fontWeight:700,fontFamily:"monospace",color:"#2e7d32",fontSize:18}}>{done}</div></div>
+          <div style={{textAlign:"center"}}><div style={{fontSize:11,color:"#bbb",fontWeight:600}}>PENDING</div><div style={{fontWeight:700,fontFamily:"monospace",color:"#aaa",fontSize:18}}>{pending}</div></div>
+          <span style={{color:"#ccc",fontSize:18}}>›</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Edit Session Modal ───────────────────────────────────────────────────────
+function EditSessionModal({ session, onClose, onSave, onSaveText }) {
+  const m = gm(session.method);
+  const isGymEdit    = session.method==="gym-strength";
+  const isStaticEdit = session.method==="static";
+  return (
+    <Modal onClose={onClose} wide>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+        <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`}}>{m.emoji} {m.label}</span>
+        <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>Edit Plan</span>
+      </div>
+      <div style={{fontWeight:700,fontSize:18,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
+      {isStaticEdit && <StaticBuilder isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
+      {isGymEdit    && <GymStrengthBuilder isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
+      {!isStaticEdit && !isGymEdit && <EditPlanForm session={session} onSave={plan=>onSaveText(session,plan)} onClose={onClose} />}
+    </Modal>
+  );
+}
+
 // ── Edit Plan Form (for depth/pool/cardio text-based sessions) ───────────────
 function EditPlanForm({ session, onSave, onClose }) {
   const isDepth = session.method==="depth";
@@ -930,43 +1012,7 @@ export default function ApneaCoach() {
                 const done=cs.filter(s=>s.feedback?.status==="completed").length;
                 const pending=cs.filter(s=>!s.feedback?.status).length;
                 return(
-                  {(()=>{
-                    const tl = getTimeline(c);
-                    return (
-                      <div key={c.id} style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",overflow:"hidden",cursor:"pointer",transition:"box-shadow .15s"}}
-                        onClick={()=>{setActiveClient(c);setView("coachWeek");}}
-                        onMouseEnter={e=>e.currentTarget.style.boxShadow="0 2px 12px rgba(0,0,0,.07)"}
-                        onMouseLeave={e=>e.currentTarget.style.boxShadow="none"}>
-                        {tl&&(
-                          <div style={{height:4,background:"#f0f0f0",overflow:"hidden"}}>
-                            <div style={{height:"100%",width:`${tl.progress||0}%`,background:tl.isPast?"#ef5350":tl.type==="competition"?"#3a8ef4":"#4caf50",transition:"width .3s"}}/>
-                          </div>
-                        )}
-                        <div style={{padding:"16px 22px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                          <div style={{display:"flex",alignItems:"center",gap:14}}>
-                            <div style={{width:42,height:42,borderRadius:"50%",background:"#f0f0ec",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:17,color:"#555"}}>{c.name.charAt(0)}</div>
-                            <div>
-                              <div style={{fontWeight:600,fontSize:15}}>{c.name}</div>
-                              <div style={{fontSize:12,color:"#999",marginTop:2}}>{c.level} · {c.goal}</div>
-                              {tl&&(
-                                <div style={{fontSize:11,marginTop:4,fontWeight:600,color:tl.isPast?"#ef5350":tl.type==="competition"?"#3a8ef4":"#4caf50"}}>
-                                  {tl.isPast ? `${tl.label} — ended` :
-                                   tl.type==="competition" ? `🏆 ${tl.label} · ${tl.daysLeft}d left (Week ${tl.currentWeek}${tl.totalWeeks?` of ${tl.totalWeeks}`:""})`  :
-                                   `📆 Week ${tl.currentWeek} of ${tl.totalWeeks} · ${tl.weeksLeft}w left`}
-                                </div>
-                              )}
-                              <div style={{display:"flex",gap:4,marginTop:5}}>{cs.slice(0,8).map(s=>{const m=gm(s.method);return<div key={s.id} title={m.label} style={{width:9,height:9,borderRadius:"50%",background:m.dot}}/>;})}</div>
-                            </div>
-                          </div>
-                          <div style={{display:"flex",alignItems:"center",gap:24}}>
-                            <div style={{textAlign:"center"}}><div style={{fontSize:11,color:"#bbb",fontWeight:600}}>DONE</div><div style={{fontWeight:700,fontFamily:"monospace",color:"#2e7d32",fontSize:18}}>{done}</div></div>
-                            <div style={{textAlign:"center"}}><div style={{fontSize:11,color:"#bbb",fontWeight:600}}>PENDING</div><div style={{fontWeight:700,fontFamily:"monospace",color:"#aaa",fontSize:18}}>{pending}</div></div>
-                            <span style={{color:"#ccc",fontSize:18}}>›</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  <ClientCard key={c.id} client={c} done={done} pending={pending} sessions={cs} onClick={()=>{setActiveClient(c);setView("coachWeek");}} />
                 );
               })}
             </div>
@@ -1066,11 +1112,7 @@ export default function ApneaCoach() {
                 <div style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".07em",textTransform:"uppercase",marginBottom:4}}>Coach View</div>
                 <div style={{fontWeight:700,fontSize:20,letterSpacing:"-.02em"}}>{activeClient.name}</div>
                 <div style={{fontSize:13,color:"#999",marginTop:3}}>{fmtShort(weekStart)} – {fmtShort(addDays(weekStart,6))}</div>
-                {(()=>{const tl=getTimeline(activeClient); return tl?(
-                  <div style={{fontSize:12,fontWeight:600,marginTop:4,color:tl.isPast?"#ef5350":tl.type==="competition"?"#3a8ef4":"#4caf50"}}>
-                    {tl.isPast?`${tl.label} ended`:tl.type==="competition"?`🏆 Week ${tl.currentWeek}${tl.totalWeeks?` of ${tl.totalWeeks}`:""}  ·  ${tl.daysLeft}d to ${tl.label}`:`📆 Week ${tl.currentWeek} of ${tl.totalWeeks}  ·  ${tl.weeksLeft} week${tl.weeksLeft!==1?"s":""} remaining`}
-                  </div>
-                ):null;})()}
+                <TimelineBadge client={activeClient} />
               </div>
               <div style={{display:"flex",gap:8}}>
                 {[["‹ Prev",()=>setWeekStart(addDays(weekStart,-7))],["Today",()=>setWeekStart(mondayOf(new Date()))],["Next ›",()=>setWeekStart(addDays(weekStart,7))]].map(([l,fn])=>(
@@ -1120,13 +1162,7 @@ export default function ApneaCoach() {
                 <div style={{fontSize:11,fontWeight:700,color:"#3a8ef4",letterSpacing:".07em",textTransform:"uppercase",marginBottom:4}}>Athlete View</div>
                 <div style={{fontWeight:700,fontSize:20,letterSpacing:"-.02em"}}>{activeClient.name}</div>
                 <div style={{fontSize:13,color:"#999",marginTop:3}}>{fmtShort(weekStart)} – {fmtShort(addDays(weekStart,6))}</div>
-                {(()=>{const tl=getTimeline(activeClient); return tl&&!tl.isPast?(
-                  <div style={{marginTop:6,display:"inline-flex",alignItems:"center",gap:8,background:tl.type==="competition"?"#e8f0ff":"#e8f5e9",borderRadius:8,padding:"5px 12px"}}>
-                    <span style={{fontSize:12,fontWeight:700,color:tl.type==="competition"?"#1a2fa3":"#2e7d32"}}>
-                      {tl.type==="competition"?`🏆 ${tl.daysLeft} days to ${tl.label}`:`📆 Week ${tl.currentWeek} of ${tl.totalWeeks}`}
-                    </span>
-                  </div>
-                ):null;})()}
+                <TimelineBadgeClient client={activeClient} />
               </div>
               <div style={{display:"flex",gap:8}}>
                 {[["‹ Prev",()=>setWeekStart(addDays(weekStart,-7))],["Today",()=>setWeekStart(mondayOf(new Date()))],["Next ›",()=>setWeekStart(addDays(weekStart,7))]].map(([l,fn])=>(
@@ -1191,31 +1227,18 @@ export default function ApneaCoach() {
           isEditing={true}
         />
       )}
-      {editModal&&(()=>{
-        const s = sessions.find(x=>x.id===editModal.id)||editModal;
-        const m = gm(s.method);
-        const isGymEdit = s.method==="gym-strength";
-        const isStaticEdit = s.method==="static";
-        return (
-          <Modal onClose={()=>setEditModal(null)} wide>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
-              <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`}}>{m.emoji} {m.label}</span>
-              <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>Edit Plan</span>
-            </div>
-            <div style={{fontWeight:700,fontSize:18,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(s.date)}</div>
-            {isStaticEdit&&<StaticBuilder isClient={false} initialData={s.plan?.gymData||null} onSave={async data=>{await handleEditSave(s.id,data);}} />}
-            {isGymEdit&&<GymStrengthBuilder isClient={false} initialData={s.plan?.gymData||null} onSave={async data=>{await handleEditSave(s.id,data);}} />}
-            {!isStaticEdit&&!isGymEdit&&<EditPlanForm session={s} onSave={async plan=>{
-              const mainSetValue=(s.method==="depth"||!plan.gymData)?plan.mainSet||null:JSON.stringify(plan.gymData);
-              const {error}=await supabase.from("sessions").update({
-                plan_warmup:plan.warmup||null, plan_mainset:mainSetValue, plan_cooldown:plan.cooldown||null,
-                plan_target_depth:plan.targetDepth||null, plan_open_line:plan.openLine||false, plan_coach_notes:plan.coachNotes||null,
-              }).eq("id",s.id);
-              if(!error){setSessions(prev=>prev.map(x=>x.id===s.id?{...x,plan:{...x.plan,...plan}}:x));setEditModal(null);flash("Plan updated!");}
-            }} onClose={()=>setEditModal(null)} />}
-          </Modal>
-        );
-      })()}
+      {editModal&&<EditSessionModal
+        session={sessions.find(x=>x.id===editModal.id)||editModal}
+        onClose={()=>setEditModal(null)}
+        onSave={handleEditSave}
+        onSaveText={async (s,plan)=>{
+          const {error}=await supabase.from("sessions").update({
+            plan_warmup:plan.warmup||null, plan_mainset:plan.mainSet||null, plan_cooldown:plan.cooldown||null,
+            plan_target_depth:plan.targetDepth||null, plan_open_line:plan.openLine||false, plan_coach_notes:plan.coachNotes||null,
+          }).eq("id",s.id);
+          if(!error){setSessions(prev=>prev.map(x=>x.id===s.id?{...x,plan:{...x.plan,...plan}}:x));setEditModal(null);flash("Plan updated!");}
+        }}
+      />}
       {addClientModal&&<AddClientModal onClose={()=>setAddClientModal(false)} onSave={handleAddClient}/>}
       {addCoachModal&&<AddCoachModal onClose={()=>setAddCoachModal(false)} onSave={handleAddCoach}/>}
       {toast&&<div style={{position:"fixed",bottom:24,right:24,background:"#1a1a1a",color:"#fff",padding:"12px 20px",borderRadius:10,fontSize:13,fontWeight:500,zIndex:999,animation:"fi .2s"}}>✓ {toast}<style>{`@keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style></div>}
