@@ -1,11 +1,13 @@
 import { useState } from "react";
 
 const DISCIPLINES = [
-  { key:"DNF",  label:"DNF",  color:"#005fa3", bg:"#e6f4ff", border:"#6ab0f4" },
-  { key:"DYN",  label:"DYN",  color:"#2d7a2d", bg:"#edf6e6", border:"#7ec87e" },
-  { key:"DYNB", label:"DYNB", color:"#7a6200", bg:"#fffbe6", border:"#e8cc4d" },
-  { key:"STA",  label:"STA",  color:"#8b1f7a", bg:"#fdf0fb", border:"#d97ec8" },
-  { key:"MIX",  label:"Mixed",color:"#555",    bg:"#f5f4f0", border:"#ccc"    },
+  { key:"DNF",         label:"DNF",         color:"#005fa3", bg:"#e6f4ff", border:"#6ab0f4" },
+  { key:"DYN",         label:"DYN",         color:"#2d7a2d", bg:"#edf6e6", border:"#7ec87e" },
+  { key:"DYNB",        label:"DYNB",        color:"#7a6200", bg:"#fffbe6", border:"#e8cc4d" },
+  { key:"STA",         label:"STA",         color:"#8b1f7a", bg:"#fdf0fb", border:"#d97ec8" },
+  { key:"freestyle",   label:"Freestyle",   color:"#1a2fa3", bg:"#eef0ff", border:"#9aa5f4" },
+  { key:"breaststroke",label:"Breaststroke",color:"#6a1b9a", bg:"#f3e5f5", border:"#ce93d8" },
+  { key:"MIX",         label:"Mixed",       color:"#555",    bg:"#f5f4f0", border:"#ccc"    },
 ];
 
 const EQUIPMENT_OPTIONS = [
@@ -37,6 +39,7 @@ function makeExercise() {
     reps: "",
     description: "",
     videoUrl: "",
+    lungVolume: "Full",
     log: { done:false, feeling:"", observations:"" },
   };
 }
@@ -102,6 +105,18 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
           </div>
         )}
 
+        {/* Lung volume */}
+        {isClient ? (
+          exercise.lungVolume && exercise.lungVolume !== "Full" ? (
+            <span style={{ padding:"3px 9px", borderRadius:7, fontSize:11, fontWeight:700, background:"#e8f0ff", color:"#1a2fa3", border:"1.5px solid #6a7ef4" }}>{exercise.lungVolume}</span>
+          ) : null
+        ) : (
+          <select value={exercise.lungVolume || "Full"} onChange={e => upd("lungVolume", e.target.value)}
+            style={{ padding:"5px 8px", border:"1.5px solid #e0e0e0", borderRadius:8, fontSize:12, fontWeight:600, fontFamily:"inherit", outline:"none", background:"#fff", color:"#555", cursor:"pointer", flexShrink:0 }}>
+            {["Full","FRC","RV"].map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+        )}
+
         <div style={{ flex:1 }} />
 
         <div style={{ display:"flex", gap:6, alignItems:"center" }}>
@@ -122,7 +137,7 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
             Video
           </button>
           {!isClient && (
-            <button onClick={onRemove} style={{ padding:"5px 9px", borderRadius:7, border:"1.5px solid #e8c5c5", background:"transparent", fontSize:11, cursor:"pointer", color:"#c0392b", fontFamily:"inherit" }}>x</button>
+            <button onClick={onRemove} style={{ padding:"5px 9px", borderRadius:7, border:"1.5px solid #e8c5c5", background:"transparent",color:"#1a1a1a", fontSize:11, cursor:"pointer", color:"#c0392b", fontFamily:"inherit" }}>x</button>
           )}
         </div>
       </div>
@@ -136,7 +151,7 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
         ) : (
           <textarea value={exercise.description} onChange={e => upd("description", e.target.value)}
             placeholder={"Describe the exercise — technique cues, focus points...\ne.g. Keep the shoulders raised, core short and legs long. Rock back and forth."}
-            style={{ width:"100%", padding:"8px 0", border:"none", outline:"none", fontSize:14, fontFamily:"inherit", resize:"vertical", minHeight:72, color:"#333", background:"transparent", lineHeight:1.7 }} />
+            style={{ width:"100%", padding:"8px 0", border:"none", outline:"none", fontSize:14, fontFamily:"inherit", resize:"vertical", minHeight:72, color:"#333", background:"transparent",color:"#1a1a1a", lineHeight:1.7 }} />
         )}
       </div>
 
@@ -152,7 +167,7 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
               style={{ background:"#f4803a", color:"#fff", border:"none", borderRadius:7, padding:"7px 14px", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>Save</button>
             {exercise.videoUrl && (
               <button onClick={() => { setVideoInput(""); upd("videoUrl", ""); setEditVideo(false); }}
-                style={{ background:"transparent", border:"1.5px solid #e8c5c5", borderRadius:7, padding:"7px 10px", fontSize:12, cursor:"pointer", color:"#c0392b", fontFamily:"inherit" }}>Remove</button>
+                style={{ background:"transparent",color:"#1a1a1a", border:"1.5px solid #e8c5c5", borderRadius:7, padding:"7px 10px", fontSize:12, cursor:"pointer", color:"#c0392b", fontFamily:"inherit" }}>Remove</button>
             )}
           </div>
           {videoInput && getVideoEmbed(videoInput) && getVideoEmbed(videoInput).type === "youtube" && <div style={{ marginTop:5, fontSize:11, color:"#4caf50" }}>YouTube detected</div>}
@@ -170,7 +185,7 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
           )}
           {videoInfo && videoInfo.type === "link" && (
             <a href={videoInfo.url} target="_blank" rel="noopener noreferrer"
-              style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"8px 14px", background:"#f0f0ec", borderRadius:8, fontSize:13, color:"#1a1a1a", textDecoration:"none", fontWeight:500 }}>
+              style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"8px 14px", background:"#f0f0ec",color:"#1a1a1a", borderRadius:8, fontSize:13, color:"#1a1a1a", textDecoration:"none", fontWeight:500 }}>
               Watch technique video
             </a>
           )}
@@ -189,7 +204,7 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
 
       {/* Client log */}
       {isClient && showLog && (
-        <div style={{ padding:"12px 16px", background:"#fafaf8" }}>
+        <div style={{ padding:"12px 16px", background:"#fafaf8",color:"#1a1a1a" }}>
           <div style={{ fontSize:10, fontWeight:800, letterSpacing:".07em", textTransform:"uppercase", color:"#aaa", marginBottom:10 }}>Your Log</div>
           <div style={{ marginBottom:10 }}>
             <div style={{ fontSize:12, fontWeight:600, color:"#555", marginBottom:5 }}>How did it feel?</div>
@@ -292,7 +307,7 @@ export default function PoolTechniqueBuilder({ initialData, onSave, isClient }) 
           <div style={{ fontWeight:700, fontSize:17 }}>{sessionName || "Pool Technique Session"}</div>
         ) : (
           <input value={sessionName} onChange={e => setSessionName(e.target.value)}
-            style={{ fontWeight:700, fontSize:17, border:"none", borderBottom:"2px solid #f0f0f0", outline:"none", fontFamily:"inherit", color:"#1a1a1a", background:"transparent", width:"100%", paddingBottom:6 }}
+            style={{ fontWeight:700, fontSize:17, border:"none", borderBottom:"2px solid #f0f0f0", outline:"none", fontFamily:"inherit", color:"#1a1a1a", background:"transparent",color:"#1a1a1a", width:"100%", paddingBottom:6 }}
             placeholder="Session name (e.g. DNF Technique — Dolphin Kick Focus)..." />
         )}
         <div style={{ fontSize:12, color:"#aaa", marginTop:5, display:"flex", gap:16 }}>
@@ -304,13 +319,13 @@ export default function PoolTechniqueBuilder({ initialData, onSave, isClient }) 
 
       {/* Progress bar */}
       {isClient && totalCount > 0 && (
-        <div style={{ height:5, background:"#f0f0f0", borderRadius:3, marginBottom:16, overflow:"hidden" }}>
+        <div style={{ height:5, background:"#f0f0f0",color:"#1a1a1a", borderRadius:3, marginBottom:16, overflow:"hidden" }}>
           <div style={{ height:"100%", width:progress + "%", background:"#4caf50", borderRadius:3, transition:"width .3s" }} />
         </div>
       )}
 
       {/* Equipment */}
-      <div style={{ background:"#f8f8f6", borderRadius:10, padding:"14px 16px", marginBottom:16 }}>
+      <div style={{ background:"#f8f8f6",color:"#1a1a1a", borderRadius:10, padding:"14px 16px", marginBottom:16 }}>
         <EquipmentSelector selected={equipment} onChange={setEquipment} isClient={isClient} />
       </div>
 
@@ -332,12 +347,12 @@ export default function PoolTechniqueBuilder({ initialData, onSave, isClient }) 
 
       {/* Empty state */}
       {exercises.length === 0 && !isClient && (
-        <div style={{ background:"#fafaf8", border:"1.5px dashed #ddd", borderRadius:12, padding:"24px", textAlign:"center", color:"#bbb", fontSize:13, marginBottom:14 }}>
+        <div style={{ background:"#fafaf8",color:"#1a1a1a", border:"1.5px dashed #ddd", borderRadius:12, padding:"24px", textAlign:"center", color:"#bbb", fontSize:13, marginBottom:14 }}>
           No exercises yet — click "+ Add Exercise" to build the session
         </div>
       )}
       {exercises.length === 0 && isClient && (
-        <div style={{ background:"#fafaf8", borderRadius:12, padding:"24px", textAlign:"center", color:"#bbb", fontSize:13, marginBottom:14 }}>
+        <div style={{ background:"#fafaf8",color:"#1a1a1a", borderRadius:12, padding:"24px", textAlign:"center", color:"#bbb", fontSize:13, marginBottom:14 }}>
           No exercises planned yet.
         </div>
       )}
@@ -352,7 +367,7 @@ export default function PoolTechniqueBuilder({ initialData, onSave, isClient }) 
       {/* Add exercise button */}
       {!isClient && (
         <button onClick={addExercise}
-          style={{ background:"#f0f0ec", border:"none", borderRadius:10, padding:"11px", fontSize:13, fontWeight:600, color:"#555", cursor:"pointer", fontFamily:"inherit", width:"100%", marginBottom:14, transition:"all .15s" }}
+          style={{ background:"#f0f0ec",color:"#1a1a1a", border:"none", borderRadius:10, padding:"11px", fontSize:13, fontWeight:600, color:"#555", cursor:"pointer", fontFamily:"inherit", width:"100%", marginBottom:14, transition:"all .15s" }}
           onMouseEnter={e => e.currentTarget.style.background = "#e8e8e4"}
           onMouseLeave={e => e.currentTarget.style.background = "#f0f0ec"}>
           + Add Exercise
@@ -362,7 +377,7 @@ export default function PoolTechniqueBuilder({ initialData, onSave, isClient }) 
       {/* Client rating */}
       {isClient && (
         <>
-          <div style={{ background:"#f8f8f6", borderRadius:10, padding:"14px", marginTop:8, textAlign:"center" }}>
+          <div style={{ background:"#f8f8f6",color:"#1a1a1a", borderRadius:10, padding:"14px", marginTop:8, textAlign:"center" }}>
             <div style={{ fontSize:11, fontWeight:700, color:"#aaa", letterSpacing:".06em", textTransform:"uppercase", marginBottom:10 }}>Rate this session</div>
             <div style={{ display:"flex", justifyContent:"center", gap:8 }}>
               {[1, 2, 3, 4, 5].map(n => (
