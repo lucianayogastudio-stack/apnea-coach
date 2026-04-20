@@ -3,11 +3,12 @@ import { supabase } from "./supabase";
 import GymStrengthBuilder from "./GymStrengthBuilder";
 import StaticBuilder from "./StaticBuilder";
 import PoolTechniqueBuilder from "./PoolTechniqueBuilder";
+import PoolBuilder from "./PoolBuilder";
 
 const METHODS = [
   { key:"gym-strength",   label:"Gym Strength",   emoji:"🏋️", bg:"#fff0e6", border:"#f4a96a", text:"#b85c00", dot:"#f4803a" },
   { key:"pool-technique", label:"Pool Technique", emoji:"🏊",  bg:"#e6f4ff", border:"#6ab0f4", text:"#005fa3", dot:"#3a8ef4" },
-  { key:"pool-co2",       label:"Pool CO₂",       emoji:"💨", bg:"#edf6e6", border:"#7ec87e", text:"#2d7a2d", dot:"#4db84d" },
+  { key:"pool-co2",       label:"Pool",           emoji:"💧", bg:"#edf6e6", border:"#7ec87e", text:"#2d7a2d", dot:"#4db84d" },
   { key:"gym-cardio",     label:"Gym Cardio",     emoji:"🏃",  bg:"#fdf0fb", border:"#d97ec8", text:"#8b1f7a", dot:"#c94db8" },
   { key:"static",         label:"Static",         emoji:"🧘",  bg:"#fffbe6", border:"#e8cc4d", text:"#7a6200", dot:"#d4aa00" },
   { key:"depth",          label:"Depth",          emoji:"🌊",  bg:"#e8f0ff", border:"#6a7ef4", text:"#1a2fa3", dot:"#3a4df4" },
@@ -30,11 +31,11 @@ function fmtFull(iso) {
 
 function dbToSession(row) {
   let gymData = null;
-  if ((row.method==="gym-strength" || row.method==="static" || row.method==="pool-technique") && row.plan_mainset) {
+  if ((row.method==="gym-strength" || row.method==="static" || row.method==="pool-technique" || row.method==="pool-co2") && row.plan_mainset) {
     try { gymData = JSON.parse(row.plan_mainset); } catch(e) { gymData = null; }
   }
   let clientGymData = null;
-  if ((row.method==="gym-strength" || row.method==="static" || row.method==="pool-technique") && row.feedback?.client_notes) {
+  if ((row.method==="gym-strength" || row.method==="static" || row.method==="pool-technique" || row.method==="pool-co2") && row.feedback?.client_notes) {
     try { clientGymData = JSON.parse(row.feedback.client_notes); } catch(e) { clientGymData = null; }
   }
   return {
@@ -181,7 +182,8 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   const m = gm(session.method);
   const isGym    = session.method==="gym-strength";
   const isStatic = session.method==="static";
-  const isPool   = session.method==="pool-technique";
+  const isPool    = session.method==="pool-technique";
+  const isPool2   = session.method==="pool-co2";
   const isDepth = session.method==="depth";
   const isClient = role==="client";
   const [fb, setFb] = useState({...session.feedback});
@@ -231,6 +233,39 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             }
             setSaving(false);
             onClose();
+          }}
+        />
+      </Modal>
+    );
+  }
+
+  if (isPool2) {
+    return (
+      <Modal onClose={onClose} wide>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+          <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`}}>{m.emoji} {m.label}</span>
+          <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?"Athlete View":"Coach View"}</span>
+          {!isClient&&onEdit&&<button onClick={()=>{onClose();onEdit&&onEdit(session);}} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>}
+        </div>
+        <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
+        <PoolBuilder
+          isClient={isClient}
+          initialData={(() => {
+            const cp = session.plan?.gymData || null;
+            const cl = session.feedback?.clientGymData || null;
+            if (isClient && cp && cl && cl.sections) {
+              return { ...cp, sections: cp.sections.map(sec => ({ ...sec, blocks: sec.blocks.map(bl => {
+                const logged = cl.sections?.flatMap(s => s.blocks || []).find(b => b.id === bl.id);
+                return logged ? { ...bl, log: logged.log } : bl;
+              })})), clientNotes: cl.clientNotes || "", rating: cl.rating || null };
+            }
+            return cp;
+          })()}
+          onSave={async (data) => {
+            setSaving(true);
+            if (isClient) { await onSave({ ...fb, gymData:data, status: fb.status||"completed" }); }
+            else { await onSave({ ...fb, gymData:data }); }
+            setSaving(false); onClose();
           }}
         />
       </Modal>
@@ -396,7 +431,8 @@ function AssignModal({ date, clientName, onClose, onSave }) {
   const isDepth = method==="depth";
   const isGym    = method==="gym-strength";
   const isStatic = method==="static";
-  const isPool   = method==="pool-technique";
+  const isPool    = method==="pool-technique";
+  const isPool2   = method==="pool-co2";
 
   async function handleSave() { setSaving(true); await onSave({method, plan:{...plan, targetDepth:plan.targetDepth?Number(plan.targetDepth):null}}); setSaving(false); }
 
@@ -412,6 +448,19 @@ function AssignModal({ date, clientName, onClose, onSave }) {
           </button>
         );})}
       </div>
+      {/* Pool — full builder */}
+      {isPool2 && (
+        <PoolBuilder
+          isClient={false}
+          initialData={null}
+          onSave={async (data) => {
+            setSaving(true);
+            await onSave({ method, plan:{ ...plan, gymData: data } });
+            setSaving(false); onClose();
+          }}
+        />
+      )}
+
       {/* Pool Technique — full builder */}
       {isPool && (
         <PoolTechniqueBuilder
@@ -454,7 +503,7 @@ function AssignModal({ date, clientName, onClose, onSave }) {
       )}
 
       {/* All other methods — text fields */}
-      {!isGym && !isStatic && !isPool && (<>
+      {!isGym && !isStatic && !isPool && !isPool2 && (<>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
           <div><div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:8}}>Warm-up</div><textarea style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,background:"#fff",outline:"none",resize:"vertical",minHeight:80,fontFamily:"inherit",color:"#1a1a1a"}} placeholder="e.g. 3×FRC to 20m..." value={plan.warmup} onChange={e=>setPlan(p=>({...p,warmup:e.target.value}))} /></div>
           <div><div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:8}}>Cool-down</div><textarea style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,background:"#fff",outline:"none",resize:"vertical",minHeight:80,fontFamily:"inherit",color:"#1a1a1a"}} placeholder="e.g. 2 easy hangs..." value={plan.cooldown} onChange={e=>setPlan(p=>({...p,cooldown:e.target.value}))} /></div>
@@ -664,6 +713,7 @@ function EditSessionModal({ session, onClose, onSave, onSaveText }) {
       <div style={{fontWeight:700,fontSize:18,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
       {isStaticEdit && <StaticBuilder isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
       {session.method==="pool-technique" && <PoolTechniqueBuilder isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
+      {session.method==="pool-co2" && <PoolBuilder isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
       {isGymEdit    && <GymStrengthBuilder isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
       {!isStaticEdit && !isGymEdit && <EditPlanForm session={session} onSave={plan=>onSaveText(session,plan)} onClose={onClose} />}
     </Modal>
@@ -930,7 +980,7 @@ export default function ApneaCoach() {
 
   async function handleAssignSave({method,plan}) {
     // For gym-strength and static, store the full workout structure as JSON in plan_mainset
-    const mainSetValue = (method==="gym-strength" || method==="static" || method==="pool-technique") && plan.gymData
+    const mainSetValue = (method==="gym-strength" || method==="static" || method==="pool-technique" || method==="pool-co2") && plan.gymData
       ? JSON.stringify(plan.gymData)
       : plan.mainSet||null;
     const {data,error} = await supabase.from("sessions").insert({
