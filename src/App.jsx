@@ -135,7 +135,7 @@ function Spinner() {
 }
 
 // ── Day Modal ─────────────────────────────────────────────────────────────────
-function DayModal({ session, role, onClose, onSave }) {
+function DayModal({ session, role, onClose, onSave, onEdit }) {
   const m = gm(session.method);
   const isGym    = session.method==="gym-strength";
   const isStatic = session.method==="static";
@@ -247,6 +247,11 @@ function DayModal({ session, role, onClose, onSave }) {
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
         <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`}}>{m.emoji} {m.label}</span>
         <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?"Athlete View":"Coach View"}</span>
+        {!isClient&&onEdit&&(
+          <button onClick={()=>{ onClose(); onEdit&&onEdit(session); }} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:5}}>
+            ✏️ Edit
+          </button>
+        )}
       </div>
       <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:14}}>{fmtFull(session.date)}</div>
       {isDepth&&session.plan?.targetDepth&&(
@@ -262,6 +267,18 @@ function DayModal({ session, role, onClose, onSave }) {
       {session.plan?.mainSet&&<div style={{background:"#f8f8f6",borderRadius:10,padding:"13px 16px",marginBottom:10}}><div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#bbb",marginBottom:6}}>Main Set</div><div style={{fontSize:14,color:"#333",lineHeight:1.65}}>{session.plan.mainSet}</div></div>}
       {session.plan?.cooldown&&<div style={{background:"#f8f8f6",borderRadius:10,padding:"13px 16px",marginBottom:10}}><div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#bbb",marginBottom:6}}>Cool-down</div><div style={{fontSize:14,color:"#333",lineHeight:1.65}}>{session.plan.cooldown}</div></div>}
       {session.plan?.coachNotes&&<div style={{background:"#fffbe6",border:"1px solid #ffe082",borderRadius:10,padding:"13px 16px",marginBottom:14}}><div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#a07a00",marginBottom:6}}>📌 Coach Notes</div><div style={{fontSize:14,color:"#5a4800",lineHeight:1.65}}>{session.plan.coachNotes}</div></div>}
+
+      {/* Edit Plan button — only for coach on incomplete sessions */}
+      {!isClient && !session.feedback?.status && (
+        <div style={{display:"flex",gap:8,marginBottom:16}}>
+          <button onClick={()=>{ onClose(); }} style={{flex:1,background:"transparent",border:"1.5px solid #ddd",color:"#666",padding:"10px",borderRadius:8,fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>Close</button>
+          <button onClick={()=>{ onClose(); onEdit && onEdit(session); }}
+            style={{flex:1,background:"#1a1a1a",color:"#fff",border:"none",padding:"10px",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+            ✏️ Edit Plan
+          </button>
+        </div>
+      )}
+
       <div style={{borderTop:"2px solid #f0f0ec",paddingTop:20,marginTop:4}}>
         <div style={{fontWeight:700,fontSize:15,marginBottom:14}}>{isClient?"Your Feedback":"Client Feedback"}</div>
         <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:9}}>Did you complete this session?</div>
@@ -437,8 +454,50 @@ function AddCoachModal({ onClose, onSave }) {
   );
 }
 
+// ── Edit Plan Form (for depth/pool/cardio text-based sessions) ───────────────
+function EditPlanForm({ session, onSave, onClose }) {
+  const isDepth = session.method==="depth";
+  const [plan, setPlan] = useState({
+    warmup: session.plan?.warmup||"",
+    mainSet: session.plan?.mainSet||"",
+    cooldown: session.plan?.cooldown||"",
+    targetDepth: session.plan?.targetDepth||"",
+    openLine: session.plan?.openLine||false,
+    coachNotes: session.plan?.coachNotes||"",
+  });
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() { setSaving(true); await onSave(plan); setSaving(false); }
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+        <div><div style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase",marginBottom:7}}>Warm-up</div>
+          <textarea value={plan.warmup} onChange={e=>setPlan(p=>({...p,warmup:e.target.value}))} style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",resize:"vertical",minHeight:72,color:"#1a1a1a"}} placeholder="Warm-up..." /></div>
+        <div><div style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase",marginBottom:7}}>Cool-down</div>
+          <textarea value={plan.cooldown} onChange={e=>setPlan(p=>({...p,cooldown:e.target.value}))} style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",resize:"vertical",minHeight:72,color:"#1a1a1a"}} placeholder="Cool-down..." /></div>
+      </div>
+      <div><div style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase",marginBottom:7}}>Main Set</div>
+        <textarea value={plan.mainSet} onChange={e=>setPlan(p=>({...p,mainSet:e.target.value}))} style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",resize:"vertical",minHeight:90,color:"#1a1a1a"}} placeholder="Main set..." /></div>
+      {isDepth&&(
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+          <div><div style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase",marginBottom:7}}>Target Depth (m)</div>
+            <input type="number" value={plan.targetDepth} onChange={e=>setPlan(p=>({...p,targetDepth:e.target.value}))} style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",color:"#1a1a1a"}} placeholder="e.g. 68" /></div>
+          <div style={{display:"flex",alignItems:"flex-end",paddingBottom:4}}><label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",fontSize:14,fontWeight:500,color:"#333"}}><input type="checkbox" checked={plan.openLine} onChange={e=>setPlan(p=>({...p,openLine:e.target.checked}))} style={{width:17,height:17,accentColor:"#3a4df4"}} />Open line</label></div>
+        </div>
+      )}
+      <div><div style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase",marginBottom:7}}>Coach Notes</div>
+        <textarea value={plan.coachNotes} onChange={e=>setPlan(p=>({...p,coachNotes:e.target.value}))} style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",resize:"vertical",minHeight:60,color:"#1a1a1a"}} placeholder="Tips, cues, safety notes..." /></div>
+      <div style={{display:"flex",gap:10}}>
+        <button onClick={handleSave} disabled={saving} style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"11px 22px",borderRadius:8,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:saving?0.6:1}}>{saving?"Saving...":"Save Changes"}</button>
+        <button onClick={onClose} style={{background:"transparent",border:"1.5px solid #ddd",color:"#444",padding:"10px 20px",borderRadius:8,fontSize:14,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 // ── Week Grid ─────────────────────────────────────────────────────────────────
-function WeekGrid({ weekDates, clientId, sessions, onClickSession, onClickAdd, isClient }) {
+function WeekGrid({ weekDates, clientId, sessions, onClickSession, onClickAdd, onCopySession, onPasteDay, isClient, hasClipboard }) {
   return (
     <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:10,marginBottom:24}}>
       {weekDates.map((d,di)=>{
@@ -453,6 +512,7 @@ function WeekGrid({ weekDates, clientId, sessions, onClickSession, onClickAdd, i
             {daySessions.map(s=>{
               const m=gm(s.method), st=s.feedback?.status;
               const sc=st==="completed"?"#4caf50":st==="partial"?"#ff9800":st==="missed"?"#ef5350":null;
+              const isCompleted = !!st;
               return (
                 <div key={s.id} onClick={()=>onClickSession(s)}
                   style={{borderRadius:10,border:`1.5px solid ${m.border}`,borderLeft:`3px solid ${m.dot}`,background:"#fff",marginBottom:8,cursor:"pointer",transition:"box-shadow .15s,transform .1s",overflow:"hidden"}}
@@ -461,19 +521,46 @@ function WeekGrid({ weekDates, clientId, sessions, onClickSession, onClickAdd, i
                   <div style={{padding:"9px 10px"}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
                       <span style={{fontSize:16}}>{m.emoji}</span>
-                      <div style={{display:"flex",alignItems:"center",gap:5}}>
+                      <div style={{display:"flex",alignItems:"center",gap:4}}>
                         {sc&&<div style={{width:8,height:8,borderRadius:"50%",background:sc}}/>}
-                        {!isClient&&<button onClick={e=>{e.stopPropagation();onClickAdd&&onClickAdd(null,s.id,true);}} style={{background:"none",border:"none",fontSize:13,color:"#ddd",cursor:"pointer",padding:0,lineHeight:1}}>×</button>}
+                        {!isClient&&!isCompleted&&(
+                          <button title="Copy session" onClick={e=>{e.stopPropagation();onCopySession&&onCopySession(s);}}
+                            style={{background:"none",border:"none",fontSize:11,color:"#ccc",cursor:"pointer",padding:0,lineHeight:1}}>⧉</button>
+                        )}
+                        {!isClient&&isCompleted&&(
+                          <button title="Copy session" onClick={e=>{e.stopPropagation();onCopySession&&onCopySession(s);}}
+                            style={{background:"none",border:"none",fontSize:11,color:"#ccc",cursor:"pointer",padding:0,lineHeight:1}}>⧉</button>
+                        )}
+                        {!isClient&&<button title="Delete session" onClick={e=>{e.stopPropagation();onClickAdd&&onClickAdd(null,s.id,true);}} style={{background:"none",border:"none",fontSize:13,color:"#ddd",cursor:"pointer",padding:0,lineHeight:1}}>×</button>}
                       </div>
                     </div>
                     <div style={{fontSize:11,fontWeight:700,color:m.text,marginBottom:3}}>{m.label}</div>
+                    {isCompleted&&<div style={{fontSize:9,color:"#bbb",fontWeight:600,letterSpacing:".04em"}}>COMPLETED · READ ONLY</div>}
                     {s.method==="depth"&&s.plan?.targetDepth&&<div style={{fontSize:10,color:"#999",fontWeight:600}}>🎯 {s.plan.targetDepth}m{s.plan.openLine?" (open)":""}</div>}
-                    {s.plan?.mainSet&&<div style={{fontSize:10,color:"#aaa",marginTop:3,lineHeight:1.4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{s.plan.mainSet}</div>}
+                    {s.plan?.gymData?.sessionName&&<div style={{fontSize:10,color:"#aaa",marginTop:2,lineHeight:1.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.plan.gymData.sessionName}</div>}
+                    {s.plan?.mainSet&&!s.plan?.gymData&&<div style={{fontSize:10,color:"#aaa",marginTop:3,lineHeight:1.4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{s.plan.mainSet}</div>}
                   </div>
                 </div>
               );
             })}
-            {!isClient&&<div onClick={()=>onClickAdd&&onClickAdd(iso)} style={{border:"1.5px dashed #ddd",borderRadius:10,padding:"10px 6px",textAlign:"center",cursor:"pointer",color:"#ccc",fontSize:12,fontWeight:600,transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor="#1a1a1a";e.currentTarget.style.color="#1a1a1a";}} onMouseLeave={e=>{e.currentTarget.style.borderColor="#ddd";e.currentTarget.style.color="#ccc";}}>+ Add</div>}
+            {!isClient&&(
+              <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                <div onClick={()=>onClickAdd&&onClickAdd(iso)}
+                  style={{border:"1.5px dashed #ddd",borderRadius:10,padding:"8px 6px",textAlign:"center",cursor:"pointer",color:"#ccc",fontSize:12,fontWeight:600,transition:"all .15s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor="#1a1a1a";e.currentTarget.style.color="#1a1a1a";}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor="#ddd";e.currentTarget.style.color="#ccc";}}>
+                  + Add
+                </div>
+                {hasClipboard&&(
+                  <div onClick={()=>onPasteDay&&onPasteDay(iso, clientId)}
+                    style={{border:"1.5px dashed #4caf50",borderRadius:10,padding:"6px 6px",textAlign:"center",cursor:"pointer",color:"#4caf50",fontSize:11,fontWeight:600,background:"#f1f8f1",transition:"all .15s"}}
+                    onMouseEnter={e=>e.currentTarget.style.background="#e8f5e9"}
+                    onMouseLeave={e=>e.currentTarget.style.background="#f1f8f1"}>
+                    📋 Paste
+                  </div>
+                )}
+              </div>
+            )}
             {isClient&&daySessions.length===0&&<div style={{border:"1.5px solid #f0f0f0",borderRadius:10,padding:"18px 6px",textAlign:"center",color:"#e8e8e8",fontSize:18}}>○</div>}
           </div>
         );
@@ -498,8 +585,11 @@ export default function ApneaCoach() {
 
   const [assignModal,    setAssignModal]    = useState(null);
   const [dayModal,       setDayModal]       = useState(null);
+  const [editModal,      setEditModal]      = useState(null); // session being edited
   const [addClientModal, setAddClientModal] = useState(false);
   const [addCoachModal,  setAddCoachModal]  = useState(false);
+  const [clipboard,      setClipboard]      = useState(null); // copied session plan
+  const [pasteModal,     setPasteModal]     = useState(null); // {date, clientId}
 
   function flash(msg) { setToast(msg); setTimeout(()=>setToast(""),2400); }
 
@@ -620,6 +710,43 @@ export default function ApneaCoach() {
     if (!error) { setSessions(prev=>prev.map(s=>s.id===sessionId?{...s,feedback:{...fb}}:s)); setDayModal(null); flash("Feedback saved!"); }
   }
 
+  // ── Edit session ──
+  async function handleEditSave(sessionId, updatedPlan) {
+    const mainSetValue = JSON.stringify(updatedPlan);
+    const { error } = await supabase.from("sessions").update({ plan_mainset: mainSetValue }).eq("id", sessionId);
+    if (!error) {
+      setSessions(prev => prev.map(s => s.id===sessionId ? {...s, plan:{...s.plan, gymData:updatedPlan}} : s));
+      setEditModal(null);
+      flash("Session updated!");
+    }
+  }
+
+  // ── Copy session ──
+  function handleCopySession(session) {
+    setClipboard({ plan: session.plan, method: session.method });
+    flash("Session copied! Now click a day to paste it.");
+  }
+
+  // ── Paste session ──
+  async function handlePasteSession(date, clientId) {
+    if (!clipboard) return;
+    const mainSetValue = clipboard.plan.gymData ? JSON.stringify(clipboard.plan.gymData) : clipboard.plan.mainSet||null;
+    const { data, error } = await supabase.from("sessions").insert({
+      client_id: clientId, date, method: clipboard.method,
+      plan_warmup: clipboard.plan.warmup||null,
+      plan_mainset: mainSetValue,
+      plan_cooldown: clipboard.plan.cooldown||null,
+      plan_target_depth: clipboard.plan.targetDepth||null,
+      plan_open_line: clipboard.plan.openLine||false,
+      plan_coach_notes: clipboard.plan.coachNotes||null,
+    }).select().single();
+    if (!error && data) {
+      setSessions(prev => [...prev, dbToSession({...data, feedback:null})]);
+      setPasteModal(null);
+      flash("Session pasted!");
+    }
+  }
+
   const weekDates = DAYS.map((_,i)=>addDays(weekStart,i));
   const isCoach = profile?.role==="coach";
   const isAdmin = user?.email===ADMIN_EMAIL;
@@ -723,11 +850,32 @@ export default function ApneaCoach() {
               </div>
             </div>
             <WeekGrid weekDates={weekDates} clientId={activeClient.id} sessions={sessions} isClient={false}
+              hasClipboard={!!clipboard}
               onClickSession={s=>setDayModal({session:s,role:"coach"})}
+              onCopySession={s=>handleCopySession(s)}
+              onPasteDay={(iso,cid)=>handlePasteSession(iso,cid)}
               onClickAdd={(iso,sid,del)=>{ if(del){removeSession(sid);}else{setAssignModal(iso);} }} />
-            <div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <div><div style={{fontWeight:600,fontSize:14}}>Switch to Client View</div><div style={{fontSize:12,color:"#999",marginTop:2}}>See what {activeClient.name.split(" ")[0]} sees</div></div>
-              <button onClick={()=>setView("clientWeek")} style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"10px 20px",borderRadius:8,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Open Client View →</button>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:0}}>
+              <div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div><div style={{fontWeight:600,fontSize:14}}>Switch to Client View</div><div style={{fontSize:12,color:"#999",marginTop:2}}>See what {activeClient.name.split(" ")[0]} sees</div></div>
+                <button onClick={()=>setView("clientWeek")} style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"10px 18px",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Open →</button>
+              </div>
+              <div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:"14px 20px"}}>
+                <div style={{fontWeight:600,fontSize:14,marginBottom:4}}>Copy from another client</div>
+                <div style={{fontSize:12,color:"#999",marginBottom:10}}>Pick a client then copy any of their sessions</div>
+                <select onChange={e=>{
+                  const cid=e.target.value;
+                  if(!cid) return;
+                  const clientSessions=sessions.filter(s=>s.clientId===cid).slice(0,5);
+                  if(clientSessions.length>0) handleCopySession(clientSessions[0]);
+                }} style={{width:"100%",padding:"7px 10px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",background:"#fff",color:"#1a1a1a",cursor:"pointer"}}>
+                  <option value="">Select client to copy from...</option>
+                  {clients.filter(c=>c.id!==activeClient.id).map(c=>(
+                    <option key={c.id} value={c.id}>{c.name} ({sessions.filter(s=>s.clientId===c.id).length} sessions)</option>
+                  ))}
+                </select>
+                {clipboard&&<div style={{marginTop:8,fontSize:11,color:"#4caf50",fontWeight:600}}>✓ Session copied! Click Paste on any day.</div>}
+              </div>
             </div>
           </div>
         )}
@@ -747,7 +895,9 @@ export default function ApneaCoach() {
                 ))}
               </div>
             </div>
-            <WeekGrid weekDates={weekDates} clientId={activeClient.id} sessions={sessions} isClient={true} onClickSession={s=>setDayModal({session:s,role:"client"})} />
+            <WeekGrid weekDates={weekDates} clientId={activeClient.id} sessions={sessions} isClient={true}
+              hasClipboard={false}
+              onClickSession={s=>setDayModal({session:s,role:"client"})} />
             <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:12}}>This Week's Sessions</div>
             {weekDates.flatMap(d=>sessions.filter(s=>s.clientId===activeClient.id&&s.date===toISO(d))).length===0&&<div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:40,textAlign:"center",color:"#bbb",fontSize:14}}>No sessions planned this week.</div>}
             {weekDates.flatMap(d=>sessions.filter(s=>s.clientId===activeClient.id&&s.date===toISO(d))).map(s=>{
@@ -785,7 +935,40 @@ export default function ApneaCoach() {
       </div>
 
       {assignModal&&activeClient&&<AssignModal date={assignModal} clientName={activeClient.name} onClose={()=>setAssignModal(null)} onSave={handleAssignSave}/>}
-      {dayModal&&<DayModal session={sessions.find(s=>s.id===dayModal.session.id)||dayModal.session} role={dayModal.role} onClose={()=>setDayModal(null)} onSave={fb=>handleFeedbackSave(dayModal.session.id,fb)}/>}
+            {/* Clipboard banner */}
+      {clipboard && view==="coachWeek" && (
+        <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#1a1a1a",color:"#fff",padding:"12px 20px",borderRadius:12,fontSize:13,fontWeight:500,zIndex:400,display:"flex",alignItems:"center",gap:14,boxShadow:"0 8px 24px rgba(0,0,0,.2)"}}>
+          <span>📋 {clipboard.method} session copied — click a day's <strong>Paste</strong> button</span>
+          <button onClick={()=>setClipboard(null)} style={{background:"rgba(255,255,255,.2)",border:"none",color:"#fff",padding:"4px 10px",borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Clear</button>
+        </div>
+      )}
+
+      {dayModal&&<DayModal session={sessions.find(s=>s.id===dayModal.session.id)||dayModal.session} role={dayModal.role} onClose={()=>setDayModal(null)} onSave={fb=>handleFeedbackSave(dayModal.session.id,fb)} onEdit={s=>setEditModal(s)}/>}
+      {editModal&&(()=>{
+        const s = sessions.find(x=>x.id===editModal.id)||editModal;
+        const m = gm(s.method);
+        const isGymEdit = s.method==="gym-strength";
+        const isStaticEdit = s.method==="static";
+        return (
+          <Modal onClose={()=>setEditModal(null)} wide>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+              <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`}}>{m.emoji} {m.label}</span>
+              <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>Edit Plan</span>
+            </div>
+            <div style={{fontWeight:700,fontSize:18,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(s.date)}</div>
+            {isStaticEdit&&<StaticBuilder isClient={false} initialData={s.plan?.gymData||null} onSave={async data=>{await handleEditSave(s.id,data);}} />}
+            {isGymEdit&&<GymStrengthBuilder isClient={false} initialData={s.plan?.gymData||null} onSave={async data=>{await handleEditSave(s.id,data);}} />}
+            {!isStaticEdit&&!isGymEdit&&<EditPlanForm session={s} onSave={async plan=>{
+              const mainSetValue=(s.method==="depth"||!plan.gymData)?plan.mainSet||null:JSON.stringify(plan.gymData);
+              const {error}=await supabase.from("sessions").update({
+                plan_warmup:plan.warmup||null, plan_mainset:mainSetValue, plan_cooldown:plan.cooldown||null,
+                plan_target_depth:plan.targetDepth||null, plan_open_line:plan.openLine||false, plan_coach_notes:plan.coachNotes||null,
+              }).eq("id",s.id);
+              if(!error){setSessions(prev=>prev.map(x=>x.id===s.id?{...x,plan:{...x.plan,...plan}}:x));setEditModal(null);flash("Plan updated!");}
+            }} onClose={()=>setEditModal(null)} />}
+          </Modal>
+        );
+      })()}
       {addClientModal&&<AddClientModal onClose={()=>setAddClientModal(false)} onSave={handleAddClient}/>}
       {addCoachModal&&<AddCoachModal onClose={()=>setAddCoachModal(false)} onSave={handleAddCoach}/>}
       {toast&&<div style={{position:"fixed",bottom:24,right:24,background:"#1a1a1a",color:"#fff",padding:"12px 20px",borderRadius:10,fontSize:13,fontWeight:500,zIndex:999,animation:"fi .2s"}}>✓ {toast}<style>{`@keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style></div>}
