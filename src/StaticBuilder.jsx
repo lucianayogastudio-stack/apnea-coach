@@ -216,7 +216,7 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
               <span style={{fontWeight:700,fontSize:14,color:"#1a1a1a"}}>{exercise.label||tmpl.label}</span>
             ) : (
               <input value={exercise.label||tmpl.label} onChange={e=>upd("label",e.target.value)}
-                style={{fontWeight:700,fontSize:14,border:"none",outline:"none",fontFamily:"inherit",color:"#1a1a1a",background:"transparent",flex:1}} />
+                style={{fontWeight:700,fontSize:14,border:"none",outline:"none",fontFamily:"inherit",color:"#1a1a1a",background:"transparent",color:"#1a1a1a",flex:1}} />
             )}
           </div>
           <div style={{fontSize:11,color:tmpl.color,fontWeight:600,marginTop:1}}>{tmpl.label !== exercise.label ? tmpl.label : tmpl.description}</div>
@@ -235,7 +235,7 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
             </button>
           )}
           {!isClient && (
-            <button onClick={onRemove} style={{background:"transparent",border:"1.5px solid #e8c5c5",borderRadius:7,padding:"5px 9px",fontSize:11,cursor:"pointer",color:"#c0392b"}}>✕</button>
+            <button onClick={onRemove} style={{background:"transparent",color:"#1a1a1a",border:"1.5px solid #e8c5c5",borderRadius:7,padding:"5px 9px",fontSize:11,cursor:"pointer",color:"#c0392b"}}>✕</button>
           )}
         </div>
       </div>
@@ -385,7 +385,7 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
           <div style={{marginTop:10}}>
             <textarea value={exercise.notes||""} onChange={e=>upd("notes",e.target.value)}
               placeholder="Coach notes for this exercise (cues, focus points, safety reminders...)"
-              style={{width:"100%",padding:"8px 10px",border:"1.5px solid #f0f0f0",borderRadius:7,fontSize:12,fontFamily:"inherit",outline:"none",resize:"vertical",minHeight:44,color:"#555",background:"#fafaf8"}} />
+              style={{width:"100%",padding:"8px 10px",border:"1.5px solid #f0f0f0",borderRadius:7,fontSize:12,fontFamily:"inherit",outline:"none",resize:"vertical",minHeight:44,color:"#555",background:"#fafaf8",color:"#1a1a1a"}} />
           </div>
         )}
 
@@ -493,7 +493,7 @@ export default function StaticBuilder({ initialData, onSave, isClient }) {
           <div style={{fontWeight:700,fontSize:17}}>{sessionName||"Static Training Session"}</div>
         ) : (
           <input value={sessionName} onChange={e=>setSessionName(e.target.value)}
-            style={{fontWeight:700,fontSize:17,border:"none",borderBottom:"2px solid #f0f0f0",outline:"none",fontFamily:"inherit",color:"#1a1a1a",background:"transparent",width:"100%",paddingBottom:6}}
+            style={{fontWeight:700,fontSize:17,border:"none",borderBottom:"2px solid #f0f0f0",outline:"none",fontFamily:"inherit",color:"#1a1a1a",background:"transparent",color:"#1a1a1a",width:"100%",paddingBottom:6}}
             placeholder="Session name (e.g. CO₂ Tolerance Block A)..." />
         )}
         <div style={{fontSize:12,color:"#aaa",marginTop:5,display:"flex",gap:14}}>
@@ -504,7 +504,7 @@ export default function StaticBuilder({ initialData, onSave, isClient }) {
 
       {/* Progress bar */}
       {isClient&&totalCount>0&&(
-        <div style={{height:5,background:"#f0f0f0",borderRadius:3,marginBottom:16,overflow:"hidden"}}>
+        <div style={{height:5,background:"#f0f0f0",color:"#1a1a1a",borderRadius:3,marginBottom:16,overflow:"hidden"}}>
           <div style={{height:"100%",width:`${progress}%`,background:"#4caf50",borderRadius:3,transition:"width .3s"}}/>
         </div>
       )}
@@ -527,12 +527,12 @@ export default function StaticBuilder({ initialData, onSave, isClient }) {
 
       {/* Exercise list */}
       {exercises.length===0&&!isClient&&(
-        <div style={{background:"#fafaf8",border:"1.5px dashed #ddd",borderRadius:12,padding:"28px",textAlign:"center",color:"#bbb",fontSize:13,marginBottom:16}}>
+        <div style={{background:"#fafaf8",color:"#1a1a1a",border:"1.5px dashed #ddd",borderRadius:12,padding:"28px",textAlign:"center",color:"#bbb",fontSize:13,marginBottom:16}}>
           No exercises yet — click "+ Add Exercise" to build the session
         </div>
       )}
       {exercises.length===0&&isClient&&(
-        <div style={{background:"#fafaf8",borderRadius:12,padding:"28px",textAlign:"center",color:"#bbb",fontSize:13,marginBottom:16}}>
+        <div style={{background:"#fafaf8",color:"#1a1a1a",borderRadius:12,padding:"28px",textAlign:"center",color:"#bbb",fontSize:13,marginBottom:16}}>
           No exercises planned for this session yet.
         </div>
       )}
@@ -546,7 +546,7 @@ export default function StaticBuilder({ initialData, onSave, isClient }) {
       {/* Add exercise */}
       {!isClient&&(
         <button onClick={()=>setShowPicker(true)}
-          style={{background:"#f0f0ec",border:"none",borderRadius:10,padding:"11px",fontSize:13,fontWeight:600,color:"#555",cursor:"pointer",fontFamily:"inherit",width:"100%",marginBottom:16,transition:"all .15s"}}
+          style={{background:"#f0f0ec",color:"#1a1a1a",border:"none",borderRadius:10,padding:"11px",fontSize:13,fontWeight:600,color:"#555",cursor:"pointer",fontFamily:"inherit",width:"100%",marginBottom:16,transition:"all .15s"}}
           onMouseEnter={e=>e.currentTarget.style.background="#e8e8e4"}
           onMouseLeave={e=>e.currentTarget.style.background="#f0f0ec"}>
           + Add Exercise
@@ -556,7 +556,7 @@ export default function StaticBuilder({ initialData, onSave, isClient }) {
       {/* Client rating + notes */}
       {isClient&&(
         <>
-          <div style={{background:"#f8f8f6",borderRadius:10,padding:"14px",marginTop:8,textAlign:"center"}}>
+          <div style={{background:"#f8f8f6",color:"#1a1a1a",borderRadius:10,padding:"14px",marginTop:8,textAlign:"center"}}>
             <div style={{fontSize:11,fontWeight:700,color:"#aaa",letterSpacing:".06em",textTransform:"uppercase",marginBottom:10}}>Rate this session</div>
             <div style={{display:"flex",justifyContent:"center",gap:8}}>
               {[1,2,3,4,5].map(n=>(
