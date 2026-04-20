@@ -186,7 +186,7 @@ function ExerciseRow({ exercise, onChange, onRemove, isClient, showLabel }) {
   const doneSets = exercise.sets.filter(s=>s.done).length;
 
   return (
-    <div style={{background:"#fafaf8",borderRadius:10,border:"1px solid #f0f0ec",marginBottom:8,overflow:"hidden"}}>
+    <div style={{background:"#fafaf8",color:"#1a1a1a",borderRadius:10,border:"1px solid #f0f0ec",marginBottom:8,overflow:"hidden"}}>
       {/* Exercise header */}
       <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:"1px solid #f0f0ec"}}>
         <div style={{flex:1}}>
@@ -194,7 +194,7 @@ function ExerciseRow({ exercise, onChange, onRemove, isClient, showLabel }) {
             <div style={{fontWeight:600,fontSize:14,color:"#1a1a1a"}}>{exercise.name}</div>
           ) : (
             <input value={exercise.name} onChange={e=>onChange({...exercise,name:e.target.value})}
-              style={{fontWeight:600,fontSize:14,border:"none",outline:"none",fontFamily:"inherit",color:"#1a1a1a",background:"transparent",width:"100%"}}
+              style={{fontWeight:600,fontSize:14,border:"none",outline:"none",fontFamily:"inherit",color:"#1a1a1a",background:"transparent",color:"#1a1a1a",width:"100%"}}
               placeholder="Exercise name..." />
           )}
           <div style={{fontSize:10,color:"#bbb",marginTop:1}}>
@@ -214,7 +214,7 @@ function ExerciseRow({ exercise, onChange, onRemove, isClient, showLabel }) {
             style={{background:(showVideo||editVideo)?"#fff0e0":"transparent",border:`1.5px solid ${exercise.videoUrl?"#f4a96a":"#e0e0e0"}`,borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",color:exercise.videoUrl?"#b85c00":"#888"}}>
             🎥
           </button>
-          {!isClient&&<button onClick={onRemove} style={{background:"transparent",border:"1.5px solid #e8c5c5",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",color:"#c0392b"}}>✕</button>}
+          {!isClient&&<button onClick={onRemove} style={{background:"transparent",color:"#1a1a1a",border:"1.5px solid #e8c5c5",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",color:"#c0392b"}}>✕</button>}
         </div>
       </div>
 
@@ -284,7 +284,7 @@ function ExerciseRow({ exercise, onChange, onRemove, isClient, showLabel }) {
                 </button>
               ) : (
                 <button onClick={()=>removeSet(s.id)}
-                  style={{width:28,height:28,borderRadius:"50%",border:"1.5px solid #f0f0f0",background:"transparent",color:"#ddd",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto"}}>
+                  style={{width:28,height:28,borderRadius:"50%",border:"1.5px solid #f0f0f0",background:"transparent",color:"#1a1a1a",color:"#ddd",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto"}}>
                   ×
                 </button>
               )}
@@ -293,7 +293,7 @@ function ExerciseRow({ exercise, onChange, onRemove, isClient, showLabel }) {
         })}
 
         {!isClient&&(
-          <button onClick={addSet} style={{background:"transparent",border:"1.5px dashed #ddd",borderRadius:7,padding:"6px",fontSize:11,fontWeight:600,color:"#aaa",cursor:"pointer",fontFamily:"inherit",width:"100%",margin:"8px 0",transition:"all .15s"}}
+          <button onClick={addSet} style={{background:"transparent",color:"#1a1a1a",border:"1.5px dashed #ddd",borderRadius:7,padding:"6px",fontSize:11,fontWeight:600,color:"#aaa",cursor:"pointer",fontFamily:"inherit",width:"100%",margin:"8px 0",transition:"all .15s"}}
             onMouseEnter={e=>{e.currentTarget.style.borderColor="#1a1a1a";e.currentTarget.style.color="#1a1a1a";}}
             onMouseLeave={e=>{e.currentTarget.style.borderColor="#ddd";e.currentTarget.style.color="#aaa";}}>
             + Add Set
@@ -305,7 +305,7 @@ function ExerciseRow({ exercise, onChange, onRemove, isClient, showLabel }) {
         <div style={{padding:"0 14px 12px"}}>
           <textarea value={exercise.notes} onChange={e=>onChange({...exercise,notes:e.target.value})}
             placeholder="Notes (e.g. slow eccentric, keep core tight...)"
-            style={{width:"100%",padding:"8px 10px",border:"1.5px solid #e0e0e0",borderRadius:7,fontSize:12,fontFamily:"inherit",outline:"none",resize:"vertical",minHeight:50,color:"#555",background:"#fafaf8"}} />
+            style={{width:"100%",padding:"8px 10px",border:"1.5px solid #e0e0e0",borderRadius:7,fontSize:12,fontFamily:"inherit",outline:"none",resize:"vertical",minHeight:50,color:"#555",background:"#fafaf8",color:"#1a1a1a"}} />
         </div>
       )}
 
@@ -322,7 +322,7 @@ function ExerciseRow({ exercise, onChange, onRemove, isClient, showLabel }) {
               Save
             </button>
             {exercise.videoUrl&&<button onClick={()=>{ setVideoInput(""); onChange({...exercise,videoUrl:""}); setEditVideo(false); }}
-              style={{background:"transparent",border:"1.5px solid #e8c5c5",borderRadius:7,padding:"8px 10px",fontSize:12,cursor:"pointer",color:"#c0392b",fontFamily:"inherit"}}>
+              style={{background:"transparent",color:"#1a1a1a",border:"1.5px solid #e8c5c5",borderRadius:7,padding:"8px 10px",fontSize:12,cursor:"pointer",color:"#c0392b",fontFamily:"inherit"}}>
               Remove
             </button>}
           </div>
@@ -350,7 +350,7 @@ function ExerciseRow({ exercise, onChange, onRemove, isClient, showLabel }) {
           )}
           {videoInfo?.type==="link"&&(
             <a href={videoInfo.url} target="_blank" rel="noopener noreferrer"
-              style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 14px",background:"#f0f0ec",borderRadius:8,fontSize:13,color:"#1a1a1a",textDecoration:"none",fontWeight:500}}>
+              style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 14px",background:"#f0f0ec",color:"#1a1a1a",borderRadius:8,fontSize:13,color:"#1a1a1a",textDecoration:"none",fontWeight:500}}>
               🎥 Watch exercise video ↗
             </a>
           )}
@@ -443,7 +443,7 @@ function Block({ block, onChange, onRemove, isClient }) {
 
         {!isClient&&canAddMore&&(
           <button onClick={()=>setShowPicker(true)}
-            style={{background:"transparent",border:`1.5px dashed ${isSingle?"#ddd":isSuperset?"#c9a0e8":"#ffb380"}`,borderRadius:8,padding:"8px",fontSize:12,fontWeight:600,color:isSingle?"#aaa":isSuperset?"#9c27b0":"#e65100",cursor:"pointer",fontFamily:"inherit",width:"100%",transition:"all .15s"}}
+            style={{background:"transparent",color:"#1a1a1a",border:`1.5px dashed ${isSingle?"#ddd":isSuperset?"#c9a0e8":"#ffb380"}`,borderRadius:8,padding:"8px",fontSize:12,fontWeight:600,color:isSingle?"#aaa":isSuperset?"#9c27b0":"#e65100",cursor:"pointer",fontFamily:"inherit",width:"100%",transition:"all .15s"}}
             onMouseEnter={e=>e.currentTarget.style.opacity="0.7"}
             onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
             + Add Exercise {isSuperset&&block.exercises.length===0?"A":isSuperset&&block.exercises.length===1?"B":""}
@@ -475,7 +475,7 @@ function Section({ section, onChange, onRemove, isClient }) {
           <div style={{fontWeight:700,fontSize:12,color:"#888",letterSpacing:".06em",textTransform:"uppercase"}}>{section.name}</div>
         ) : (
           <input value={section.name} onChange={e=>onChange({...section,name:e.target.value})}
-            style={{fontWeight:700,fontSize:12,color:"#888",letterSpacing:".06em",textTransform:"uppercase",border:"none",outline:"none",fontFamily:"inherit",background:"transparent",flex:1}}
+            style={{fontWeight:700,fontSize:12,color:"#888",letterSpacing:".06em",textTransform:"uppercase",border:"none",outline:"none",fontFamily:"inherit",background:"transparent",color:"#1a1a1a",flex:1}}
             placeholder="Section name..." />
         )}
         {isClient&&totalSets>0&&<span style={{fontSize:11,color:"#4caf50",fontWeight:600}}>{doneSets}/{totalSets} sets</span>}
@@ -550,7 +550,7 @@ export default function GymStrengthBuilder({ initialData, onSave, isClient }) {
           <div style={{fontWeight:700,fontSize:17}}>{workoutName||"Gym Strength Session"}</div>
         ) : (
           <input value={workoutName} onChange={e=>setWorkoutName(e.target.value)}
-            style={{fontWeight:700,fontSize:17,border:"none",borderBottom:"2px solid #f0f0f0",outline:"none",fontFamily:"inherit",color:"#1a1a1a",background:"transparent",width:"100%",paddingBottom:6}}
+            style={{fontWeight:700,fontSize:17,border:"none",borderBottom:"2px solid #f0f0f0",outline:"none",fontFamily:"inherit",color:"#1a1a1a",background:"transparent",color:"#1a1a1a",width:"100%",paddingBottom:6}}
             placeholder="Workout name (e.g. Upper Body Strength A)..." />
         )}
         <div style={{display:"flex",gap:14,marginTop:6,fontSize:12,color:"#aaa"}}>
@@ -562,7 +562,7 @@ export default function GymStrengthBuilder({ initialData, onSave, isClient }) {
 
       {/* Progress bar */}
       {isClient&&totalSets>0&&(
-        <div style={{height:5,background:"#f0f0f0",borderRadius:3,marginBottom:16,overflow:"hidden"}}>
+        <div style={{height:5,background:"#f0f0f0",color:"#1a1a1a",borderRadius:3,marginBottom:16,overflow:"hidden"}}>
           <div style={{height:"100%",width:`${progress}%`,background:"#4caf50",borderRadius:3,transition:"width .3s"}}/>
         </div>
       )}
@@ -587,7 +587,7 @@ export default function GymStrengthBuilder({ initialData, onSave, isClient }) {
 
       {!isClient&&(
         <button onClick={addSection}
-          style={{background:"transparent",border:"1.5px dashed #ddd",borderRadius:10,padding:"10px",fontSize:12,fontWeight:600,color:"#aaa",cursor:"pointer",fontFamily:"inherit",width:"100%",marginBottom:16,transition:"all .15s"}}
+          style={{background:"transparent",color:"#1a1a1a",border:"1.5px dashed #ddd",borderRadius:10,padding:"10px",fontSize:12,fontWeight:600,color:"#aaa",cursor:"pointer",fontFamily:"inherit",width:"100%",marginBottom:16,transition:"all .15s"}}
           onMouseEnter={e=>{e.currentTarget.style.borderColor="#555";e.currentTarget.style.color="#555";}}
           onMouseLeave={e=>{e.currentTarget.style.borderColor="#ddd";e.currentTarget.style.color="#aaa";}}>
           + Add Section
@@ -597,7 +597,7 @@ export default function GymStrengthBuilder({ initialData, onSave, isClient }) {
       {/* Client rating + notes */}
       {isClient&&(
         <>
-          <div style={{background:"#f8f8f6",borderRadius:10,padding:"14px",marginTop:8,textAlign:"center"}}>
+          <div style={{background:"#f8f8f6",color:"#1a1a1a",borderRadius:10,padding:"14px",marginTop:8,textAlign:"center"}}>
             <div style={{fontSize:11,fontWeight:700,color:"#aaa",letterSpacing:".06em",textTransform:"uppercase",marginBottom:10}}>Rate this workout</div>
             <div style={{display:"flex",justifyContent:"center",gap:8}}>
               {[1,2,3,4,5].map(n=>(
