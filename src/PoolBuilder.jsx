@@ -2,10 +2,12 @@ import { useState } from "react";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DISCIPLINES = [
-  { key:"DYN",  label:"DYN",  color:"#2d7a2d", bg:"#edf6e6", border:"#7ec87e" },
-  { key:"DYNB", label:"DYNB", color:"#7a6200", bg:"#fffbe6", border:"#e8cc4d" },
-  { key:"DNF",  label:"DNF",  color:"#005fa3", bg:"#e6f4ff", border:"#6ab0f4" },
-  { key:"MIX",  label:"Mixed",color:"#555",    bg:"#f5f4f0", border:"#ccc"    },
+  { key:"DYN",        label:"DYN",        color:"#2d7a2d", bg:"#edf6e6", border:"#7ec87e" },
+  { key:"DYNB",       label:"DYNB",       color:"#7a6200", bg:"#fffbe6", border:"#e8cc4d" },
+  { key:"DNF",        label:"DNF",        color:"#005fa3", bg:"#e6f4ff", border:"#6ab0f4" },
+  { key:"freestyle",  label:"Freestyle",  color:"#1a2fa3", bg:"#eef0ff", border:"#9aa5f4" },
+  { key:"breaststroke",label:"Breaststroke",color:"#6a1b9a",bg:"#f3e5f5",border:"#ce93d8" },
+  { key:"MIX",        label:"Mixed",      color:"#555",    bg:"#f5f4f0", border:"#ccc"    },
 ];
 
 const POOL_LENGTHS = ["25m","50m","33m","20m"];
@@ -31,9 +33,10 @@ const EQUIPMENT_OPTIONS = [
 
 // Exercise block types
 const BLOCK_TYPES = [
-  { key:"distance",  label:"Distance",  desc:"Simple set — X reps × Y meters" },
-  { key:"interval",  label:"Interval",  desc:"Starts / timed intervals with recovery" },
-  { key:"compound",  label:"Compound",  desc:"Complex multi-part set — write freely" },
+  { key:"distance",   label:"Distance",   desc:"Simple set — X reps × Y meters" },
+  { key:"interval",   label:"Interval",   desc:"Starts / timed intervals with recovery" },
+  { key:"overunder",  label:"Over/Under", desc:"Alternating surface + underwater lengths" },
+  { key:"compound",   label:"Compound",   desc:"Complex multi-part set — write freely" },
 ];
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
@@ -41,6 +44,7 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 function makeBlock(type) {
   return {
     id: uid(), type,
+    lungVolume: "Full",
     discipline: "DYN",
     // distance fields
     reps: "", meters: "",
@@ -138,6 +142,18 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
           </select>
         )}
 
+        {/* Lung volume */}
+        {isClient ? (
+          block.lungVolume && block.lungVolume !== "Full" && (
+            <span style={{ padding:"3px 9px", borderRadius:7, fontSize:11, fontWeight:700, background:"#e8f0ff", color:"#1a2fa3", border:"1.5px solid #6a7ef4" }}>{block.lungVolume}</span>
+          )
+        ) : (
+          <select value={block.lungVolume || "Full"} onChange={e => upd("lungVolume", e.target.value)}
+            style={{ padding:"4px 7px", border:"1.5px solid #e0e0e0", borderRadius:7, fontSize:11, fontWeight:600, fontFamily:"inherit", outline:"none", background:"#fff", color:"#555", cursor:"pointer" }}>
+            {["Full","FRC","RV"].map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+        )}
+
         {/* Block type toggle (coach only) */}
         {!isClient && (
           <div style={{ display:"flex", gap:4 }}>
@@ -151,7 +167,7 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
         )}
 
         {isClient && block.type !== "compound" && (
-          <span style={{ fontSize:11, fontWeight:600, color:"#555", background:"#f0f0ec", padding:"3px 8px", borderRadius:6 }}>
+          <span style={{ fontSize:11, fontWeight:600, color:"#555", background:"#f0f0ec",color:"#1a1a1a", padding:"3px 8px", borderRadius:6 }}>
             {BLOCK_TYPES.find(b => b.key === block.type)?.label}
           </span>
         )}
@@ -218,7 +234,7 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
                   style={{ width:74, padding:"5px 7px", border:"1.5px solid #e0e0e0", borderRadius:6, fontSize:13, fontFamily:"inherit", outline:"none", color:"#1a1a1a", textAlign:"center" }} />
               )}
             </div>
-            <div style={{ background:"#f8f8f6", borderRadius:8, padding:"8px 10px" }}>
+            <div style={{ background:"#f8f8f6",color:"#1a1a1a", borderRadius:8, padding:"8px 10px" }}>
               <div style={{ fontSize:10, fontWeight:700, color:"#bbb", letterSpacing:".06em", textTransform:"uppercase", marginBottom:8 }}>Interval Sets</div>
               {/* Headers */}
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 28px", gap:6, marginBottom:6 }}>
@@ -244,14 +260,14 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
                       <input placeholder="30s" value={s.rest} onChange={e => updInterval(s.id, "rest", e.target.value)}
                         style={{ padding:"4px 6px", border:"1.5px solid #e0e0e0", borderRadius:5, fontSize:12, fontFamily:"inherit", outline:"none", color:"#1a1a1a", textAlign:"center" }} />
                       <button onClick={() => removeInterval(s.id)}
-                        style={{ background:"transparent", border:"none", fontSize:14, color:"#ddd", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>x</button>
+                        style={{ background:"transparent",color:"#1a1a1a", border:"none", fontSize:14, color:"#ddd", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>x</button>
                     </>
                   )}
                 </div>
               ))}
               {!isClient && (
                 <button onClick={addInterval}
-                  style={{ background:"transparent", border:"1.5px dashed #ddd", borderRadius:6, padding:"4px", fontSize:11, color:"#aaa", cursor:"pointer", fontFamily:"inherit", width:"100%", marginTop:4 }}>
+                  style={{ background:"transparent",color:"#1a1a1a", border:"1.5px dashed #ddd", borderRadius:6, padding:"4px", fontSize:11, color:"#aaa", cursor:"pointer", fontFamily:"inherit", width:"100%", marginTop:4 }}>
                   + Add interval set
                 </button>
               )}
@@ -264,6 +280,36 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
           </div>
         )}
 
+        {/* OVER/UNDER type */}
+        {block.type === "overunder" && (
+          <div style={{ marginBottom:8 }}>
+            <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:10, flexWrap:"wrap" }}>
+              <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                <span style={{ fontSize:11, color:"#bbb", fontWeight:700 }}>ROUNDS</span>
+                {isClient ? <span style={{ fontWeight:700, fontSize:14 }}>{block.reps || "?"}</span>
+                  : <input type="number" placeholder="4" value={block.reps} onChange={e => upd("reps", e.target.value)}
+                      style={{ width:52, padding:"5px 7px", border:"1.5px solid #e0e0e0", borderRadius:6, fontSize:13, fontFamily:"inherit", outline:"none", color:"#1a1a1a", textAlign:"center" }} />}
+              </div>
+              <span style={{ color:"#bbb" }}>×</span>
+              <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                <span style={{ fontSize:11, color:"#bbb", fontWeight:700 }}>METERS UNDER</span>
+                {isClient ? <span style={{ fontWeight:700, fontSize:14 }}>{block.meters || "?"}m</span>
+                  : <input type="number" placeholder="25" value={block.meters} onChange={e => upd("meters", e.target.value)}
+                      style={{ width:64, padding:"5px 7px", border:"1.5px solid #e0e0e0", borderRadius:6, fontSize:13, fontFamily:"inherit", outline:"none", color:"#1a1a1a", textAlign:"center" }} />}
+              </div>
+            </div>
+            <div style={{ background:"#e8f0ff", border:"1px solid #b3c5f7", borderRadius:8, padding:"10px 12px", fontSize:13, color:"#1a2fa3", lineHeight:1.5 }}>
+              {isClient
+                ? (block.reps && block.meters ? block.reps + " rounds: " + block.meters + "m underwater + " + block.meters + "m surface, alternating" : "Over/Under set")
+                : <textarea value={block.compoundText} onChange={e => upd("compoundText", e.target.value)}
+                    placeholder={"Describe the over/under pattern...
+e.g. 25m freestyle surface breathing normally, 25m DYNB underwater. Repeat x4."}
+                    style={{ width:"100%", padding:"0", border:"none", outline:"none", fontSize:13, fontFamily:"inherit", resize:"vertical", minHeight:52, color:"#1a2fa3", background:"transparent", lineHeight:1.6 }} />
+              }
+            </div>
+          </div>
+        )}
+
         {/* COMPOUND type */}
         {block.type === "compound" && (
           <div style={{ marginBottom:8 }}>
@@ -272,7 +318,7 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
             ) : (
               <textarea value={block.compoundText} onChange={e => upd("compoundText", e.target.value)}
                 placeholder={"Write the full set description...\ne.g. 100m over/under: 25m freestyle breathing normally, 25m DYNB, repeat x2. Rest 2min between rounds."}
-                style={{ width:"100%", padding:"8px 0", border:"none", outline:"none", fontSize:14, fontFamily:"inherit", resize:"vertical", minHeight:72, color:"#333", background:"transparent", lineHeight:1.7 }} />
+                style={{ width:"100%", padding:"8px 0", border:"none", outline:"none", fontSize:14, fontFamily:"inherit", resize:"vertical", minHeight:72, color:"#333", background:"transparent",color:"#1a1a1a", lineHeight:1.7 }} />
             )}
           </div>
         )}
@@ -285,7 +331,7 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
             ) : (
               <textarea value={block.description} onChange={e => upd("description", e.target.value)}
                 placeholder="Additional notes — technique cues, breathing pattern, intensity..."
-                style={{ width:"100%", padding:"6px 0", border:"none", borderTop:"1px solid #f5f5f5", outline:"none", fontSize:13, fontFamily:"inherit", resize:"vertical", minHeight:48, color:"#555", background:"transparent", lineHeight:1.6 }} />
+                style={{ width:"100%", padding:"6px 0", border:"none", borderTop:"1px solid #f5f5f5", outline:"none", fontSize:13, fontFamily:"inherit", resize:"vertical", minHeight:48, color:"#555", background:"transparent",color:"#1a1a1a", lineHeight:1.6 }} />
             )}
           </div>
         )}
@@ -307,7 +353,7 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
             <button onClick={() => { upd("videoUrl", videoInput); setEditVideo(false); }}
               style={{ background:"#f4803a", color:"#fff", border:"none", borderRadius:6, padding:"6px 12px", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>Save</button>
             {block.videoUrl && <button onClick={() => { setVideoInput(""); upd("videoUrl", ""); setEditVideo(false); }}
-              style={{ background:"transparent", border:"1.5px solid #e8c5c5", borderRadius:6, padding:"6px 9px", fontSize:12, cursor:"pointer", color:"#c0392b", fontFamily:"inherit" }}>Remove</button>}
+              style={{ background:"transparent",color:"#1a1a1a", border:"1.5px solid #e8c5c5", borderRadius:6, padding:"6px 9px", fontSize:12, cursor:"pointer", color:"#c0392b", fontFamily:"inherit" }}>Remove</button>}
           </div>
         </div>
       )}
@@ -330,7 +376,7 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
 
       {/* Client log */}
       {isClient && showLog && (
-        <div style={{ padding:"10px 14px", background:"#fafaf8", borderTop:"1px solid #f5f5f5" }}>
+        <div style={{ padding:"10px 14px", background:"#fafaf8",color:"#1a1a1a", borderTop:"1px solid #f5f5f5" }}>
           <div style={{ fontSize:10, fontWeight:800, letterSpacing:".07em", textTransform:"uppercase", color:"#aaa", marginBottom:8 }}>Your Log</div>
           <div style={{ marginBottom:8 }}>
             <div style={{ fontSize:12, fontWeight:600, color:"#555", marginBottom:4 }}>How did it feel?</div>
@@ -366,7 +412,7 @@ function Section({ section, onChange, onRemove, isClient, poolLength }) {
           <div style={{ fontWeight:700, fontSize:12, color:"#888", letterSpacing:".06em", textTransform:"uppercase" }}>{section.name}</div>
         ) : (
           <input value={section.name} onChange={e => onChange({ ...section, name: e.target.value })}
-            style={{ fontWeight:700, fontSize:12, color:"#888", letterSpacing:".06em", textTransform:"uppercase", border:"none", outline:"none", fontFamily:"inherit", background:"transparent", flex:1 }}
+            style={{ fontWeight:700, fontSize:12, color:"#888", letterSpacing:".06em", textTransform:"uppercase", border:"none", outline:"none", fontFamily:"inherit", background:"transparent",color:"#1a1a1a", flex:1 }}
             placeholder="Section name..." />
         )}
         {isClient && totalCount > 0 && <span style={{ fontSize:11, color:"#4caf50", fontWeight:600 }}>{doneCount}/{totalCount}</span>}
@@ -381,7 +427,7 @@ function Section({ section, onChange, onRemove, isClient, poolLength }) {
       ))}
 
       {section.blocks.length === 0 && !isClient && (
-        <div style={{ background:"#fafaf8", border:"1.5px dashed #e0e0e0", borderRadius:10, padding:"16px", textAlign:"center", color:"#ccc", fontSize:12, marginBottom:8 }}>
+        <div style={{ background:"#fafaf8",color:"#1a1a1a", border:"1.5px dashed #e0e0e0", borderRadius:10, padding:"16px", textAlign:"center", color:"#ccc", fontSize:12, marginBottom:8 }}>
           No blocks yet
         </div>
       )}
@@ -390,7 +436,7 @@ function Section({ section, onChange, onRemove, isClient, poolLength }) {
         <div style={{ display:"flex", gap:7, marginTop:6 }}>
           {BLOCK_TYPES.map(bt => (
             <button key={bt.key} onClick={() => addBlock(bt.key)}
-              style={{ flex:1, padding:"8px", borderRadius:8, border:"1.5px dashed #ddd", background:"#fafaf8", color:"#888", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit", transition:"all .15s" }}
+              style={{ flex:1, padding:"8px", borderRadius:8, border:"1.5px dashed #ddd", background:"#fafaf8",color:"#1a1a1a", color:"#888", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit", transition:"all .15s" }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = "#555"; e.currentTarget.style.color = "#555"; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = "#ddd"; e.currentTarget.style.color = "#888"; }}>
               + {bt.label}
@@ -485,7 +531,7 @@ export default function PoolBuilder({ initialData, onSave, isClient }) {
           <div style={{ fontWeight:700, fontSize:17 }}>{sessionName || "Pool Training Session"}</div>
         ) : (
           <input value={sessionName} onChange={e => setSessionName(e.target.value)}
-            style={{ fontWeight:700, fontSize:17, border:"none", borderBottom:"2px solid #f0f0f0", outline:"none", fontFamily:"inherit", color:"#1a1a1a", background:"transparent", width:"100%", paddingBottom:6 }}
+            style={{ fontWeight:700, fontSize:17, border:"none", borderBottom:"2px solid #f0f0f0", outline:"none", fontFamily:"inherit", color:"#1a1a1a", background:"transparent",color:"#1a1a1a", width:"100%", paddingBottom:6 }}
             placeholder="Session name (e.g. DYN Hypercapnic Block)..." />
         )}
         <div style={{ fontSize:12, color:"#aaa", marginTop:5, display:"flex", gap:16, flexWrap:"wrap" }}>
@@ -497,13 +543,13 @@ export default function PoolBuilder({ initialData, onSave, isClient }) {
 
       {/* Progress bar */}
       {isClient && totalBlocks > 0 && (
-        <div style={{ height:5, background:"#f0f0f0", borderRadius:3, marginBottom:16, overflow:"hidden" }}>
+        <div style={{ height:5, background:"#f0f0f0",color:"#1a1a1a", borderRadius:3, marginBottom:16, overflow:"hidden" }}>
           <div style={{ height:"100%", width:progress + "%", background:"#4caf50", borderRadius:3, transition:"width .3s" }} />
         </div>
       )}
 
       {/* Session equipment */}
-      <div style={{ background:"#f8f8f6", borderRadius:10, padding:"12px 14px", marginBottom:14 }}>
+      <div style={{ background:"#f8f8f6",color:"#1a1a1a", borderRadius:10, padding:"12px 14px", marginBottom:14 }}>
         <div style={{ fontSize:11, fontWeight:700, color:"#bbb", letterSpacing:".07em", textTransform:"uppercase", marginBottom:8 }}>Session Equipment</div>
         <EquipmentPicker selected={equipment} onChange={setEquipment} isClient={isClient} />
       </div>
@@ -533,7 +579,7 @@ export default function PoolBuilder({ initialData, onSave, isClient }) {
 
       {!isClient && (
         <button onClick={addSection}
-          style={{ background:"transparent", border:"1.5px dashed #ddd", borderRadius:10, padding:"10px", fontSize:12, fontWeight:600, color:"#aaa", cursor:"pointer", fontFamily:"inherit", width:"100%", marginBottom:14 }}
+          style={{ background:"transparent",color:"#1a1a1a", border:"1.5px dashed #ddd", borderRadius:10, padding:"10px", fontSize:12, fontWeight:600, color:"#aaa", cursor:"pointer", fontFamily:"inherit", width:"100%", marginBottom:14 }}
           onMouseEnter={e => { e.currentTarget.style.borderColor = "#555"; e.currentTarget.style.color = "#555"; }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = "#ddd"; e.currentTarget.style.color = "#aaa"; }}>
           + Add Section
@@ -543,7 +589,7 @@ export default function PoolBuilder({ initialData, onSave, isClient }) {
       {/* Client rating */}
       {isClient && (
         <>
-          <div style={{ background:"#f8f8f6", borderRadius:10, padding:"14px", textAlign:"center" }}>
+          <div style={{ background:"#f8f8f6",color:"#1a1a1a", borderRadius:10, padding:"14px", textAlign:"center" }}>
             <div style={{ fontSize:11, fontWeight:700, color:"#aaa", letterSpacing:".06em", textTransform:"uppercase", marginBottom:10 }}>Rate this session</div>
             <div style={{ display:"flex", justifyContent:"center", gap:8 }}>
               {[1,2,3,4,5].map(n => (
