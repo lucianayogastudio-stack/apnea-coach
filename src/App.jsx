@@ -775,17 +775,15 @@ export default function ApneaCoach() {
               <span style={{fontSize:20}}>🤿</span>
               <span style={{fontWeight:700,fontSize:16,letterSpacing:"-.02em"}}>ApneaCoach</span>
             </div>
-            {isCoach&&(
-              <div style={{display:"flex",gap:2}}>
-                {[
-                  {key:"dashboard",label:"📋 Dashboard"},
-                  ...(isAdmin?[{key:"adminView",label:"👑 Admin"}]:[]),
-                  ...(activeClient?[{key:"coachWeek",label:`📅 ${activeClient.name.split(" ")[0]}'s Week`},{key:"clientWeek",label:"🏊 Client View"}]:[])
-                ].map(t=>(
-                  <button key={t.key} onClick={()=>setView(t.key)} style={{padding:"8px 15px",borderRadius:8,border:"none",fontSize:13,cursor:"pointer",fontFamily:"inherit",transition:"all .15s",background:view===t.key?"#f0f0ec":"transparent",color:view===t.key?"#1a1a1a":"#888",fontWeight:view===t.key?600:500}}>{t.label}</button>
-                ))}
-              </div>
-            )}
+            <div style={{display:"flex",gap:2}}>
+              {[
+                {key:"dashboard",label:"📋 Dashboard"},
+                ...(isAdmin?[{key:"adminView",label:"👑 Admin"}]:[]),
+                ...(isCoach&&activeClient?[{key:"coachWeek",label:`📅 ${activeClient.name.split(" ")[0]}'s Week`},{key:"clientWeek",label:"🏊 Client View"}]:[])
+              ].map(t=>(
+                <button key={t.key} onClick={()=>setView(t.key)} style={{padding:"8px 15px",borderRadius:8,border:"none",fontSize:13,cursor:"pointer",fontFamily:"inherit",transition:"all .15s",background:view===t.key?"#f0f0ec":"transparent",color:view===t.key?"#1a1a1a":"#888",fontWeight:view===t.key?600:500}}>{t.label}</button>
+              ))}
+            </div>
           </div>
           <div style={{display:"flex",gap:10,alignItems:"center"}}>
             <div style={{fontSize:12,color:"#aaa",fontWeight:500}}>{user.email}</div>
