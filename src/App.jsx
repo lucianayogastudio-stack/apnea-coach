@@ -54,7 +54,48 @@ function dbToSession(row) {
 }
 
 function dbToClient(row) {
-  return { id:row.id, name:row.name, age:row.age, level:row.level, goal:row.goal, pb:{CWT:row.pb_cwt, STA:row.pb_sta, DYN:row.pb_dyn} };
+  return {
+    id:row.id, name:row.name, age:row.age, level:row.level, goal:row.goal,
+    pb:{CWT:row.pb_cwt, STA:row.pb_sta, DYN:row.pb_dyn},
+    planType: row.plan_type||"weeks",
+    planWeeks: row.plan_weeks||null,
+    planStartDate: row.plan_start_date||null,
+    competitionDate: row.competition_date||null,
+    competitionName: row.competition_name||null,
+  };
+}
+
+// ── Timeline helpers ──────────────────────────────────────────────────────────
+function getTimeline(client) {
+  if (!client) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  if (client.planType==="competition" && client.competitionDate) {
+    const compDate = new Date(client.competitionDate);
+    const daysLeft = Math.ceil((compDate - today) / (1000*60*60*24));
+    const weeksLeft = Math.ceil(daysLeft / 7);
+    const startDate = client.planStartDate ? new Date(client.planStartDate) : null;
+    const totalDays = startDate ? Math.ceil((compDate - startDate) / (1000*60*60*24)) : null;
+    const elapsed = startDate ? Math.ceil((today - startDate) / (1000*60*60*24)) : null;
+    const progress = totalDays && elapsed ? Math.min(100, Math.round((elapsed/totalDays)*100)) : null;
+    const currentWeek = startDate ? Math.ceil(elapsed/7) : null;
+    const totalWeeks = totalDays ? Math.ceil(totalDays/7) : null;
+    return { type:"competition", daysLeft, weeksLeft, progress, currentWeek, totalWeeks,
+             label: client.competitionName||"Competition", date: client.competitionDate, isPast: daysLeft < 0 };
+  }
+
+  if (client.planType==="weeks" && client.planWeeks && client.planStartDate) {
+    const startDate = new Date(client.planStartDate);
+    const endDate = new Date(startDate); endDate.setDate(endDate.getDate() + client.planWeeks*7);
+    const daysLeft = Math.ceil((endDate - today) / (1000*60*60*24));
+    const weeksLeft = Math.max(0, Math.ceil(daysLeft / 7));
+    const elapsed = Math.ceil((today - startDate) / (1000*60*60*24));
+    const progress = Math.min(100, Math.max(0, Math.round((elapsed/(client.planWeeks*7))*100)));
+    const currentWeek = Math.min(client.planWeeks, Math.max(1, Math.ceil(elapsed/7)));
+    return { type:"weeks", daysLeft, weeksLeft, progress, currentWeek, totalWeeks:client.planWeeks,
+             label:`${client.planWeeks}-Week Plan`, isPast: daysLeft < 0 };
+  }
+  return null;
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────────
@@ -385,18 +426,19 @@ function AssignModal({ date, clientName, onClose, onSave }) {
 }
 
 // ── Add Client Modal ──────────────────────────────────────────────────────────
-function AddClientModal({ onClose, onSave }) {
-  const [form, setForm] = useState({name:"",age:"",level:"Competitive",goal:"",email:"",password:"",pb:{CWT:"",STA:"",DYN:""}});
+function AddClientModal({ onClose, onSave, initialClient, isEditing }) {
+  const [form, setForm] = useState(initialClient || {name:"",age:"",level:"Competitive",goal:"",email:"",password:"",pb:{CWT:"",STA:"",DYN:""},planType:"weeks",planWeeks:"",planStartDate:"",competitionDate:"",competitionName:""});
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
-    if (!form.name||!form.email||!form.password) return;
+    if (!form.name) return;
+    if (!isEditing && (!form.email||!form.password)) return;
     setSaving(true); await onSave(form); setSaving(false);
   }
 
   return (
     <Modal onClose={onClose}>
-      <div style={{fontWeight:700,fontSize:18,marginBottom:20,letterSpacing:"-.02em"}}>New Client</div>
+      <div style={{fontWeight:700,fontSize:18,marginBottom:20,letterSpacing:"-.02em"}}>{isEditing?"Edit Client":"New Client"}</div>
       <div style={{display:"flex",flexDirection:"column",gap:13}}>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
           <div><div style={{fontSize:12,fontWeight:600,color:"#666",marginBottom:6}}>Full Name</div><input style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,outline:"none",fontFamily:"inherit",color:"#1a1a1a"}} placeholder="Name" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} /></div>
@@ -404,20 +446,62 @@ function AddClientModal({ onClose, onSave }) {
         </div>
         <div><div style={{fontSize:12,fontWeight:600,color:"#666",marginBottom:6}}>Level</div><select style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,outline:"none",fontFamily:"inherit",background:"#fff",color:"#1a1a1a"}} value={form.level} onChange={e=>setForm(p=>({...p,level:e.target.value}))}>{["Beginner","Intermediate","Advanced","Competitive"].map(l=><option key={l}>{l}</option>)}</select></div>
         <div><div style={{fontSize:12,fontWeight:600,color:"#666",marginBottom:6}}>Goal</div><input style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,outline:"none",fontFamily:"inherit",color:"#1a1a1a"}} placeholder="e.g. Break -80m CWT" value={form.goal} onChange={e=>setForm(p=>({...p,goal:e.target.value}))} /></div>
-        <div style={{background:"#f0f7ff",border:"1px solid #c0d8f0",borderRadius:10,padding:"14px 16px"}}>
-          <div style={{fontSize:11,fontWeight:700,color:"#005fa3",letterSpacing:".06em",textTransform:"uppercase",marginBottom:12}}>🔐 Client Login Details</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-            <div><div style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:6}}>Email</div><input type="email" style={{width:"100%",padding:"10px 12px",border:"1.5px solid #c0d8f0",borderRadius:8,fontSize:14,outline:"none",fontFamily:"inherit",color:"#1a1a1a"}} placeholder="client@email.com" value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} /></div>
-            <div><div style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:6}}>Password</div><input type="text" style={{width:"100%",padding:"10px 12px",border:"1.5px solid #c0d8f0",borderRadius:8,fontSize:14,outline:"none",fontFamily:"inherit",color:"#1a1a1a"}} placeholder="Set a password" value={form.password} onChange={e=>setForm(p=>({...p,password:e.target.value}))} /></div>
+        {!isEditing&&(
+          <div style={{background:"#f0f7ff",border:"1px solid #c0d8f0",borderRadius:10,padding:"14px 16px"}}>
+            <div style={{fontSize:11,fontWeight:700,color:"#005fa3",letterSpacing:".06em",textTransform:"uppercase",marginBottom:12}}>🔐 Client Login Details</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <div><div style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:6}}>Email</div><input type="email" style={{width:"100%",padding:"10px 12px",border:"1.5px solid #c0d8f0",borderRadius:8,fontSize:14,outline:"none",fontFamily:"inherit",color:"#1a1a1a"}} placeholder="client@email.com" value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} /></div>
+              <div><div style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:6}}>Password</div><input type="text" style={{width:"100%",padding:"10px 12px",border:"1.5px solid #c0d8f0",borderRadius:8,fontSize:14,outline:"none",fontFamily:"inherit",color:"#1a1a1a"}} placeholder="Set a password" value={form.password} onChange={e=>setForm(p=>({...p,password:e.target.value}))} /></div>
+            </div>
+            <div style={{fontSize:11,color:"#666",marginTop:8}}>Share these credentials with your client so they can log in.</div>
           </div>
-          <div style={{fontSize:11,color:"#666",marginTop:8}}>Share these credentials with your client so they can log in.</div>
-        </div>
+        )}
         <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginTop:4}}>Personal Bests</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
           {[["CWT (m)","CWT","number"],["STA (m:ss)","STA","text"],["DYN (m)","DYN","number"]].map(([label,key,type])=>(
             <div key={key}><div style={{fontSize:12,fontWeight:600,color:"#666",marginBottom:6}}>{label}</div><input type={type} style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,outline:"none",fontFamily:"inherit",color:"#1a1a1a"}} placeholder="—" value={form.pb[key]} onChange={e=>setForm(p=>({...p,pb:{...p.pb,[key]:e.target.value}}))} /></div>
           ))}
         </div>
+        {/* Timeline */}
+        <div style={{background:"#f0f7ff",border:"1px solid #c0d8f0",borderRadius:10,padding:"14px 16px"}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#005fa3",letterSpacing:".06em",textTransform:"uppercase",marginBottom:12}}>📅 Training Timeline</div>
+          <div style={{display:"flex",gap:8,marginBottom:12}}>
+            {[["weeks","📆 X-Week Plan"],["competition","🏆 Competition Date"]].map(([k,l])=>(
+              <button key={k} onClick={()=>setForm(p=>({...p,planType:k}))}
+                style={{flex:1,padding:"8px",borderRadius:8,border:`2px solid ${form.planType===k?"#3a8ef4":"#c0d8f0"}`,background:form.planType===k?"#dbeeff":"#fff",color:form.planType===k?"#005fa3":"#888",fontWeight:form.planType===k?700:500,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                {l}
+              </button>
+            ))}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div>
+              <div style={{fontSize:11,fontWeight:600,color:"#444",marginBottom:5}}>Start Date</div>
+              <input type="date" style={{width:"100%",padding:"8px 10px",border:"1.5px solid #c0d8f0",borderRadius:7,fontSize:13,fontFamily:"inherit",outline:"none",color:"#1a1a1a"}}
+                value={form.planStartDate} onChange={e=>setForm(p=>({...p,planStartDate:e.target.value}))} />
+            </div>
+            {form.planType==="weeks" ? (
+              <div>
+                <div style={{fontSize:11,fontWeight:600,color:"#444",marginBottom:5}}>Number of weeks</div>
+                <input type="number" placeholder="e.g. 8" style={{width:"100%",padding:"8px 10px",border:"1.5px solid #c0d8f0",borderRadius:7,fontSize:13,fontFamily:"inherit",outline:"none",color:"#1a1a1a"}}
+                  value={form.planWeeks} onChange={e=>setForm(p=>({...p,planWeeks:e.target.value}))} />
+              </div>
+            ) : (
+              <div>
+                <div style={{fontSize:11,fontWeight:600,color:"#444",marginBottom:5}}>Competition date</div>
+                <input type="date" style={{width:"100%",padding:"8px 10px",border:"1.5px solid #c0d8f0",borderRadius:7,fontSize:13,fontFamily:"inherit",outline:"none",color:"#1a1a1a"}}
+                  value={form.competitionDate} onChange={e=>setForm(p=>({...p,competitionDate:e.target.value}))} />
+              </div>
+            )}
+          </div>
+          {form.planType==="competition" && (
+            <div style={{marginTop:10}}>
+              <div style={{fontSize:11,fontWeight:600,color:"#444",marginBottom:5}}>Competition name</div>
+              <input placeholder="e.g. AIDA World Cup 2026" style={{width:"100%",padding:"8px 10px",border:"1.5px solid #c0d8f0",borderRadius:7,fontSize:13,fontFamily:"inherit",outline:"none",color:"#1a1a1a"}}
+                value={form.competitionName} onChange={e=>setForm(p=>({...p,competitionName:e.target.value}))} />
+            </div>
+          )}
+        </div>
+
         <div style={{display:"flex",gap:10,paddingTop:4}}>
           <button onClick={handleSave} disabled={saving} style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"11px 22px",borderRadius:8,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:saving?0.6:1}}>{saving?"Creating...":"Add Client"}</button>
           <button onClick={onClose} style={{background:"transparent",border:"1.5px solid #ddd",color:"#444",padding:"10px 20px",borderRadius:8,fontSize:14,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
@@ -591,6 +675,7 @@ export default function ApneaCoach() {
   const [clipboard,      setClipboard]      = useState(null); // copied session plan
   const [pasteModal,     setPasteModal]     = useState(null); // {date, clientId}
   const [adminData,      setAdminData]      = useState(null); // {coaches, allClients}
+  const [editClientModal, setEditClientModal] = useState(null); // client being edited
 
   function flash(msg) { setToast(msg); setTimeout(()=>setToast(""),2400); }
 
@@ -639,6 +724,26 @@ export default function ApneaCoach() {
     }
   }
 
+  // ── Edit client profile ──
+  async function handleEditClient(form) {
+    const {error} = await supabase.from("clients").update({
+      name:form.name, age:form.age?Number(form.age):null, level:form.level, goal:form.goal,
+      pb_cwt:form.pb.CWT?Number(form.pb.CWT):null, pb_sta:form.pb.STA||null, pb_dyn:form.pb.DYN?Number(form.pb.DYN):null,
+      plan_type:form.planType||"weeks", plan_weeks:form.planWeeks?Number(form.planWeeks):null,
+      plan_start_date:form.planStartDate||null, competition_date:form.competitionDate||null, competition_name:form.competitionName||null,
+    }).eq("id", editClientModal.id);
+    if (!error) {
+      const updated = {...editClientModal, ...form, id:editClientModal.id,
+        planType:form.planType, planWeeks:form.planWeeks?Number(form.planWeeks):null,
+        planStartDate:form.planStartDate||null, competitionDate:form.competitionDate||null, competitionName:form.competitionName||null,
+        pb:{CWT:form.pb.CWT, STA:form.pb.STA, DYN:form.pb.DYN}};
+      setClients(prev=>prev.map(c=>c.id===editClientModal.id?updated:c));
+      if (activeClient?.id===editClientModal.id) setActiveClient(updated);
+      setEditClientModal(null);
+      flash("Client updated!");
+    }
+  }
+
   // ── Admin: load all coaches + their clients ──
   async function loadAdminData() {
     const { data: profiles } = await supabase.from("profiles").select("*").eq("role","coach");
@@ -657,7 +762,12 @@ export default function ApneaCoach() {
     const {data:clientData, error:clientError} = await supabase.from("clients").insert({
       name:form.name, age:form.age?Number(form.age):null, level:form.level, goal:form.goal,
       pb_cwt:form.pb.CWT?Number(form.pb.CWT):null, pb_sta:form.pb.STA||null, pb_dyn:form.pb.DYN?Number(form.pb.DYN):null,
-      coach_id: user.id, // link to current coach!
+      coach_id: user.id,
+      plan_type: form.planType||"weeks",
+      plan_weeks: form.planWeeks?Number(form.planWeeks):null,
+      plan_start_date: form.planStartDate||null,
+      competition_date: form.competitionDate||null,
+      competition_name: form.competitionName||null,
     }).select().single();
     if (!clientError&&clientData) {
       if (authData?.user) {
@@ -820,24 +930,43 @@ export default function ApneaCoach() {
                 const done=cs.filter(s=>s.feedback?.status==="completed").length;
                 const pending=cs.filter(s=>!s.feedback?.status).length;
                 return(
-                  <div key={c.id} style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:"16px 22px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",transition:"box-shadow .15s"}}
-                    onClick={()=>{setActiveClient(c);setView("coachWeek");}}
-                    onMouseEnter={e=>e.currentTarget.style.boxShadow="0 2px 12px rgba(0,0,0,.07)"}
-                    onMouseLeave={e=>e.currentTarget.style.boxShadow="none"}>
-                    <div style={{display:"flex",alignItems:"center",gap:14}}>
-                      <div style={{width:42,height:42,borderRadius:"50%",background:"#f0f0ec",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:17,color:"#555"}}>{c.name.charAt(0)}</div>
-                      <div>
-                        <div style={{fontWeight:600,fontSize:15}}>{c.name}</div>
-                        <div style={{fontSize:12,color:"#999",marginTop:2}}>{c.level} · {c.goal}</div>
-                        <div style={{display:"flex",gap:4,marginTop:6}}>{cs.slice(0,8).map(s=>{const m=gm(s.method);return<div key={s.id} title={m.label} style={{width:9,height:9,borderRadius:"50%",background:m.dot}}/>;})}</div>
+                  {(()=>{
+                    const tl = getTimeline(c);
+                    return (
+                      <div key={c.id} style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",overflow:"hidden",cursor:"pointer",transition:"box-shadow .15s"}}
+                        onClick={()=>{setActiveClient(c);setView("coachWeek");}}
+                        onMouseEnter={e=>e.currentTarget.style.boxShadow="0 2px 12px rgba(0,0,0,.07)"}
+                        onMouseLeave={e=>e.currentTarget.style.boxShadow="none"}>
+                        {tl&&(
+                          <div style={{height:4,background:"#f0f0f0",overflow:"hidden"}}>
+                            <div style={{height:"100%",width:`${tl.progress||0}%`,background:tl.isPast?"#ef5350":tl.type==="competition"?"#3a8ef4":"#4caf50",transition:"width .3s"}}/>
+                          </div>
+                        )}
+                        <div style={{padding:"16px 22px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:14}}>
+                            <div style={{width:42,height:42,borderRadius:"50%",background:"#f0f0ec",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:17,color:"#555"}}>{c.name.charAt(0)}</div>
+                            <div>
+                              <div style={{fontWeight:600,fontSize:15}}>{c.name}</div>
+                              <div style={{fontSize:12,color:"#999",marginTop:2}}>{c.level} · {c.goal}</div>
+                              {tl&&(
+                                <div style={{fontSize:11,marginTop:4,fontWeight:600,color:tl.isPast?"#ef5350":tl.type==="competition"?"#3a8ef4":"#4caf50"}}>
+                                  {tl.isPast ? `${tl.label} — ended` :
+                                   tl.type==="competition" ? `🏆 ${tl.label} · ${tl.daysLeft}d left (Week ${tl.currentWeek}${tl.totalWeeks?` of ${tl.totalWeeks}`:""})`  :
+                                   `📆 Week ${tl.currentWeek} of ${tl.totalWeeks} · ${tl.weeksLeft}w left`}
+                                </div>
+                              )}
+                              <div style={{display:"flex",gap:4,marginTop:5}}>{cs.slice(0,8).map(s=>{const m=gm(s.method);return<div key={s.id} title={m.label} style={{width:9,height:9,borderRadius:"50%",background:m.dot}}/>;})}</div>
+                            </div>
+                          </div>
+                          <div style={{display:"flex",alignItems:"center",gap:24}}>
+                            <div style={{textAlign:"center"}}><div style={{fontSize:11,color:"#bbb",fontWeight:600}}>DONE</div><div style={{fontWeight:700,fontFamily:"monospace",color:"#2e7d32",fontSize:18}}>{done}</div></div>
+                            <div style={{textAlign:"center"}}><div style={{fontSize:11,color:"#bbb",fontWeight:600}}>PENDING</div><div style={{fontWeight:700,fontFamily:"monospace",color:"#aaa",fontSize:18}}>{pending}</div></div>
+                            <span style={{color:"#ccc",fontSize:18}}>›</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div style={{display:"flex",alignItems:"center",gap:24}}>
-                      <div style={{textAlign:"center"}}><div style={{fontSize:11,color:"#bbb",fontWeight:600}}>DONE</div><div style={{fontWeight:700,fontFamily:"monospace",color:"#2e7d32",fontSize:18}}>{done}</div></div>
-                      <div style={{textAlign:"center"}}><div style={{fontSize:11,color:"#bbb",fontWeight:600}}>PENDING</div><div style={{fontWeight:700,fontFamily:"monospace",color:"#aaa",fontSize:18}}>{pending}</div></div>
-                      <span style={{color:"#ccc",fontSize:18}}>›</span>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 );
               })}
             </div>
@@ -937,11 +1066,18 @@ export default function ApneaCoach() {
                 <div style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".07em",textTransform:"uppercase",marginBottom:4}}>Coach View</div>
                 <div style={{fontWeight:700,fontSize:20,letterSpacing:"-.02em"}}>{activeClient.name}</div>
                 <div style={{fontSize:13,color:"#999",marginTop:3}}>{fmtShort(weekStart)} – {fmtShort(addDays(weekStart,6))}</div>
+                {(()=>{const tl=getTimeline(activeClient); return tl?(
+                  <div style={{fontSize:12,fontWeight:600,marginTop:4,color:tl.isPast?"#ef5350":tl.type==="competition"?"#3a8ef4":"#4caf50"}}>
+                    {tl.isPast?`${tl.label} ended`:tl.type==="competition"?`🏆 Week ${tl.currentWeek}${tl.totalWeeks?` of ${tl.totalWeeks}`:""}  ·  ${tl.daysLeft}d to ${tl.label}`:`📆 Week ${tl.currentWeek} of ${tl.totalWeeks}  ·  ${tl.weeksLeft} week${tl.weeksLeft!==1?"s":""} remaining`}
+                  </div>
+                ):null;})()}
               </div>
               <div style={{display:"flex",gap:8}}>
                 {[["‹ Prev",()=>setWeekStart(addDays(weekStart,-7))],["Today",()=>setWeekStart(mondayOf(new Date()))],["Next ›",()=>setWeekStart(addDays(weekStart,7))]].map(([l,fn])=>(
                   <button key={l} onClick={fn} style={{background:"transparent",border:"1.5px solid #ddd",color:"#444",padding:"8px 13px",borderRadius:8,fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>{l}</button>
                 ))}
+                <button onClick={()=>setEditClientModal({...activeClient, planType:activeClient.planType||"weeks", planWeeks:activeClient.planWeeks||"", planStartDate:activeClient.planStartDate||"", competitionDate:activeClient.competitionDate||"", competitionName:activeClient.competitionName||"", pb:{CWT:activeClient.pb?.CWT||"", STA:activeClient.pb?.STA||"", DYN:activeClient.pb?.DYN||""}})}
+                  style={{background:"transparent",border:"1.5px solid #ddd",color:"#555",padding:"8px 13px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>✏️ Edit</button>
                 <button onClick={()=>deleteClient(activeClient.id)} style={{background:"transparent",border:"1.5px solid #e8c5c5",color:"#c0392b",padding:"8px 13px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Remove</button>
               </div>
             </div>
@@ -984,6 +1120,13 @@ export default function ApneaCoach() {
                 <div style={{fontSize:11,fontWeight:700,color:"#3a8ef4",letterSpacing:".07em",textTransform:"uppercase",marginBottom:4}}>Athlete View</div>
                 <div style={{fontWeight:700,fontSize:20,letterSpacing:"-.02em"}}>{activeClient.name}</div>
                 <div style={{fontSize:13,color:"#999",marginTop:3}}>{fmtShort(weekStart)} – {fmtShort(addDays(weekStart,6))}</div>
+                {(()=>{const tl=getTimeline(activeClient); return tl&&!tl.isPast?(
+                  <div style={{marginTop:6,display:"inline-flex",alignItems:"center",gap:8,background:tl.type==="competition"?"#e8f0ff":"#e8f5e9",borderRadius:8,padding:"5px 12px"}}>
+                    <span style={{fontSize:12,fontWeight:700,color:tl.type==="competition"?"#1a2fa3":"#2e7d32"}}>
+                      {tl.type==="competition"?`🏆 ${tl.daysLeft} days to ${tl.label}`:`📆 Week ${tl.currentWeek} of ${tl.totalWeeks}`}
+                    </span>
+                  </div>
+                ):null;})()}
               </div>
               <div style={{display:"flex",gap:8}}>
                 {[["‹ Prev",()=>setWeekStart(addDays(weekStart,-7))],["Today",()=>setWeekStart(mondayOf(new Date()))],["Next ›",()=>setWeekStart(addDays(weekStart,7))]].map(([l,fn])=>(
@@ -1040,6 +1183,14 @@ export default function ApneaCoach() {
       )}
 
       {dayModal&&<DayModal session={sessions.find(s=>s.id===dayModal.session.id)||dayModal.session} role={dayModal.role} onClose={()=>setDayModal(null)} onSave={fb=>handleFeedbackSave(dayModal.session.id,fb)} onEdit={s=>setEditModal(s)}/>}
+      {editClientModal&&(
+        <AddClientModal
+          onClose={()=>setEditClientModal(null)}
+          onSave={handleEditClient}
+          initialClient={editClientModal}
+          isEditing={true}
+        />
+      )}
       {editModal&&(()=>{
         const s = sessions.find(x=>x.id===editModal.id)||editModal;
         const m = gm(s.method);
