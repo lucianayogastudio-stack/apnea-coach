@@ -95,16 +95,14 @@ function DivePlanRow({ dive, index, onChange, onRemove }) {
         </select>
 
         {/* Open line toggle */}
-        {!isDrill && (
-          <label style={{ display:"flex", alignItems:"center", gap:6, cursor:"pointer", fontSize:12, fontWeight:500, color:"#555", flexShrink:0 }}>
-            <input type="checkbox" checked={dive.openLine} onChange={e => upd("openLine", e.target.checked)}
-              style={{ width:15, height:15, accentColor:"#3a4df4", cursor:"pointer" }} />
-            Open line
-          </label>
-        )}
+        <label style={{ display:"flex", alignItems:"center", gap:6, cursor:"pointer", fontSize:12, fontWeight:500, color:"#555", flexShrink:0 }}>
+          <input type="checkbox" checked={dive.openLine} onChange={e => upd("openLine", e.target.checked)}
+            style={{ width:15, height:15, accentColor:"#3a4df4", cursor:"pointer" }} />
+          Open line
+        </label>
 
         {/* Target depth or open line max */}
-        {!isDrill && (
+        {(
           dive.openLine ? (
             <div style={{ display:"flex", alignItems:"center", gap:6 }}>
               <span style={{ fontSize:11, color:"#bbb", fontWeight:700 }}>MAX</span>
