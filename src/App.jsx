@@ -15,7 +15,7 @@ const METHODS = [
   { key:"pool-co2",       label:"Pool",           emoji:"💧", bg:"#edf6e6", border:"#7ec87e", text:"#2d7a2d", dot:"#4db84d" },
   { key:"gym-cardio",     label:"Gym Cardio",     emoji:"🏃",  bg:"#fdf0fb", border:"#d97ec8", text:"#8b1f7a", dot:"#c94db8" },
   { key:"dry-eq",         label:"Dry Eq",         emoji:"👂",  bg:"#e8f5e9", border:"#81c784", text:"#1b5e20", dot:"#43a047" },
-  { key:"mobility",       label:"Mobility",       emoji:"🧘",  bg:"#fce4ec", border:"#f48fb1", text:"#880e4f", dot:"#e91e63" },
+  { key:"mobility",       label:"Mobility",       emoji:"🤸",  bg:"#fce4ec", border:"#f48fb1", text:"#880e4f", dot:"#e91e63" },
   { key:"static",         label:"Static",         emoji:"🧘",  bg:"#fffbe6", border:"#e8cc4d", text:"#7a6200", dot:"#d4aa00" },
   { key:"depth",          label:"Depth",          emoji:"🌊",  bg:"#e8f0ff", border:"#6a7ef4", text:"#1a2fa3", dot:"#3a4df4" },
 ];
