@@ -1145,7 +1145,7 @@ export default function ApneaCoach() {
       <div style={{maxWidth:1040,margin:"0 auto",padding:"28px 24px"}}>
 
         {/* DASHBOARD */}
-        {view==="dashboard"&&isCoach&&(
+        {view==="dashboard"&&(isCoach||isAdmin)&&(
           <div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,marginBottom:24}}>
               {[["My Clients",clients.length],["Sessions Planned",sessions.length],["Best Depth",Math.max(0,...sessions.map(s=>Number(s.feedback?.actualDepth)).filter(Boolean))||"—"]].map(([l,v])=>(
@@ -1260,7 +1260,7 @@ export default function ApneaCoach() {
         )}
 
         {/* COACH WEEK */}
-        {view==="coachWeek"&&activeClient&&isCoach&&(
+        {view==="coachWeek"&&activeClient&&(isCoach||isAdmin)&&(
           <div>
             <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:22}}>
               <div>
