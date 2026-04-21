@@ -197,9 +197,19 @@ export default function ProgressCharts({ sessions, clientName }) {
     .sort((a, b) => a.date.localeCompare(b.date));
 
   // Per-session: deepest completed dive
+  // Athlete logs are in feedback.clientGymData, merged with plan dives
   const depthOverTime = depthSessions.map(s => {
-    const dives = s.plan.gymData.dives || [];
-    const completed = dives.filter(d => d.log && d.log.status === "completed" && d.log.actualDepth);
+    const planDives  = s.plan.gymData.dives || [];
+    const clientData = s.feedback?.clientGymData;
+    const loggedDives = clientData?.dives || planDives;
+
+    // Try client log first, fall back to plan dives
+    const allDives = planDives.map(pd => {
+      const logged = loggedDives.find(l => l.id === pd.id);
+      return logged ? { ...pd, log: logged.log } : pd;
+    });
+
+    const completed = allDives.filter(d => d.log && d.log.status === "completed" && d.log.actualDepth);
     const maxDepth = completed.length > 0 ? Math.max(...completed.map(d => Number(d.log.actualDepth))) : null;
     return maxDepth ? { x: s.date, y: maxDepth, label: fmtDateShort(s.date) } : null;
   }).filter(Boolean);
@@ -216,8 +226,14 @@ export default function ProgressCharts({ sessions, clientName }) {
   const totalDepthSessions = depthSessions.length;
   const totalDives = depthSessions.reduce((a, s) => a + (s.plan?.gymData?.dives?.length || 0), 0);
   const completedDives = depthSessions.reduce((a, s) => {
-    const dives = s.plan?.gymData?.dives || [];
-    return a + dives.filter(d => d.log && d.log.status === "completed").length;
+    const planDives  = s.plan?.gymData?.dives || [];
+    const clientData = s.feedback?.clientGymData;
+    const loggedDives = clientData?.dives || planDives;
+    const allDives = planDives.map(pd => {
+      const logged = loggedDives.find(l => l.id === pd.id);
+      return logged ? { ...pd, log: logged.log } : pd;
+    });
+    return a + allDives.filter(d => d.log && d.log.status === "completed").length;
   }, 0);
 
   // ── Parse pool sessions ──
