@@ -7,6 +7,7 @@ import PoolBuilder from "./PoolBuilder";
 import DepthBuilder from "./DepthBuilder";
 import DryEqBuilder from "./DryEqBuilder";
 import ProgressCharts from "./ProgressCharts";
+import MobilityBuilder from "./MobilityBuilder";
 
 const METHODS = [
   { key:"gym-strength",   label:"Gym Strength",   emoji:"🏋️", bg:"#fff0e6", border:"#f4a96a", text:"#b85c00", dot:"#f4803a" },
@@ -14,6 +15,7 @@ const METHODS = [
   { key:"pool-co2",       label:"Pool",           emoji:"💧", bg:"#edf6e6", border:"#7ec87e", text:"#2d7a2d", dot:"#4db84d" },
   { key:"gym-cardio",     label:"Gym Cardio",     emoji:"🏃",  bg:"#fdf0fb", border:"#d97ec8", text:"#8b1f7a", dot:"#c94db8" },
   { key:"dry-eq",         label:"Dry Eq",         emoji:"👂",  bg:"#e8f5e9", border:"#81c784", text:"#1b5e20", dot:"#43a047" },
+  { key:"mobility",       label:"Mobility",       emoji:"🧘",  bg:"#fce4ec", border:"#f48fb1", text:"#880e4f", dot:"#e91e63" },
   { key:"static",         label:"Static",         emoji:"🧘",  bg:"#fffbe6", border:"#e8cc4d", text:"#7a6200", dot:"#d4aa00" },
   { key:"depth",          label:"Depth",          emoji:"🌊",  bg:"#e8f0ff", border:"#6a7ef4", text:"#1a2fa3", dot:"#3a4df4" },
 ];
@@ -35,11 +37,11 @@ function fmtFull(iso) {
 
 function dbToSession(row) {
   let gymData = null;
-  if ((row.method==="gym-strength" || row.method==="static" || row.method==="pool-technique" || row.method==="pool-co2" || row.method==="depth" || row.method==="gym-cardio" || row.method==="dry-eq") && row.plan_mainset) {
+  if ((row.method==="gym-strength" || row.method==="static" || row.method==="pool-technique" || row.method==="pool-co2" || row.method==="depth" || row.method==="gym-cardio" || row.method==="dry-eq" || row.method==="mobility") && row.plan_mainset) {
     try { gymData = JSON.parse(row.plan_mainset); } catch(e) { gymData = null; }
   }
   let clientGymData = null;
-  if ((row.method==="gym-strength" || row.method==="static" || row.method==="pool-technique" || row.method==="pool-co2" || row.method==="depth" || row.method==="gym-cardio" || row.method==="dry-eq") && row.feedback?.client_notes) {
+  if ((row.method==="gym-strength" || row.method==="static" || row.method==="pool-technique" || row.method==="pool-co2" || row.method==="depth" || row.method==="gym-cardio" || row.method==="dry-eq" || row.method==="mobility") && row.feedback?.client_notes) {
     try { clientGymData = JSON.parse(row.feedback.client_notes); } catch(e) { clientGymData = null; }
   }
   return {
@@ -190,6 +192,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   const isPool2      = session.method==="pool-co2";
   const isDepthSess  = session.method==="depth";
   const isDryEq      = session.method==="dry-eq";
+  const isMobility   = session.method==="mobility";
   const isDepth = session.method==="depth";
   const isClient = role==="client";
   const [fb, setFb] = useState({...session.feedback});
@@ -239,6 +242,47 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             }
             setSaving(false);
             onClose();
+          }}
+        />
+      </Modal>
+    );
+  }
+
+  if (isMobility) {
+    return (
+      <Modal onClose={onClose} wide>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+          <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`}}>{m.emoji} {m.label}</span>
+          <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?"Athlete View":"Coach View"}</span>
+          {!isClient&&onEdit&&<button onClick={()=>{onClose();onEdit&&onEdit(session);}} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>}
+        </div>
+        <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
+        <MobilityBuilder
+          isClient={isClient}
+          initialData={(() => {
+            const cp = session.plan?.gymData || null;
+            const cl = session.feedback?.clientGymData || null;
+            if (isClient && cp && cl) {
+              return { ...cp,
+                sections: cp.sections?.map(sec => ({ ...sec,
+                  blocks: sec.blocks?.map(blk => ({ ...blk,
+                    exercises: blk.exercises?.map(ex => {
+                      const logged = cl.sections?.flatMap(s=>s.blocks?.flatMap(b=>b.exercises||[])||[]).find(l=>l.id===ex.id);
+                      return logged ? { ...ex, sets: logged.sets } : ex;
+                    }) || [],
+                  })) || [],
+                })) || [],
+                clientNotes: cl.clientNotes || "",
+                rating: cl.rating || null,
+              };
+            }
+            return cp;
+          })()}
+          onSave={async (data) => {
+            setSaving(true);
+            if (isClient) { await onSave({ ...fb, gymData:data, status: fb.status||"completed" }); }
+            else { await onSave({ ...fb, gymData:data }); }
+            setSaving(false); onClose();
           }}
         />
       </Modal>
@@ -517,6 +561,7 @@ function AssignModal({ date, clientName, onClose, onSave }) {
   const isPool2      = method==="pool-co2";
   const isDepthSess  = method==="depth";
   const isDryEq      = method==="dry-eq";
+  const isMobility   = method==="mobility";
 
   async function handleSave() { setSaving(true); await onSave({method, plan:{...plan, targetDepth:plan.targetDepth?Number(plan.targetDepth):null}}); setSaving(false); }
 
@@ -532,6 +577,19 @@ function AssignModal({ date, clientName, onClose, onSave }) {
           </button>
         );})}
       </div>
+      {/* Mobility — full builder */}
+      {isMobility && (
+        <MobilityBuilder
+          isClient={false}
+          initialData={null}
+          onSave={async (data) => {
+            setSaving(true);
+            await onSave({ method, plan:{ ...plan, gymData: data } });
+            setSaving(false); onClose();
+          }}
+        />
+      )}
+
       {/* Dry Eq — full builder */}
       {isDryEq && (
         <DryEqBuilder
@@ -613,7 +671,7 @@ function AssignModal({ date, clientName, onClose, onSave }) {
       )}
 
       {/* All other methods — text fields */}
-      {!isGym && !isStatic && !isPool && !isPool2 && !isDepthSess && !isDryEq && (<>
+      {!isGym && !isStatic && !isPool && !isPool2 && !isDepthSess && !isDryEq && !isMobility && (<>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
           <div><div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:8}}>Warm-up</div><textarea style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,background:"#fff",outline:"none",resize:"vertical",minHeight:80,fontFamily:"inherit",color:"#1a1a1a"}} placeholder="e.g. 3×FRC to 20m..." value={plan.warmup} onChange={e=>setPlan(p=>({...p,warmup:e.target.value}))} /></div>
           <div><div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:8}}>Cool-down</div><textarea style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,background:"#fff",outline:"none",resize:"vertical",minHeight:80,fontFamily:"inherit",color:"#1a1a1a"}} placeholder="e.g. 2 easy hangs..." value={plan.cooldown} onChange={e=>setPlan(p=>({...p,cooldown:e.target.value}))} /></div>
@@ -825,7 +883,8 @@ function EditSessionModal({ session, onClose, onSave, onSaveText }) {
       {session.method==="pool-technique" && <PoolTechniqueBuilder isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
       {session.method==="pool-co2" && <PoolBuilder isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
       {session.method==="depth" && <DepthBuilder isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
-      {session.method==="dry-eq" && <DryEqBuilder isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
+      {session.method==="dry-eq"   && <DryEqBuilder    isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
+      {session.method==="mobility"  && <MobilityBuilder isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
       {isGymEdit    && <GymStrengthBuilder isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
       {!isStaticEdit && !isGymEdit && <EditPlanForm session={session} onSave={plan=>onSaveText(session,plan)} onClose={onClose} />}
     </Modal>
@@ -1092,7 +1151,7 @@ export default function ApneaCoach() {
 
   async function handleAssignSave({method,plan}) {
     // For gym-strength and static, store the full workout structure as JSON in plan_mainset
-    const mainSetValue = (method==="gym-strength" || method==="static" || method==="pool-technique" || method==="pool-co2" || method==="depth" || method==="gym-cardio" || method==="dry-eq") && plan.gymData
+    const mainSetValue = (method==="gym-strength" || method==="static" || method==="pool-technique" || method==="pool-co2" || method==="depth" || method==="gym-cardio" || method==="dry-eq" || method==="mobility") && plan.gymData
       ? JSON.stringify(plan.gymData)
       : plan.mainSet||null;
     const {data,error} = await supabase.from("sessions").insert({
