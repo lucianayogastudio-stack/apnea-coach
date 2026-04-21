@@ -302,8 +302,7 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
               {isClient
                 ? (block.reps && block.meters ? block.reps + " rounds: " + block.meters + "m underwater + " + block.meters + "m surface, alternating" : "Over/Under set")
                 : <textarea value={block.compoundText} onChange={e => upd("compoundText", e.target.value)}
-                    placeholder={"Describe the over/under pattern...
-e.g. 25m freestyle surface breathing normally, 25m DYNB underwater. Repeat x4."}
+                    placeholder="Describe the over/under pattern... e.g. 25m freestyle surface, 25m DYNB underwater. Repeat x4."
                     style={{ width:"100%", padding:"0", border:"none", outline:"none", fontSize:13, fontFamily:"inherit", resize:"vertical", minHeight:52, color:"#1a2fa3", background:"transparent", lineHeight:1.6 }} />
               }
             </div>
