@@ -23,6 +23,7 @@ function makeDive() {
     openLineMax: "",
     drillNotes: "",
     coachNotes: "",
+    hang: "",          // hang duration in seconds
     // athlete log
     log: {
       status: null,        // "completed" | "early-turn" | "missed"
@@ -120,6 +121,14 @@ function DivePlanRow({ dive, index, onChange, onRemove }) {
             </div>
           )
         )}
+
+        {/* Hang */}
+        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+          <span style={{ fontSize:11, color:"#bbb", fontWeight:700 }}>HANG</span>
+          <input type="number" placeholder="—" value={dive.hang || ""} onChange={e => upd("hang", e.target.value)}
+            style={{ width:48, padding:"5px 7px", border:"1.5px solid #e8cc4d", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", color:"#7a6200", textAlign:"center", background:"#fffbe6" }} />
+          <span style={{ fontSize:11, color:"#aaa" }}>s</span>
+        </div>
 
         <div style={{ flex:1 }} />
         <button onClick={onRemove} style={{ padding:"5px 9px", borderRadius:7, border:"1.5px solid #e8c5c5", background:"transparent", fontSize:11, cursor:"pointer", color:"#c0392b", fontFamily:"inherit" }}>x</button>
@@ -375,6 +384,7 @@ export default function DepthBuilder({ initialData, onSave, isClient }) {
                   <span style={{ fontWeight:700, fontSize:14, color:"#1a2fa3" }}>
                     {dive.openLine ? "Open" + (dive.openLineMax ? " (max " + dive.openLineMax + "m)" : "") : dive.targetDepth ? dive.targetDepth + "m" : "—"}
                   </span>
+                  {dive.hang && <span style={{ padding:"2px 8px", borderRadius:6, fontSize:11, fontWeight:700, background:"#fffbe6", color:"#7a6200", border:"1px solid #e8cc4d", flexShrink:0 }}>⏱ {dive.hang}s hang</span>}
                   {dive.coachNotes && <span style={{ fontSize:11, color:"#aaa", fontStyle:"italic", flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{dive.coachNotes}</span>}
                   {dive.discipline === "DRILL" && dive.drillNotes && (
                     <span style={{ fontSize:11, color:"#555", flex:1 }}>{dive.drillNotes}</span>
