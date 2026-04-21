@@ -6,6 +6,7 @@ import PoolTechniqueBuilder from "./PoolTechniqueBuilder";
 import PoolBuilder from "./PoolBuilder";
 import DepthBuilder from "./DepthBuilder";
 import DryEqBuilder from "./DryEqBuilder";
+import ProgressCharts from "./ProgressCharts";
 
 const METHODS = [
   { key:"gym-strength",   label:"Gym Strength",   emoji:"🏋️", bg:"#fff0e6", border:"#f4a96a", text:"#b85c00", dot:"#f4803a" },
@@ -524,7 +525,7 @@ function AssignModal({ date, clientName, onClose, onSave }) {
       <div style={{fontWeight:700,fontSize:18,marginBottom:4,letterSpacing:"-.02em"}}>Plan Session</div>
       <div style={{fontSize:13,color:"#999",marginBottom:20}}>{clientName} · {fmtFull(date)}</div>
       <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:10}}>Training Method</div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:20}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:20}}>
         {METHODS.map(m=>{const sel=method===m.key;return(
           <button key={m.key} onClick={()=>setMethod(m.key)} style={{borderRadius:10,padding:"10px 8px",border:`2px solid ${sel?m.dot:"#e8e8e8"}`,background:sel?m.bg:"#fff",color:sel?m.text:"#aaa",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",flexDirection:"column",alignItems:"center",gap:5,transition:"all .12s"}}>
             <span style={{fontSize:20}}>{m.emoji}</span><span style={{lineHeight:1.3,textAlign:"center"}}>{m.label}</span>
@@ -1362,6 +1363,12 @@ export default function ApneaCoach() {
                 {clipboard&&<div style={{marginTop:8,fontSize:11,color:"#4caf50",fontWeight:600}}>✓ Session copied! Click Paste on any day.</div>}
               </div>
             </div>
+
+            {/* Progress Charts */}
+            <div style={{marginTop:24}}>
+              <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:14}}>Progress Charts</div>
+              <ProgressCharts sessions={sessions.filter(s=>s.clientId===activeClient.id)} clientName={activeClient.name} />
+            </div>
           </div>
         )}
 
@@ -1386,6 +1393,14 @@ export default function ApneaCoach() {
               onClickSession={s=>setDayModal({session:s,role:"client"})} />
             <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:12}}>This Week's Sessions</div>
             {weekDates.flatMap(d=>sessions.filter(s=>s.clientId===activeClient.id&&s.date===toISO(d))).length===0&&<div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:40,textAlign:"center",color:"#bbb",fontSize:14}}>No sessions planned this week.</div>}
+            {/* Progress Charts for athlete */}
+            {sessions.filter(s=>s.clientId===activeClient.id).some(s=>s.method==="depth"||s.method==="pool-co2") && (
+              <div style={{marginBottom:24}}>
+                <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:14}}>Your Progress</div>
+                <ProgressCharts sessions={sessions.filter(s=>s.clientId===activeClient.id)} clientName={activeClient.name} />
+              </div>
+            )}
+
             {weekDates.flatMap(d=>sessions.filter(s=>s.clientId===activeClient.id&&s.date===toISO(d))).map(s=>{
               const m=gm(s.method);
               return(
