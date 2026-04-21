@@ -11,7 +11,8 @@ const METHODS = [
   { key:"gym-strength",   label:"Gym Strength",   emoji:"🏋️", bg:"#fff0e6", border:"#f4a96a", text:"#b85c00", dot:"#f4803a" },
   { key:"pool-technique", label:"Pool Technique", emoji:"🏊",  bg:"#e6f4ff", border:"#6ab0f4", text:"#005fa3", dot:"#3a8ef4" },
   { key:"pool-co2",       label:"Pool",           emoji:"💧", bg:"#edf6e6", border:"#7ec87e", text:"#2d7a2d", dot:"#4db84d" },
-  { key:"gym-cardio",     label:"Dry Eq",         emoji:"👂",  bg:"#fdf0fb", border:"#d97ec8", text:"#8b1f7a", dot:"#c94db8" },
+  { key:"gym-cardio",     label:"Gym Cardio",     emoji:"🏃",  bg:"#fdf0fb", border:"#d97ec8", text:"#8b1f7a", dot:"#c94db8" },
+  { key:"dry-eq",         label:"Dry Eq",         emoji:"👂",  bg:"#e8f5e9", border:"#81c784", text:"#1b5e20", dot:"#43a047" },
   { key:"static",         label:"Static",         emoji:"🧘",  bg:"#fffbe6", border:"#e8cc4d", text:"#7a6200", dot:"#d4aa00" },
   { key:"depth",          label:"Depth",          emoji:"🌊",  bg:"#e8f0ff", border:"#6a7ef4", text:"#1a2fa3", dot:"#3a4df4" },
 ];
@@ -33,11 +34,11 @@ function fmtFull(iso) {
 
 function dbToSession(row) {
   let gymData = null;
-  if ((row.method==="gym-strength" || row.method==="static" || row.method==="pool-technique" || row.method==="pool-co2" || row.method==="depth" || row.method==="gym-cardio") && row.plan_mainset) {
+  if ((row.method==="gym-strength" || row.method==="static" || row.method==="pool-technique" || row.method==="pool-co2" || row.method==="depth" || row.method==="gym-cardio" || row.method==="dry-eq") && row.plan_mainset) {
     try { gymData = JSON.parse(row.plan_mainset); } catch(e) { gymData = null; }
   }
   let clientGymData = null;
-  if ((row.method==="gym-strength" || row.method==="static" || row.method==="pool-technique" || row.method==="pool-co2" || row.method==="depth" || row.method==="gym-cardio") && row.feedback?.client_notes) {
+  if ((row.method==="gym-strength" || row.method==="static" || row.method==="pool-technique" || row.method==="pool-co2" || row.method==="depth" || row.method==="gym-cardio" || row.method==="dry-eq") && row.feedback?.client_notes) {
     try { clientGymData = JSON.parse(row.feedback.client_notes); } catch(e) { clientGymData = null; }
   }
   return {
@@ -187,7 +188,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   const isPool    = session.method==="pool-technique";
   const isPool2      = session.method==="pool-co2";
   const isDepthSess  = session.method==="depth";
-  const isDryEq      = session.method==="gym-cardio";
+  const isDryEq      = session.method==="dry-eq";
   const isDepth = session.method==="depth";
   const isClient = role==="client";
   const [fb, setFb] = useState({...session.feedback});
@@ -514,7 +515,7 @@ function AssignModal({ date, clientName, onClose, onSave }) {
   const isPool    = method==="pool-technique";
   const isPool2      = method==="pool-co2";
   const isDepthSess  = method==="depth";
-  const isDryEq      = method==="gym-cardio";
+  const isDryEq      = method==="dry-eq";
 
   async function handleSave() { setSaving(true); await onSave({method, plan:{...plan, targetDepth:plan.targetDepth?Number(plan.targetDepth):null}}); setSaving(false); }
 
@@ -823,7 +824,7 @@ function EditSessionModal({ session, onClose, onSave, onSaveText }) {
       {session.method==="pool-technique" && <PoolTechniqueBuilder isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
       {session.method==="pool-co2" && <PoolBuilder isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
       {session.method==="depth" && <DepthBuilder isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
-      {session.method==="gym-cardio" && <DryEqBuilder isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
+      {session.method==="dry-eq" && <DryEqBuilder isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
       {isGymEdit    && <GymStrengthBuilder isClient={false} initialData={session.plan?.gymData||null} onSave={async data=>{ await onSave(session.id, data); onClose(); }} />}
       {!isStaticEdit && !isGymEdit && <EditPlanForm session={session} onSave={plan=>onSaveText(session,plan)} onClose={onClose} />}
     </Modal>
@@ -1090,7 +1091,7 @@ export default function ApneaCoach() {
 
   async function handleAssignSave({method,plan}) {
     // For gym-strength and static, store the full workout structure as JSON in plan_mainset
-    const mainSetValue = (method==="gym-strength" || method==="static" || method==="pool-technique" || method==="pool-co2" || method==="depth" || method==="gym-cardio") && plan.gymData
+    const mainSetValue = (method==="gym-strength" || method==="static" || method==="pool-technique" || method==="pool-co2" || method==="depth" || method==="gym-cardio" || method==="dry-eq") && plan.gymData
       ? JSON.stringify(plan.gymData)
       : plan.mainSet||null;
     const {data,error} = await supabase.from("sessions").insert({
