@@ -1051,6 +1051,15 @@ export default function ApneaCoach() {
     setProfile(data);
     await loadAll(data, u);
     if (u.email === ADMIN_EMAIL) await loadAdminData();
+    else if (data?.role === "coach") {
+      // Log coach login
+      await supabase.from("activity_log").insert({
+        event_type: "coach_login",
+        coach_email: u.email,
+        coach_id: u.id,
+        details: "Coach logged in",
+      });
+    }
     setLoading(false);
   }
 
@@ -1101,7 +1110,8 @@ export default function ApneaCoach() {
   async function loadAdminData() {
     const { data: profiles } = await supabase.from("profiles").select("*").eq("role","coach");
     const { data: allClients } = await supabase.from("clients").select("*").order("created_at");
-    setAdminData({ coaches: profiles||[], allClients: allClients||[] });
+    const { data: activityLog } = await supabase.from("activity_log").select("*").order("created_at", {ascending:false}).limit(100);
+    setAdminData({ coaches: profiles||[], allClients: allClients||[], activityLog: activityLog||[] });
   }
 
   async function handleSignOut() {
@@ -1111,7 +1121,17 @@ export default function ApneaCoach() {
 
   // ── Add Client ──
   async function handleAddClient(form) {
-    const {data:authData} = await supabase.auth.signUp({email:form.email, password:form.password});
+    // Try admin API first for instant confirmation, fallback to signUp
+    let authData = null;
+    try {
+      const {data, error} = await supabase.auth.admin.createUser({
+        email: form.email, password: form.password, email_confirm: true,
+      });
+      if (!error) authData = data;
+    } catch(e) {
+      const {data} = await supabase.auth.signUp({email:form.email, password:form.password});
+      authData = data;
+    }
     const {data:clientData, error:clientError} = await supabase.from("clients").insert({
       name:form.name, age:form.age?Number(form.age):null, level:form.level, goal:form.goal,
       pb_cwt:form.pb.CWT?Number(form.pb.CWT):null, pb_sta:form.pb.STA||null, pb_dyn:form.pb.DYN?Number(form.pb.DYN):null,
@@ -1126,19 +1146,71 @@ export default function ApneaCoach() {
       if (authData?.user) {
         await supabase.from("profiles").insert({id:authData.user.id, email:form.email, role:"client", client_id:clientData.id});
       }
+      // Log client added
+      await supabase.from("activity_log").insert({
+        event_type: "client_added",
+        coach_email: user.email,
+        coach_id: user.id,
+        details: `Added client: ${form.name} (${form.email})`,
+      });
       setClients(prev=>[...prev, dbToClient(clientData)]);
       setAddClientModal(false);
       flash(`Client added! They can log in with ${form.email}`);
+      // Log activity
+      await supabase.from("activity_log").insert({
+        event_type: "client_added",
+        coach_email: user.email,
+        coach_id: user.id,
+        details: `Added client: ${form.name} (${form.email})`,
+      });
     }
   }
 
   // ── Add Coach (admin only) ──
   async function handleAddCoach(form) {
-    const {data:authData, error} = await supabase.auth.signUp({email:form.email, password:form.password});
-    if (!error&&authData?.user) {
-      await supabase.from("profiles").insert({id:authData.user.id, email:form.email, role:"coach"});
-      setAddCoachModal(false);
-      flash(`Coach account created for ${form.email}!`);
+    try {
+      // Use admin API to create user without email confirmation
+      const {data:authData, error} = await supabase.auth.admin.createUser({
+        email: form.email,
+        password: form.password,
+        email_confirm: true,  // auto-confirm so they can log in immediately
+      });
+      if (error) throw error;
+      if (authData?.user) {
+        // Insert profile row
+        const {error: profileError} = await supabase.from("profiles").insert({
+          id: authData.user.id,
+          email: form.email,
+          role: "coach"
+        });
+        if (profileError) {
+          // Profile might already exist, try upsert
+          await supabase.from("profiles").upsert({
+            id: authData.user.id,
+            email: form.email,
+            role: "coach"
+          });
+        }
+        setAddCoachModal(false);
+        flash("Coach account created! They can log in immediately with " + form.email);
+      }
+    } catch(err) {
+      // Fallback to signUp if admin API not available
+      const {data:authData, error:signUpError} = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+      });
+      if (!signUpError && authData?.user) {
+        await supabase.from("profiles").upsert({
+          id: authData.user.id,
+          email: form.email,
+          role: "coach"
+        });
+        setAddCoachModal(false);
+        flash("Coach account created for " + form.email + "! They may need to confirm their email.");
+      } else {
+        flash("Error creating coach: " + (signUpError?.message || err.message));
+      }
     }
   }
 
@@ -1332,7 +1404,10 @@ export default function ApneaCoach() {
                           <div style={{fontWeight:600,fontSize:15,color:"#1a1a1a"}}>{coach.email}</div>
                           {isMe&&<span style={{background:"#1a1a1a",color:"#fff",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,letterSpacing:".04em"}}>YOU</span>}
                         </div>
-                        <div style={{fontSize:12,color:"#999",marginTop:2}}>{coachClients.length} client{coachClients.length!==1?"s":""}</div>
+                        <div style={{fontSize:12,color:"#999",marginTop:2}}>
+                          {coachClients.length} client{coachClients.length!==1?"s":""}
+                          {adminData?.activityLog && (" · " + (adminData.activityLog.filter(e=>e.event_type==="coach_login"&&e.coach_email===coach.email).length) + " logins")}
+                        </div>
                       </div>
                       <div style={{fontSize:11,color:"#bbb",fontWeight:600,textTransform:"uppercase",letterSpacing:".05em"}}>Coach</div>
                     </div>
@@ -1366,9 +1441,77 @@ export default function ApneaCoach() {
               })}
             </div>
 
+            {/* Activity Feed */}
+            <div style={{marginTop:28}}>
+              <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:12}}>Recent Activity</div>
+              {(!adminData?.activityLog || adminData.activityLog.length===0) && (
+                <div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:24,textAlign:"center",color:"#bbb",fontSize:13}}>No activity yet — coaches will appear here when they log in or add clients.</div>
+              )}
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {(adminData?.activityLog||[]).map(event => {
+                  const isLogin  = event.event_type==="coach_login";
+                  const isClient = event.event_type==="client_added";
+                  const date     = new Date(event.created_at);
+                  const timeStr  = date.toLocaleDateString("en-US",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});
+                  return (
+                    <div key={event.id} style={{background:"#fff",borderRadius:10,border:"1px solid #ebebeb",padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+                      <div style={{width:36,height:36,borderRadius:"50%",background:isLogin?"#e8f5e9":isClient?"#e8f0ff":"#f5f4f0",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+                        {isLogin?"🔑":isClient?"👤":"📋"}
+                      </div>
+                      <div style={{flex:1}}>
+                        <div style={{fontWeight:600,fontSize:13,color:"#1a1a1a"}}>
+                          {isLogin?"Coach logged in":isClient?"New client added":event.event_type}
+                        </div>
+                        <div style={{fontSize:12,color:"#999",marginTop:2}}>
+                          {event.coach_email}{isClient&&event.details?" · "+event.details.replace("Added client: ",""):""}
+                        </div>
+                      </div>
+                      <div style={{fontSize:11,color:"#bbb",flexShrink:0}}>{timeStr}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Activity Log */}
+            <div style={{marginTop:28}}>
+              <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:12}}>Recent Activity</div>
+              {(!adminData?.activityLog || adminData.activityLog.length===0) && (
+                <div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:24,textAlign:"center",color:"#bbb",fontSize:13}}>No activity yet — coaches will appear here when they log in or add clients.</div>
+              )}
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {adminData?.activityLog?.map(log=>{
+                  const isLogin   = log.event_type==="coach_login";
+                  const isAdded   = log.event_type==="client_added";
+                  const timeAgo   = (() => {
+                    const diff = Date.now() - new Date(log.created_at).getTime();
+                    const mins = Math.floor(diff/60000);
+                    const hrs  = Math.floor(mins/60);
+                    const days = Math.floor(hrs/24);
+                    if (days>0)  return days+"d ago";
+                    if (hrs>0)   return hrs+"h ago";
+                    if (mins>0)  return mins+"m ago";
+                    return "just now";
+                  })();
+                  return (
+                    <div key={log.id} style={{background:"#fff",borderRadius:10,border:"1px solid #ebebeb",padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+                      <div style={{width:34,height:34,borderRadius:"50%",background:isLogin?"#e8f0ff":isAdded?"#e8f5e9":"#f5f4f0",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>
+                        {isLogin?"🔑":isAdded?"👤":"📝"}
+                      </div>
+                      <div style={{flex:1}}>
+                        <div style={{fontWeight:600,fontSize:13,color:"#1a1a1a"}}>{log.details}</div>
+                        <div style={{fontSize:11,color:"#aaa",marginTop:2}}>{log.coach_email}</div>
+                      </div>
+                      <div style={{fontSize:11,color:"#bbb",fontWeight:500,flexShrink:0}}>{timeAgo}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Refresh button */}
             <div style={{marginTop:20,textAlign:"center"}}>
-              <button onClick={loadAdminData} style={{background:"transparent",color:"#1a1a1a",border:"1.5px solid #ddd",color:"#666",padding:"9px 20px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+              <button onClick={loadAdminData} style={{background:"transparent",border:"1.5px solid #ddd",color:"#666",padding:"9px 20px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
                 🔄 Refresh Data
               </button>
             </div>
