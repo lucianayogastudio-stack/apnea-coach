@@ -505,8 +505,8 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
       {session.plan?.cooldown&&<div style={{background:"#f8f8f6",color:"#1a1a1a",borderRadius:10,padding:"13px 16px",marginBottom:10}}><div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#bbb",marginBottom:6}}>Cool-down</div><div style={{fontSize:14,color:"#333",lineHeight:1.65}}>{session.plan.cooldown}</div></div>}
       {session.plan?.coachNotes&&<div style={{background:"#fffbe6",border:"1px solid #ffe082",borderRadius:10,padding:"13px 16px",marginBottom:14}}><div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#a07a00",marginBottom:6}}>📌 Coach Notes</div><div style={{fontSize:14,color:"#5a4800",lineHeight:1.65}}>{session.plan.coachNotes}</div></div>}
 
-      {/* Edit Plan button — only for coach on incomplete sessions */}
-      {!isClient && !session.feedback?.status && (
+      {/* Edit Plan button — coach can always edit plan */}
+      {!isClient && (
         <div style={{display:"flex",gap:8,marginBottom:16}}>
           <button onClick={()=>{ onClose(); }} style={{flex:1,background:"transparent",color:"#1a1a1a",border:"1.5px solid #ddd",color:"#666",padding:"10px",borderRadius:8,fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>Close</button>
           <button onClick={()=>{ onClose(); onEdit && onEdit(session); }}
@@ -517,7 +517,15 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
       )}
 
       <div style={{borderTop:"2px solid #f0f0ec",paddingTop:20,marginTop:4}}>
-        <div style={{fontWeight:700,fontSize:15,marginBottom:14}}>{isClient?"Your Feedback":"Client Feedback"}</div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+          <div style={{fontWeight:700,fontSize:15}}>{isClient?"Your Feedback":"Client Feedback"}</div>
+          {!isClient && fb.status && (
+            <button onClick={()=>setFb(p=>({...p,status:null}))}
+              style={{background:"transparent",border:"1.5px solid #e0e0e0",color:"#888",padding:"5px 12px",borderRadius:7,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+              ↩ Mark as incomplete
+            </button>
+          )}
+        </div>
         <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:9}}>Did you complete this session?</div>
         <div style={{display:"flex",gap:9,marginBottom:18}}>
           {[{key:"completed",label:"✓ Completed",bg:"#e8f5e9",bc:"#4caf50",tc:"#2e7d32"},{key:"partial",label:"~ Partial",bg:"#fff8e1",bc:"#ff9800",tc:"#e65100"},{key:"missed",label:"✗ Missed",bg:"#fce4ec",bc:"#ef5350",tc:"#c62828"}].map(opt=>{
@@ -1044,7 +1052,7 @@ function WeekGrid({ weekDates, clientId, sessions, onClickSession, onClickAdd, o
                       </div>
                     </div>
                     <div style={{fontSize:11,fontWeight:700,color:m.text,marginBottom:3}}>{m.label}</div>
-                    {isCompleted&&<div style={{fontSize:9,color:"#bbb",fontWeight:600,letterSpacing:".04em"}}>COMPLETED · READ ONLY</div>}
+                    {isCompleted&&<div style={{fontSize:9,color:"#bbb",fontWeight:600,letterSpacing:".04em"}}>COMPLETED</div>}
                     {s.method==="depth"&&s.plan?.targetDepth&&<div style={{fontSize:10,color:"#999",fontWeight:600}}>🎯 {s.plan.targetDepth}m{s.plan.openLine?" (open)":""}</div>}
                     {s.plan?.gymData?.sessionName&&<div style={{fontSize:10,color:"#aaa",marginTop:2,lineHeight:1.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.plan.gymData.sessionName}</div>}
                     {s.plan?.mainSet&&!s.plan?.gymData&&<div style={{fontSize:10,color:"#aaa",marginTop:3,lineHeight:1.4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{s.plan.mainSet}</div>}
