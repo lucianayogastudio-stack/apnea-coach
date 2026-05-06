@@ -1201,17 +1201,15 @@ export default function ApneaCoach() {
 
   // ── Add Client ──
   async function handleAddClient(form) {
-    // Try admin API first for instant confirmation, fallback to signUp
+    // Create auth user via signUp
     let authData = null;
-    try {
-      const {data, error} = await supabase.auth.admin.createUser({
-        email: form.email, password: form.password, email_confirm: true,
-      });
-      if (!error) authData = data;
-    } catch(e) {
-      const {data} = await supabase.auth.signUp({email:form.email, password:form.password});
-      authData = data;
-    }
+    const {data, error: signUpError} = await supabase.auth.signUp({
+      email: form.email,
+      password: form.password,
+      options: { data: { role: "client" } }
+    });
+    if (signUpError) { flash("Error: " + signUpError.message); return; }
+    authData = data;
     const {data:clientData, error:clientError} = await supabase.from("clients").insert({
       name:form.name, age:form.age?Number(form.age):null, level:form.level, goal:form.goal,
       pb_cwt:form.pb.CWT?Number(form.pb.CWT):null, pb_sta:form.pb.STA||null, pb_dyn:form.pb.DYN?Number(form.pb.DYN):null,
