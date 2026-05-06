@@ -550,10 +550,12 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
 }
 
 // ── Assign Modal ──────────────────────────────────────────────────────────────
-function AssignModal({ date, clientName, onClose, onSave }) {
+function AssignModal({ date, clientName, onClose, onSave, existingSessions }) {
   const [method, setMethod] = useState("depth");
   const [plan, setPlan] = useState({warmup:"",mainSet:"",cooldown:"",targetDepth:"",openLine:false,coachNotes:""});
   const [saving, setSaving] = useState(false);
+  const [templateSession, setTemplateSession] = useState(null);
+  const [templateConfirmed, setTemplateConfirmed] = useState(false);
   const isDepth = method==="depth";
   const isGym    = method==="gym-strength";
   const isStatic = method==="static";
@@ -562,6 +564,9 @@ function AssignModal({ date, clientName, onClose, onSave }) {
   const isDepthSess  = method==="depth";
   const isDryEq      = method==="dry-eq";
   const isMobility   = method==="mobility";
+  const hasBuilder = isGym||isStatic||isPool||isPool2||isDepthSess||isDryEq||isMobility;
+  const prevSessions = existingSessions ? existingSessions.filter(s=>s.method===method).slice(-5).reverse() : [];
+  const needsTemplate = hasBuilder && prevSessions.length>0 && !templateConfirmed;
 
   async function handleSave() { setSaving(true); await onSave({method, plan:{...plan, targetDepth:plan.targetDepth?Number(plan.targetDepth):null}}); setSaving(false); }
 
@@ -577,11 +582,61 @@ function AssignModal({ date, clientName, onClose, onSave }) {
           </button>
         );})}
       </div>
+      {/* Template suggester — shown when coach has previous sessions of same type */}
+      {needsTemplate && (
+        <div style={{background:"#f0f7ff",border:"1px solid #c0d8f0",borderLeft:"3px solid #3a8ef4",borderRadius:10,padding:"14px 16px",marginBottom:16}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#005fa3",letterSpacing:".06em",textTransform:"uppercase",marginBottom:10}}>
+            Use a previous session as template?
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:12}}>
+            {prevSessions.map(s=>{
+              const m=gm(s.method);
+              const isSelected = templateSession?.id===s.id;
+              const label = s.plan?.gymData?.sessionName || s.plan?.gymData?.name || s.plan?.mainSet?.slice(0,40) || fmtFull(s.date);
+              const subLabel = s.method==="depth"
+                ? (s.plan?.gymData?.dives?.length||0)+" dives"
+                : s.method==="gym-strength"||s.method==="mobility"
+                ? (s.plan?.gymData?.sections?.reduce((a,sec)=>a+sec.blocks?.reduce((b,bl)=>b+bl.exercises?.length||0,0),0)||0)+" exercises"
+                : s.method==="pool-co2"
+                ? (s.plan?.gymData?.totalMeters||"")+"m total"
+                : s.plan?.gymData?.drills?.length
+                ? (s.plan.gymData.drills.length)+" drills"
+                : s.plan?.gymData?.exercises?.length
+                ? (s.plan.gymData.exercises.length)+" exercises"
+                : "";
+              return (
+                <div key={s.id} onClick={()=>setTemplateSession(isSelected?null:s)}
+                  style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:8,border:`1.5px solid ${isSelected?"#3a8ef4":"#c0d8f0"}`,background:isSelected?"#dbeeff":"#fff",cursor:"pointer",transition:"all .12s"}}>
+                  <div style={{width:8,height:8,borderRadius:"50%",background:m.dot,flexShrink:0}}/>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:500,color:"#1a1a1a"}}>{fmtFull(s.date)}</div>
+                    {label&&label!==fmtFull(s.date)&&<div style={{fontSize:11,color:"#555",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:320}}>{label}</div>}
+                    {subLabel&&<div style={{fontSize:11,color:"#3a8ef4",fontWeight:600,marginTop:1}}>{subLabel}</div>}
+                  </div>
+                  {isSelected&&<span style={{fontSize:12,color:"#3a8ef4",fontWeight:700}}>Selected ✓</span>}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>{setTemplateSession(null);setTemplateConfirmed(true);}}
+              style={{flex:1,padding:"9px",borderRadius:8,border:"1.5px solid #c0d8f0",background:"#fff",color:"#666",fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+              Start from scratch
+            </button>
+            <button onClick={()=>{ if(templateSession) setTemplateConfirmed(true); }}
+              disabled={!templateSession}
+              style={{flex:1,padding:"9px",borderRadius:8,border:"none",background:templateSession?"#1a1a1a":"#ccc",color:"#fff",fontSize:13,fontWeight:600,cursor:templateSession?"pointer":"default",fontFamily:"inherit",transition:"all .15s"}}>
+              Use this template →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Mobility — full builder */}
-      {isMobility && (
+      {!needsTemplate && isMobility && (
         <MobilityBuilder
           isClient={false}
-          initialData={null}
+          initialData={templateSession?.plan?.gymData || null}
           onSave={async (data) => {
             setSaving(true);
             await onSave({ method, plan:{ ...plan, gymData: data } });
@@ -591,10 +646,10 @@ function AssignModal({ date, clientName, onClose, onSave }) {
       )}
 
       {/* Dry Eq — full builder */}
-      {isDryEq && (
+      {!needsTemplate && isDryEq && (
         <DryEqBuilder
           isClient={false}
-          initialData={null}
+          initialData={templateSession?.plan?.gymData || null}
           onSave={async (data) => {
             setSaving(true);
             await onSave({ method, plan:{ ...plan, gymData: data } });
@@ -604,10 +659,10 @@ function AssignModal({ date, clientName, onClose, onSave }) {
       )}
 
       {/* Depth — full builder */}
-      {isDepthSess && (
+      {!needsTemplate && isDepthSess && (
         <DepthBuilder
           isClient={false}
-          initialData={null}
+          initialData={templateSession?.plan?.gymData || null}
           onSave={async (data) => {
             setSaving(true);
             await onSave({ method, plan:{ ...plan, gymData: data } });
@@ -617,10 +672,10 @@ function AssignModal({ date, clientName, onClose, onSave }) {
       )}
 
       {/* Pool — full builder */}
-      {isPool2 && (
+      {!needsTemplate && isPool2 && (
         <PoolBuilder
           isClient={false}
-          initialData={null}
+          initialData={templateSession?.plan?.gymData || null}
           onSave={async (data) => {
             setSaving(true);
             await onSave({ method, plan:{ ...plan, gymData: data } });
@@ -630,10 +685,10 @@ function AssignModal({ date, clientName, onClose, onSave }) {
       )}
 
       {/* Pool Technique — full builder */}
-      {isPool && (
+      {!needsTemplate && isPool && (
         <PoolTechniqueBuilder
           isClient={false}
-          initialData={null}
+          initialData={templateSession?.plan?.gymData || null}
           onSave={async (data) => {
             setSaving(true);
             await onSave({ method, plan:{ ...plan, gymData: data } });
@@ -643,10 +698,10 @@ function AssignModal({ date, clientName, onClose, onSave }) {
       )}
 
       {/* Static — full builder */}
-      {isStatic && (
+      {!needsTemplate && isStatic && (
         <StaticBuilder
           isClient={false}
-          initialData={null}
+          initialData={templateSession?.plan?.gymData || null}
           onSave={async (data) => {
             setSaving(true);
             await onSave({ method, plan:{ ...plan, gymData: data } });
@@ -657,10 +712,10 @@ function AssignModal({ date, clientName, onClose, onSave }) {
       )}
 
       {/* Gym strength — full builder */}
-      {isGym && (
+      {!needsTemplate && isGym && (
         <GymStrengthBuilder
           isClient={false}
-          initialData={null}
+          initialData={templateSession?.plan?.gymData || null}
           onSave={async (gymData) => {
             setSaving(true);
             await onSave({ method, plan:{ ...plan, gymData } });
@@ -671,7 +726,7 @@ function AssignModal({ date, clientName, onClose, onSave }) {
       )}
 
       {/* All other methods — text fields */}
-      {!isGym && !isStatic && !isPool && !isPool2 && !isDepthSess && !isDryEq && !isMobility && (<>
+      {!needsTemplate && !isGym && !isStatic && !isPool && !isPool2 && !isDepthSess && !isDryEq && !isMobility && (<>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
           <div><div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:8}}>Warm-up</div><textarea style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,background:"#fff",outline:"none",resize:"vertical",minHeight:80,fontFamily:"inherit",color:"#1a1a1a"}} placeholder="e.g. 3×FRC to 20m..." value={plan.warmup} onChange={e=>setPlan(p=>({...p,warmup:e.target.value}))} /></div>
           <div><div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:8}}>Cool-down</div><textarea style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,background:"#fff",outline:"none",resize:"vertical",minHeight:80,fontFamily:"inherit",color:"#1a1a1a"}} placeholder="e.g. 2 easy hangs..." value={plan.cooldown} onChange={e=>setPlan(p=>({...p,cooldown:e.target.value}))} /></div>
@@ -934,14 +989,28 @@ function EditPlanForm({ session, onSave, onClose }) {
 }
 
 // ── Week Grid ─────────────────────────────────────────────────────────────────
-function WeekGrid({ weekDates, clientId, sessions, onClickSession, onClickAdd, onCopySession, onPasteDay, isClient, hasClipboard }) {
+function WeekGrid({ weekDates, clientId, sessions, onClickSession, onClickAdd, onCopySession, onPasteDay, isClient, hasClipboard, onMoveSession }) {
+  const [dragOverDay, setDragOverDay] = useState(null);
+  const [draggingId,  setDraggingId]  = useState(null);
+
   return (
     <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:10,marginBottom:24}}>
       {weekDates.map((d,di)=>{
         const iso=toISO(d), isToday=iso===toISO(new Date());
         const daySessions=sessions.filter(s=>s.clientId===clientId&&s.date===iso);
+        const isDragOver = dragOverDay===iso && draggingId && !daySessions.find(s=>s.id===draggingId);
         return (
-          <div key={di}>
+          <div key={di}
+            onDragOver={isClient ? e=>{e.preventDefault();setDragOverDay(iso);} : undefined}
+            onDragLeave={isClient ? ()=>setDragOverDay(null) : undefined}
+            onDrop={isClient ? e=>{
+              e.preventDefault();
+              const sid=e.dataTransfer.getData("sessionId");
+              if(sid&&onMoveSession) onMoveSession(sid,iso);
+              setDragOverDay(null);
+              setDraggingId(null);
+            } : undefined}
+            style={{borderRadius:10,padding:isDragOver?"3px":"0",background:isDragOver?"#e8f5e9":"transparent",border:isDragOver?"2px dashed #4caf50":"2px solid transparent",transition:"all .15s"}}>
             <div style={{textAlign:"center",marginBottom:8}}>
               <div style={{fontSize:11,fontWeight:700,color:isToday?"#1a1a1a":"#aaa",letterSpacing:".06em",textTransform:"uppercase"}}>{DAYS[di]}</div>
               <div style={{width:28,height:28,borderRadius:"50%",display:"inline-flex",alignItems:"center",justifyContent:"center",marginTop:3,background:isToday?"#1a1a1a":"transparent",color:isToday?"#fff":"#555",fontWeight:isToday?700:500,fontSize:14}}>{d.getDate()}</div>
@@ -952,7 +1021,10 @@ function WeekGrid({ weekDates, clientId, sessions, onClickSession, onClickAdd, o
               const isCompleted = !!st;
               return (
                 <div key={s.id} onClick={()=>onClickSession(s)}
-                  style={{borderRadius:10,border:`1.5px solid ${m.border}`,borderLeft:`3px solid ${m.dot}`,background:"#fff",marginBottom:8,cursor:"pointer",transition:"box-shadow .15s,transform .1s",overflow:"hidden"}}
+                  draggable={isClient}
+                  onDragStart={isClient ? e=>{e.dataTransfer.setData("sessionId",s.id);setDraggingId(s.id);} : undefined}
+                  onDragEnd={isClient ? ()=>{setDraggingId(null);setDragOverDay(null);} : undefined}
+                  style={{borderRadius:10,border:`1.5px solid ${m.border}`,borderLeft:`3px solid ${m.dot}`,background:"#fff",marginBottom:8,cursor:isClient?"grab":"pointer",transition:"box-shadow .15s,transform .1s",overflow:"hidden",opacity:draggingId===s.id?0.5:1}}
                   onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,.1)";e.currentTarget.style.transform="translateY(-1px)";}}
                   onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";e.currentTarget.style.transform="none";}}>
                   <div style={{padding:"9px 10px"}}>
@@ -1291,6 +1363,17 @@ export default function ApneaCoach() {
     }
   }
 
+  // ── Move session (client drag & drop) ──
+  async function handleMoveSession(sessionId, newDate) {
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session || session.date === newDate) return;
+    const { error } = await supabase.from("sessions").update({ date: newDate }).eq("id", sessionId);
+    if (!error) {
+      setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, date: newDate } : s));
+      flash("Session moved!");
+    }
+  }
+
   const weekDates = DAYS.map((_,i)=>addDays(weekStart,i));
   const isCoach = profile?.role==="coach";
   const isAdmin = user?.email===ADMIN_EMAIL;
@@ -1590,9 +1673,14 @@ export default function ApneaCoach() {
                 ))}
               </div>
             </div>
+            {/* Drag hint for client */}
+            <div style={{fontSize:11,color:"#bbb",textAlign:"center",marginBottom:8,fontWeight:500}}>
+              Drag sessions between days to reschedule ↔
+            </div>
             <WeekGrid weekDates={weekDates} clientId={activeClient.id} sessions={sessions} isClient={true}
               hasClipboard={false}
-              onClickSession={s=>setDayModal({session:s,role:"client"})} />
+              onClickSession={s=>setDayModal({session:s,role:"client"})}
+              onMoveSession={handleMoveSession} />
             <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:12}}>This Week's Sessions</div>
             {weekDates.flatMap(d=>sessions.filter(s=>s.clientId===activeClient.id&&s.date===toISO(d))).length===0&&<div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:40,textAlign:"center",color:"#bbb",fontSize:14}}>No sessions planned this week.</div>}
             {/* Progress Charts for athlete */}
@@ -1637,7 +1725,7 @@ export default function ApneaCoach() {
         )}
       </div>
 
-      {assignModal&&activeClient&&<AssignModal date={assignModal} clientName={activeClient.name} onClose={()=>setAssignModal(null)} onSave={handleAssignSave}/>}
+      {assignModal&&activeClient&&<AssignModal date={assignModal} clientName={activeClient.name} onClose={()=>setAssignModal(null)} onSave={handleAssignSave} existingSessions={sessions.filter(s=>s.clientId===activeClient.id&&s.plan?.gymData)} />}
             {/* Clipboard banner */}
       {clipboard && view==="coachWeek" && (
         <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#1a1a1a",color:"#fff",padding:"12px 20px",borderRadius:12,fontSize:13,fontWeight:500,zIndex:400,display:"flex",alignItems:"center",gap:14,boxShadow:"0 8px 24px rgba(0,0,0,.2)"}}>
