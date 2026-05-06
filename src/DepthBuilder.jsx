@@ -375,17 +375,26 @@ export default function DepthBuilder({ initialData, onSave, isClient }) {
             {dives.map((dive, i) => {
               const disc = getDiscipline(dive.discipline);
               return (
-                <div key={dive.id} style={{ padding:"12px 16px", borderBottom: i < dives.length - 1 ? "1px solid #f5f5f5" : "none", display:"flex", alignItems:"center", gap:12 }}>
-                  <span style={{ fontSize:13, fontWeight:700, color:"#bbb", flexShrink:0 }}>#{i+1}</span>
-                  <span style={{ padding:"3px 10px", borderRadius:7, fontSize:12, fontWeight:700, background:disc.bg, color:disc.color, border:"1px solid " + disc.border, flexShrink:0 }}>{disc.label}</span>
-                  <span style={{ fontSize:12, color:"#888", fontWeight:500 }}>{dive.lungVolume}</span>
-                  <span style={{ fontWeight:700, fontSize:14, color:"#1a2fa3" }}>
-                    {dive.openLine ? "Open" + (dive.openLineMax ? " (max " + dive.openLineMax + "m)" : "") : dive.targetDepth ? dive.targetDepth + "m" : "—"}
-                  </span>
-                  {dive.hang && <span style={{ padding:"2px 8px", borderRadius:6, fontSize:11, fontWeight:700, background:"#fffbe6", color:"#7a6200", border:"1px solid #e8cc4d", flexShrink:0 }}>⏱ {dive.hang}s hang</span>}
-                  {dive.coachNotes && <span style={{ fontSize:11, color:"#aaa", fontStyle:"italic", flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{dive.coachNotes}</span>}
-                  {dive.discipline === "DRILL" && dive.drillNotes && (
-                    <span style={{ fontSize:11, color:"#555", flex:1 }}>{dive.drillNotes}</span>
+                <div key={dive.id} style={{ borderBottom: i < dives.length - 1 ? "1px solid #f0f0f0" : "none", overflow:"hidden" }}>
+                  {/* Dive header row */}
+                  <div style={{ padding:"12px 16px", display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+                    <span style={{ fontSize:12, fontWeight:700, color:"#bbb", flexShrink:0 }}>#{i+1}</span>
+                    <span style={{ padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:700, background:disc.bg, color:disc.color, border:"1px solid " + disc.border, flexShrink:0 }}>{disc.label}</span>
+                    <span style={{ fontSize:11, color:"#888", fontWeight:600, background:"#f5f4f0", padding:"2px 8px", borderRadius:6, flexShrink:0 }}>{dive.lungVolume}</span>
+                    <span style={{ fontWeight:700, fontSize:16, color:"#1a2fa3", marginLeft:4 }}>
+                      {dive.openLine
+                        ? <span>Open <span style={{ fontSize:12, fontWeight:500, color:"#888" }}>{dive.openLineMax ? "(max " + dive.openLineMax + "m)" : ""}</span></span>
+                        : dive.targetDepth ? dive.targetDepth + "m" : "—"}
+                    </span>
+                    {dive.hang && <span style={{ padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:700, background:"#fffbe6", color:"#7a6200", border:"1px solid #e8cc4d", flexShrink:0 }}>⏱ {dive.hang}s hang</span>}
+                  </div>
+                  {/* Full coach notes */}
+                  {(dive.coachNotes || (dive.discipline === "DRILL" && dive.drillNotes)) && (
+                    <div style={{ padding:"0 16px 14px", background:"#f8f8f6" }}>
+                      <div style={{ fontSize:13, color:"#333", lineHeight:1.75, whiteSpace:"pre-wrap" }}>
+                        {dive.coachNotes || dive.drillNotes}
+                      </div>
+                    </div>
                   )}
                 </div>
               );
