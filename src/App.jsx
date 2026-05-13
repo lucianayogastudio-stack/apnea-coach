@@ -1201,57 +1201,38 @@ export default function ApneaCoach() {
 
   // ── Add Client ──
   async function handleAddClient(form) {
-    // Store current coach session before creating client
-    const { data: { session: coachSession } } = await supabase.auth.getSession();
-    
-    // Create auth user via signUp (this auto-signs-in the new user)
-    let authData = null;
-    const {data, error: signUpError} = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
-      options: { data: { role: "client" } }
+    // Use server-side RPC to create auth user WITHOUT logging coach out
+    const { data: newUserId, error: rpcError } = await supabase.rpc("create_auth_user", {
+      user_email: form.email,
+      user_password: form.password,
     });
-    if (signUpError) { flash("Error: " + signUpError.message); return; }
-    authData = data;
+    if (rpcError) { flash("Error creating account: " + rpcError.message); return; }
+
+    // Create client record
     const {data:clientData, error:clientError} = await supabase.from("clients").insert({
       name:form.name, age:form.age?Number(form.age):null, level:form.level, goal:form.goal,
       pb_cwt:form.pb.CWT?Number(form.pb.CWT):null, pb_sta:form.pb.STA||null, pb_dyn:form.pb.DYN?Number(form.pb.DYN):null,
       coach_id: user.id,
-      plan_type: form.planType||"weeks",
-      plan_weeks: form.planWeeks?Number(form.planWeeks):null,
-      plan_start_date: form.planStartDate||null,
-      competition_date: form.competitionDate||null,
-      competition_name: form.competitionName||null,
+      plan_type: form.planType||"weeks", plan_weeks:form.planWeeks?Number(form.planWeeks):null,
+      plan_start_date:form.planStartDate||null, competition_date:form.competitionDate||null, competition_name:form.competitionName||null,
     }).select().single();
-    if (!clientError&&clientData) {
-      if (authData?.user) {
-        await supabase.from("profiles").upsert({id:authData.user.id, email:form.email, role:"client", client_id:clientData.id}, {onConflict:"id"});
-      }
-      // Log client added
-      await supabase.from("activity_log").insert({
-        event_type: "client_added",
-        coach_email: user.email,
-        coach_id: user.id,
-        details: `Added client: ${form.name} (${form.email})`,
-      });
-      setClients(prev=>[...prev, dbToClient(clientData)]);
-      setAddClientModal(false);
-      flash(`Client added! They can log in with ${form.email}`);
-      // Log activity
-      await supabase.from("activity_log").insert({
-        event_type: "client_added",
-        coach_email: user.email,
-        coach_id: user.id,
-        details: `Added client: ${form.name} (${form.email})`,
-      });
-      // Restore coach session (signUp auto-logs-in the new user)
-      if (coachSession) {
-        await supabase.auth.setSession({
-          access_token: coachSession.access_token,
-          refresh_token: coachSession.refresh_token,
-        });
-      }
-    }
+    if (clientError || !clientData) { flash("Error creating client: " + clientError?.message); return; }
+
+    // Link auth user to client record
+    await supabase.from("profiles").upsert({
+      id: newUserId, email: form.email, role: "client", client_id: clientData.id
+    }, { onConflict: "id" });
+
+    // Log activity
+    await supabase.from("activity_log").insert({
+      event_type: "client_added", coach_email: user.email, coach_id: user.id,
+      details: `Added client: ${form.name} (${form.email})`,
+    }).catch(()=>{});
+
+    // Update UI — coach stays logged in the whole time
+    setClients(prev=>[...prev, dbToClient(clientData)]);
+    setAddClientModal(false);
+    flash(`Client added! They can log in with ${form.email}`);
   }
 
   // ── Add Coach (admin only) ──
