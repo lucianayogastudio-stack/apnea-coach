@@ -1201,7 +1201,10 @@ export default function ApneaCoach() {
 
   // ── Add Client ──
   async function handleAddClient(form) {
-    // Create auth user via signUp
+    // Store current coach session before creating client
+    const { data: { session: coachSession } } = await supabase.auth.getSession();
+    
+    // Create auth user via signUp (this auto-signs-in the new user)
     let authData = null;
     const {data, error: signUpError} = await supabase.auth.signUp({
       email: form.email,
@@ -1222,7 +1225,7 @@ export default function ApneaCoach() {
     }).select().single();
     if (!clientError&&clientData) {
       if (authData?.user) {
-        await supabase.from("profiles").insert({id:authData.user.id, email:form.email, role:"client", client_id:clientData.id});
+        await supabase.from("profiles").upsert({id:authData.user.id, email:form.email, role:"client", client_id:clientData.id}, {onConflict:"id"});
       }
       // Log client added
       await supabase.from("activity_log").insert({
@@ -1241,54 +1244,31 @@ export default function ApneaCoach() {
         coach_id: user.id,
         details: `Added client: ${form.name} (${form.email})`,
       });
+      // Restore coach session (signUp auto-logs-in the new user)
+      if (coachSession) {
+        await supabase.auth.setSession({
+          access_token: coachSession.access_token,
+          refresh_token: coachSession.refresh_token,
+        });
+      }
     }
   }
 
   // ── Add Coach (admin only) ──
   async function handleAddCoach(form) {
-    try {
-      // Use admin API to create user without email confirmation
-      const {data:authData, error} = await supabase.auth.admin.createUser({
+    const {data:authData, error:signUpError} = await supabase.auth.signUp({
+      email: form.email,
+      password: form.password,
+    });
+    if (signUpError) { flash("Error: " + signUpError.message); return; }
+    if (authData?.user) {
+      await supabase.from("profiles").upsert({
+        id: authData.user.id,
         email: form.email,
-        password: form.password,
-        email_confirm: true,  // auto-confirm so they can log in immediately
-      });
-      if (error) throw error;
-      if (authData?.user) {
-        // Insert profile row
-        const {error: profileError} = await supabase.from("profiles").insert({
-          id: authData.user.id,
-          email: form.email,
-          role: "coach"
-        });
-        if (profileError) {
-          // Profile might already exist, try upsert
-          await supabase.from("profiles").upsert({
-            id: authData.user.id,
-            email: form.email,
-            role: "coach"
-          });
-        }
-        setAddCoachModal(false);
-        flash("Coach account created! They can log in immediately with " + form.email);
-      }
-    } catch(err) {
-      // Fallback to signUp if admin API not available
-      const {data:authData, error:signUpError} = await supabase.auth.signUp({
-        email: form.email,
-        password: form.password,
-      });
-      if (!signUpError && authData?.user) {
-        await supabase.from("profiles").upsert({
-          id: authData.user.id,
-          email: form.email,
-          role: "coach"
-        });
-        setAddCoachModal(false);
-        flash("Coach account created for " + form.email + "! They may need to confirm their email.");
-      } else {
-        flash("Error creating coach: " + (signUpError?.message || err.message));
-      }
+        role: "coach"
+      }, { onConflict: "id" });
+      setAddCoachModal(false);
+      flash("Coach account created! They can log in immediately with " + form.email);
     }
   }
 
