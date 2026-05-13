@@ -1112,6 +1112,9 @@ export default function ApneaCoach() {
 
   function flash(msg) { setToast(msg); setTimeout(()=>setToast(""),2400); }
 
+  // Flag to ignore auth changes during client creation
+  const ignoringAuthChange = { current: false };
+
   useEffect(()=>{
     supabase.auth.getSession().then(({data:{session}})=>{
       setUser(session?.user||null);
@@ -1119,6 +1122,8 @@ export default function ApneaCoach() {
       else setLoading(false);
     });
     const {data:{subscription}} = supabase.auth.onAuthStateChange((_,session)=>{
+      // Ignore auth changes triggered by client creation
+      if (ignoringAuthChange.current) return;
       setUser(session?.user||null);
       if (session?.user) loadProfile(session.user);
       else { setProfile(null); setLoading(false); }
@@ -1201,38 +1206,45 @@ export default function ApneaCoach() {
 
   // ── Add Client ──
   async function handleAddClient(form) {
-    // Use server-side RPC to create auth user WITHOUT logging coach out
-    const { data: newUserId, error: rpcError } = await supabase.rpc("create_auth_user", {
-      user_email: form.email,
-      user_password: form.password,
-    });
-    if (rpcError) { flash("Error creating account: " + rpcError.message); return; }
+    // Block auth listener so creating a user doesn't trigger a session change
+    ignoringAuthChange.current = true;
+    try {
+      // Use server-side RPC to create auth user WITHOUT logging coach out
+      const { data: newUserId, error: rpcError } = await supabase.rpc("create_auth_user", {
+        user_email: form.email,
+        user_password: form.password,
+      });
+      if (rpcError) { flash("Error creating account: " + rpcError.message); return; }
 
-    // Create client record
-    const {data:clientData, error:clientError} = await supabase.from("clients").insert({
-      name:form.name, age:form.age?Number(form.age):null, level:form.level, goal:form.goal,
-      pb_cwt:form.pb.CWT?Number(form.pb.CWT):null, pb_sta:form.pb.STA||null, pb_dyn:form.pb.DYN?Number(form.pb.DYN):null,
-      coach_id: user.id,
-      plan_type: form.planType||"weeks", plan_weeks:form.planWeeks?Number(form.planWeeks):null,
-      plan_start_date:form.planStartDate||null, competition_date:form.competitionDate||null, competition_name:form.competitionName||null,
-    }).select().single();
-    if (clientError || !clientData) { flash("Error creating client: " + clientError?.message); return; }
+      // Create client record
+      const {data:clientData, error:clientError} = await supabase.from("clients").insert({
+        name:form.name, age:form.age?Number(form.age):null, level:form.level, goal:form.goal,
+        pb_cwt:form.pb.CWT?Number(form.pb.CWT):null, pb_sta:form.pb.STA||null, pb_dyn:form.pb.DYN?Number(form.pb.DYN):null,
+        coach_id: user.id,
+        plan_type: form.planType||"weeks", plan_weeks:form.planWeeks?Number(form.planWeeks):null,
+        plan_start_date:form.planStartDate||null, competition_date:form.competitionDate||null, competition_name:form.competitionName||null,
+      }).select().single();
+      if (clientError || !clientData) { flash("Error creating client: " + clientError?.message); return; }
 
-    // Link auth user to client record
-    await supabase.from("profiles").upsert({
-      id: newUserId, email: form.email, role: "client", client_id: clientData.id
-    }, { onConflict: "id" });
+      // Link auth user to client record (override any trigger-created profile)
+      await supabase.from("profiles").upsert({
+        id: newUserId, email: form.email, role: "client", client_id: clientData.id
+      }, { onConflict: "id" });
 
-    // Log activity
-    await supabase.from("activity_log").insert({
-      event_type: "client_added", coach_email: user.email, coach_id: user.id,
-      details: `Added client: ${form.name} (${form.email})`,
-    }).catch(()=>{});
+      // Log activity
+      await supabase.from("activity_log").insert({
+        event_type: "client_added", coach_email: user.email, coach_id: user.id,
+        details: `Added client: ${form.name} (${form.email})`,
+      }).catch(()=>{});
 
-    // Update UI — coach stays logged in the whole time
-    setClients(prev=>[...prev, dbToClient(clientData)]);
-    setAddClientModal(false);
-    flash(`Client added! They can log in with ${form.email}`);
+      // Update UI — coach stays logged in the whole time
+      setClients(prev=>[...prev, dbToClient(clientData)]);
+      setAddClientModal(false);
+      flash(`Client added! They can log in with ${form.email}`);
+    } finally {
+      // Always re-enable auth listener
+      setTimeout(() => { ignoringAuthChange.current = false; }, 1000);
+    }
   }
 
   // ── Add Coach (admin only) ──
