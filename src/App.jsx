@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase";
 import GymStrengthBuilder from "./GymStrengthBuilder";
 import StaticBuilder from "./StaticBuilder";
@@ -1113,7 +1113,7 @@ export default function ApneaCoach() {
   function flash(msg) { setToast(msg); setTimeout(()=>setToast(""),2400); }
 
   // Flag to ignore auth changes during client creation
-  const ignoringAuthChange = { current: false };
+  const ignoringAuthChange = useRef(false);
 
   useEffect(()=>{
     supabase.auth.getSession().then(({data:{session}})=>{
