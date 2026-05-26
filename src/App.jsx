@@ -70,6 +70,7 @@ function dbToClient(row) {
     planStartDate: row.plan_start_date||null,
     competitionDate: row.competition_date||null,
     competitionName: row.competition_name||null,
+    archived: row.archived||false,
   };
 }
 
@@ -1439,10 +1440,27 @@ export default function ApneaCoach() {
   }
 
   async function deleteClient(id) {
-    await supabase.from("clients").delete().eq("id",id);
+    // Delete sessions and feedback first, then client
+    const clientSessions = sessions.filter(s=>s.clientId===id);
+    for (const s of clientSessions) {
+      await supabase.from("feedback").delete().eq("session_id", s.id);
+    }
+    await supabase.from("sessions").delete().eq("client_id", id);
+    await supabase.from("clients").delete().eq("id", id);
     setClients(prev=>prev.filter(c=>c.id!==id));
     setSessions(prev=>prev.filter(s=>s.clientId!==id));
     setActiveClient(null); setView("dashboard");
+  }
+
+  async function archiveClient(id) {
+    await supabase.from("clients").update({ archived: true }).eq("id", id);
+    setClients(prev=>prev.map(c=>c.id===id ? {...c, archived:true} : c));
+    setActiveClient(null); setView("dashboard");
+  }
+
+  async function unarchiveClient(id) {
+    await supabase.from("clients").update({ archived: false }).eq("id", id);
+    setClients(prev=>prev.map(c=>c.id===id ? {...c, archived:false} : c));
   }
 
   async function handleAssignSave({method,plan}) {
@@ -1584,9 +1602,9 @@ export default function ApneaCoach() {
               {METHODS.map(m=><div key={m.key} style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:9,height:9,borderRadius:"50%",background:m.dot}}/><span style={{fontSize:12,fontWeight:500,color:"#555"}}>{m.emoji} {m.label}</span></div>)}
             </div>
             <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:12}}>Your Clients</div>
-            {clients.length===0&&<div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:40,textAlign:"center",color:"#bbb",fontSize:14}}>No clients yet. Click "+ Add Client" to get started.</div>}
+            {clients.filter(c=>!c.archived).length===0&&<div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:40,textAlign:"center",color:"#bbb",fontSize:14}}>No active clients yet. Click "+ Add Client" to get started.</div>}
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {clients.map(c=>{
+              {clients.filter(c=>!c.archived).map(c=>{
                 const cs=sessions.filter(s=>s.clientId===c.id);
                 const done=cs.filter(s=>s.feedback?.status==="completed").length;
                 const pending=cs.filter(s=>!s.feedback?.status).length;
@@ -1595,6 +1613,34 @@ export default function ApneaCoach() {
                 );
               })}
             </div>
+
+            {/* Archived / Past Clients */}
+            {clients.filter(c=>c.archived).length > 0 && (
+              <div style={{marginTop:32}}>
+                <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:12}}>📦 Past Clients</div>
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {clients.filter(c=>c.archived).map(c=>{
+                    const cs=sessions.filter(s=>s.clientId===c.id);
+                    const done=cs.filter(s=>s.feedback?.status==="completed").length;
+                    return(
+                      <div key={c.id} onClick={()=>{setActiveClient(c);setView("coachWeek");}}
+                        style={{background:"#fafaf8",border:"1px solid #ebebeb",borderRadius:12,padding:"14px 18px",cursor:"pointer",opacity:0.65,display:"flex",alignItems:"center",justifyContent:"space-between",transition:"opacity .15s"}}
+                        onMouseEnter={e=>e.currentTarget.style.opacity="1"}
+                        onMouseLeave={e=>e.currentTarget.style.opacity="0.65"}>
+                        <div>
+                          <div style={{fontWeight:700,fontSize:15,color:"#555"}}>{c.name}</div>
+                          <div style={{fontSize:12,color:"#aaa",marginTop:2}}>{c.level} · {done} sessions completed</div>
+                        </div>
+                        <button onClick={e=>{e.stopPropagation();unarchiveClient(c.id);}}
+                          style={{background:"transparent",border:"1.5px solid #a5d6a7",color:"#2e7d32",padding:"5px 12px",borderRadius:7,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                          Reactivate
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1770,7 +1816,12 @@ export default function ApneaCoach() {
                 ))}
                 <button onClick={()=>setEditClientModal({...activeClient, planType:activeClient.planType||"weeks", planWeeks:activeClient.planWeeks||"", planStartDate:activeClient.planStartDate||"", competitionDate:activeClient.competitionDate||"", competitionName:activeClient.competitionName||"", pb:{CWT:activeClient.pb?.CWT||"", STA:activeClient.pb?.STA||"", DYN:activeClient.pb?.DYN||""}})}
                   style={{background:"transparent",color:"#1a1a1a",border:"1.5px solid #ddd",color:"#555",padding:"8px 13px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>✏️ Edit</button>
-                <button onClick={()=>deleteClient(activeClient.id)} style={{background:"transparent",color:"#1a1a1a",border:"1.5px solid #e8c5c5",color:"#c0392b",padding:"8px 13px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Remove</button>
+                {activeClient.archived ? (
+                  <button onClick={()=>unarchiveClient(activeClient.id)} style={{background:"transparent",border:"1.5px solid #a5d6a7",color:"#2e7d32",padding:"8px 13px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Unarchive</button>
+                ) : (
+                  <button onClick={()=>archiveClient(activeClient.id)} style={{background:"transparent",border:"1.5px solid #ffe082",color:"#f57f17",padding:"8px 13px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Archive</button>
+                )}
+                <button onClick={()=>{ if(window.confirm("Are you sure you want to permanently delete " + activeClient.name + "? This cannot be undone.")) deleteClient(activeClient.id); }} style={{background:"transparent",border:"1.5px solid #e8c5c5",color:"#c0392b",padding:"8px 13px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Delete</button>
               </div>
             </div>
             <WeekGrid weekDates={weekDates} clientId={activeClient.id} sessions={sessions} isClient={false}
