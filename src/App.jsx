@@ -996,6 +996,185 @@ function EditPlanForm({ session, onSave, onClose }) {
   );
 }
 
+
+// ── Generate Week PDF ─────────────────────────────────────────────────────────
+function generateWeekPDF(weekDates, sessions, clientName, coachName) {
+  const METHODS = {
+    "gym-strength":  { label:"Gym Strength",   emoji:"🏋️" },
+    "pool-technique":{ label:"Pool Technique",  emoji:"🏊" },
+    "pool-co2":      { label:"Pool",            emoji:"💧" },
+    "gym-cardio":    { label:"Gym Cardio",      emoji:"🏃" },
+    "dry-eq":        { label:"Dry Eq",          emoji:"👂" },
+    "mobility":      { label:"Mobility",        emoji:"🤸" },
+    "static":        { label:"Static",          emoji:"🧘" },
+    "depth":         { label:"Depth",           emoji:"🌊" },
+  };
+
+  const DAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+  const weekLabel = weekDates[0].toLocaleDateString("en-US",{month:"long",day:"numeric"}) + " – " + weekDates[6].toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"});
+
+  let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+  <title>Training Week — ${clientName}</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: -apple-system, 'Helvetica Neue', sans-serif; color:#1a1a1a; padding:40px; max-width:800px; margin:0 auto; }
+    .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:32px; padding-bottom:20px; border-bottom:2px solid #f0f0f0; }
+    .logo { font-size:22px; font-weight:800; letter-spacing:-.03em; }
+    .meta { text-align:right; }
+    .meta .athlete { font-size:18px; font-weight:700; }
+    .meta .week { font-size:13px; color:#888; margin-top:3px; }
+    .meta .coach { font-size:12px; color:#aaa; margin-top:2px; }
+    .day-block { margin-bottom:28px; }
+    .day-header { font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#bbb; margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid #f0f0f0; }
+    .rest-day { font-size:13px; color:#ddd; font-style:italic; padding:8px 0; }
+    .session { background:#fafaf8; border-radius:10px; padding:16px; margin-bottom:10px; border-left:4px solid #1a1a1a; }
+    .session-header { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    .session-type { font-size:12px; font-weight:700; background:#1a1a1a; color:#fff; padding:3px 10px; border-radius:20px; }
+    .session-name { font-size:15px; font-weight:700; }
+    .session-notes { font-size:13px; color:#444; line-height:1.7; margin-bottom:10px; white-space:pre-wrap; }
+    .section-label { font-size:10px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:#bbb; margin:10px 0 6px; }
+    .dive { display:flex; align-items:flex-start; gap:10px; padding:8px 10px; background:#fff; border-radius:7px; margin-bottom:6px; border:1px solid #ebebeb; }
+    .dive-num { font-size:11px; color:#bbb; font-weight:700; min-width:20px; margin-top:2px; }
+    .dive-disc { font-size:11px; font-weight:700; background:#eef0ff; color:#1a2fa3; padding:2px 8px; border-radius:5px; white-space:nowrap; }
+    .dive-lung { font-size:11px; color:#888; white-space:nowrap; }
+    .dive-target { font-size:14px; font-weight:700; color:#1a2fa3; white-space:nowrap; }
+    .dive-hang { font-size:11px; font-weight:700; background:#fffbe6; color:#7a6200; padding:2px 7px; border-radius:5px; }
+    .dive-notes { font-size:12px; color:#555; line-height:1.6; margin-top:5px; white-space:pre-wrap; }
+    .exercise { display:flex; align-items:center; gap:8px; padding:6px 10px; background:#fff; border-radius:7px; margin-bottom:4px; border:1px solid #ebebeb; font-size:13px; }
+    .ex-name { font-weight:600; flex:1; }
+    .ex-sets { color:#888; font-size:12px; }
+    .drill { padding:8px 10px; background:#fff; border-radius:7px; margin-bottom:6px; border:1px solid #ebebeb; }
+    .drill-name { font-size:13px; font-weight:600; margin-bottom:3px; }
+    .drill-desc { font-size:12px; color:#555; line-height:1.6; white-space:pre-wrap; }
+    .footer { margin-top:40px; padding-top:16px; border-top:1px solid #f0f0f0; font-size:11px; color:#bbb; text-align:center; }
+    @media print { body { padding:20px; } }
+  </style>
+  </head><body>
+  <div class="header">
+    <div class="logo">🤿 ApneaCoach</div>
+    <div class="meta">
+      <div class="athlete">${clientName}</div>
+      <div class="week">${weekLabel}</div>
+      ${coachName ? `<div class="coach">Coach: ${coachName}</div>` : ""}
+    </div>
+  </div>`;
+
+  weekDates.forEach((d, di) => {
+    const iso = d.toISOString().split("T")[0];
+    const daySessions = sessions.filter(s => s.date === iso);
+    const dayLabel = DAYS[di] + " " + d.toLocaleDateString("en-US",{month:"short",day:"numeric"});
+
+    html += `<div class="day-block"><div class="day-header">${dayLabel}</div>`;
+
+    if (daySessions.length === 0) {
+      html += `<div class="rest-day">Rest day</div>`;
+    }
+
+    daySessions.forEach(session => {
+      const m = METHODS[session.method] || { label: session.method, emoji:"📋" };
+      const gd = session.plan?.gymData;
+
+      html += `<div class="session">
+        <div class="session-header">
+          <span class="session-type">${m.emoji} ${m.label}</span>
+          ${gd?.sessionName ? `<span class="session-name">${gd.sessionName}</span>` : ""}
+        </div>`;
+
+      // Coach notes
+      if (gd?.coachNotes) {
+        html += `<div class="session-notes">${gd.coachNotes}</div>`;
+      }
+      if (session.plan?.coachNotes) {
+        html += `<div class="session-notes">${session.plan.coachNotes}</div>`;
+      }
+
+      // DEPTH — dives
+      if (session.method === "depth" && gd?.dives?.length > 0) {
+        html += `<div class="section-label">Dives</div>`;
+        gd.dives.forEach((dive, i) => {
+          const target = dive.openLine
+            ? "Open" + (dive.openLineMax ? " (max " + dive.openLineMax + "m)" : "")
+            : dive.targetDepth ? dive.targetDepth + "m" : "—";
+          html += `<div class="dive">
+            <span class="dive-num">#${i+1}</span>
+            <span class="dive-disc">${dive.discipline}</span>
+            <span class="dive-lung">${dive.lungVolume}</span>
+            <span class="dive-target">${target}</span>
+            ${dive.hang ? `<span class="dive-hang">⏱ ${dive.hang}s hang</span>` : ""}
+            <div style="flex:1">
+              ${dive.coachNotes || dive.drillNotes ? `<div class="dive-notes">${dive.coachNotes || dive.drillNotes}</div>` : ""}
+            </div>
+          </div>`;
+        });
+      }
+
+      // GYM / MOBILITY — exercises
+      if ((session.method === "gym-strength" || session.method === "mobility") && gd?.sections?.length > 0) {
+        gd.sections.forEach(sec => {
+          if (sec.name) html += `<div class="section-label">${sec.name}</div>`;
+          sec.blocks?.forEach(block => {
+            block.exercises?.forEach(ex => {
+              const sets = ex.sets?.map(s => s.reps ? s.weight ? `${s.reps}×${s.weight}kg` : `${s.reps} reps` : s.duration ? s.duration : "").filter(Boolean).join(", ");
+              html += `<div class="exercise"><span class="ex-name">${ex.name}</span><span class="ex-sets">${sets || ""}</span></div>`;
+            });
+          });
+        });
+      }
+
+      // DRY EQ — drills
+      if (session.method === "dry-eq" && gd?.drills?.length > 0) {
+        html += `<div class="section-label">Drills</div>`;
+        gd.drills.forEach(drill => {
+          html += `<div class="drill">
+            <div class="drill-name">${drill.name || drill.technique}</div>
+            ${drill.description ? `<div class="drill-desc">${drill.description}</div>` : ""}
+          </div>`;
+        });
+      }
+
+      // POOL — sections
+      if (session.method === "pool-co2" && gd?.sections?.length > 0) {
+        gd.sections.forEach(sec => {
+          if (sec.name) html += `<div class="section-label">${sec.name}</div>`;
+          sec.blocks?.forEach(block => {
+            let blockDesc = "";
+            if (block.type === "distance") blockDesc = `${block.discipline || ""} ${block.meters || ""}m`;
+            else if (block.type === "interval") blockDesc = `${block.sets || ""}×${block.intervalMeters || ""}m @ ${block.rest || ""}`;
+            else if (block.type === "over-under") blockDesc = `Over/Under: ${block.description || ""}`;
+            if (blockDesc) html += `<div class="exercise"><span class="ex-name">${blockDesc}</span></div>`;
+          });
+        });
+      }
+
+      // STATIC
+      if (session.method === "static" && gd) {
+        if (gd.warmup) html += `<div class="section-label">Warm-up</div><div class="session-notes">${gd.warmup}</div>`;
+        if (gd.mainSet) html += `<div class="section-label">Main Set</div><div class="session-notes">${gd.mainSet}</div>`;
+        if (gd.cooldown) html += `<div class="section-label">Cool-down</div><div class="session-notes">${gd.cooldown}</div>`;
+      }
+
+      // Plain text sessions
+      if (!gd && session.plan?.mainSet) {
+        html += `<div class="session-notes">${session.plan.mainSet}</div>`;
+      }
+
+      html += `</div>`;
+    });
+
+    html += `</div>`;
+  });
+
+  html += `<div class="footer">Generated by ApneaCoach · ${new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</div>
+  </body></html>`;
+
+  // Open in new window and print
+  const win = window.open("", "_blank");
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => { win.print(); };
+}
+
+
 // ── Week Grid ─────────────────────────────────────────────────────────────────
 function WeekGrid({ weekDates, clientId, sessions, onClickSession, onClickAdd, onCopySession, onPasteDay, isClient, hasClipboard, onMoveSession }) {
   const [dragOverDay, setDragOverDay] = useState(null);
@@ -1640,7 +1819,11 @@ export default function ApneaCoach() {
                 <div style={{fontSize:13,color:"#999",marginTop:3}}>{fmtShort(weekStart)} – {fmtShort(addDays(weekStart,6))}</div>
                 <TimelineBadgeClient client={activeClient} />
               </div>
-              <div style={{display:"flex",gap:8}}>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <button onClick={()=>generateWeekPDF(weekDates, sessions.filter(s=>s.clientId===activeClient.id), activeClient.name, "")}
+                  style={{background:"#f0f0ec",border:"none",borderRadius:8,padding:"8px 13px",fontSize:12,fontWeight:600,color:"#555",cursor:"pointer",fontFamily:"inherit"}}>
+                  📄 PDF
+                </button>
                 {[["‹ Prev",()=>setWeekStart(addDays(weekStart,-7))],["Today",()=>setWeekStart(mondayOf(new Date()))],["Next ›",()=>setWeekStart(addDays(weekStart,7))]].map(([l,fn])=>(
                   <button key={l} onClick={fn} style={{background:"transparent",color:"#1a1a1a",border:"1.5px solid #ddd",color:"#444",padding:"8px 13px",borderRadius:8,fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>{l}</button>
                 ))}
