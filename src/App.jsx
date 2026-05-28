@@ -1408,9 +1408,18 @@ export default function ApneaCoach() {
 
     if (rpcError) { flash("Error: " + rpcError.message); return; }
 
-    // Optimistically update state with the returned client row — no refetch needed
-    if (result?.client) {
-      setClients(prev => [...prev, dbToClient(result.client)]);
+    // Supabase RPC returns the JSON directly in `result`
+    // result could be the json object itself or nested
+    const clientRow = result?.client || (typeof result === 'object' && result?.id ? result : null);
+    
+    if (clientRow) {
+      setClients(prev => [...prev, dbToClient(clientRow)]);
+    } else {
+      // Fallback: refetch with small delay to avoid timing issues
+      setTimeout(async () => {
+        const { data: updatedClients } = await supabase.from("clients").select("*").eq("coach_id", user.id).order("created_at");
+        if (updatedClients) setClients(updatedClients.map(dbToClient));
+      }, 500);
     }
 
     // Log activity
