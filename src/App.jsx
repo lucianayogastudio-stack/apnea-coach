@@ -72,7 +72,7 @@ function dbToClient(row) {
     competitionName: row.competition_name||null,
     archived: row.archived||false,
     avatarUrl: row.avatar_url||null,
-    email: row.email || row.profiles?.email || null,
+    email: row.email || (Array.isArray(row.profiles) ? row.profiles[0]?.email : row.profiles?.email) || null,
   };
 }
 
@@ -758,20 +758,38 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions }) {
 }
 
 // ── Add Client Modal ──────────────────────────────────────────────────────────
+// Compress image to max 200x200px
+function compressImage(file, callback) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 200;
+      const scale = Math.min(MAX/img.width, MAX/img.height, 1);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      callback(canvas.toDataURL("image/jpeg", 0.7));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 function AddClientModal({ onClose, onSave, initialClient, isEditing }) {
   const [form, setForm] = useState(initialClient || {name:"",age:"",level:"Competitive",goal:"",email:"",password:"",pb:{CWT:"",STA:"",DYN:""},planType:"weeks",planWeeks:"",planStartDate:"",competitionDate:"",competitionName:"",avatarUrl:""});
   const [saving, setSaving] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState(initialClient?.avatarUrl || null);
 
-  async function handleAvatarChange(e) {
+  function handleAvatarChange(e) {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      setAvatarPreview(ev.target.result);
-      setForm(p => ({...p, avatarUrl: ev.target.result}));
-    };
-    reader.readAsDataURL(file);
+    compressImage(file, url => {
+      setAvatarPreview(url);
+      setForm(p => ({...p, avatarUrl: url}));
+    });
   }
 
   async function handleSave() {
@@ -1934,7 +1952,7 @@ export default function ApneaCoach() {
         )}
 
         {/* ATHLETE DASHBOARD */}
-        {view==="dashboard"&&profile?.role==="client"&&(
+        {view==="dashboard"&&profile?.role==="client"&&(clients.length>0||activeClient)&&(
           <div>
             {/* Header */}
             {(()=>{ if(!activeClient && clients[0]) setActiveClient(clients[0]); return null; })()}
@@ -1954,14 +1972,11 @@ export default function ApneaCoach() {
                     <input type="file" accept="image/*" style={{display:"none"}} onChange={async e=>{
                       const file = e.target.files[0];
                       if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = async ev => {
-                        const url = ev.target.result;
+                      compressImage(file, async url => {
                         await supabase.from("clients").update({avatar_url:url}).eq("id",client.id);
                         setClients(prev=>prev.map(c=>c.id===client.id?{...c,avatarUrl:url}:c));
                         setActiveClient(prev=>prev?{...prev,avatarUrl:url}:prev);
-                      };
-                      reader.readAsDataURL(file);
+                      });
                     }}/>
                   </label>
                   <div>
