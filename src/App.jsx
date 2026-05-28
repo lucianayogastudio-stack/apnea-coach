@@ -851,7 +851,8 @@ function AddCoachModal({ onClose, onSave }) {
     setSaving(true);
     try {
       await onSave(form);
-    } finally {
+      onClose(); // close modal after successful save
+    } catch(e) {
       setSaving(false);
     }
   }
@@ -1433,7 +1434,6 @@ export default function ApneaCoach() {
       details: `Added client: ${form.name} (${form.email})`,
     }).catch(()=>{});
 
-    setAddClientModal(false);
     flash(`Client added! They can log in with ${form.email}`);
   }
 
