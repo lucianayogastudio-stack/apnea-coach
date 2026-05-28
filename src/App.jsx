@@ -1284,6 +1284,7 @@ export default function ApneaCoach() {
   const [dayModal,       setDayModal]       = useState(null);
   const [editModal,      setEditModal]      = useState(null); // session being edited
   const [addClientModal, setAddClientModal] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [addCoachModal,  setAddCoachModal]  = useState(false);
   const [clipboard,      setClipboard]      = useState(null); // copied session plan
   const [pasteModal,     setPasteModal]     = useState(null); // {date, clientId}
@@ -1821,7 +1822,7 @@ export default function ApneaCoach() {
                 ) : (
                   <button onClick={()=>archiveClient(activeClient.id)} style={{background:"transparent",border:"1.5px solid #ffe082",color:"#f57f17",padding:"8px 13px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Archive</button>
                 )}
-                <button onClick={()=>{ if(window.confirm("Are you sure you want to permanently delete " + activeClient.name + "? This cannot be undone.")) deleteClient(activeClient.id); }} style={{background:"transparent",border:"1.5px solid #e8c5c5",color:"#c0392b",padding:"8px 13px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Delete</button>
+                <button onClick={()=>setConfirmDeleteId(activeClient.id)} style={{background:"transparent",border:"1.5px solid #e8c5c5",color:"#c0392b",padding:"8px 13px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Delete</button>
               </div>
             </div>
             <WeekGrid weekDates={weekDates} clientId={activeClient.id} sessions={sessions} isClient={false}
@@ -2073,6 +2074,27 @@ export default function ApneaCoach() {
       />}
       {addClientModal&&<AddClientModal onClose={()=>setAddClientModal(false)} onSave={handleAddClient}/>}
       {addCoachModal&&<AddCoachModal onClose={()=>setAddCoachModal(false)} onSave={handleAddCoach}/>}
+      {confirmDeleteId&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{background:"#fff",borderRadius:16,padding:"28px 32px",maxWidth:380,width:"90%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,.2)"}}>
+            <div style={{fontSize:32,marginBottom:12}}>⚠️</div>
+            <div style={{fontWeight:700,fontSize:18,marginBottom:8}}>Delete Client?</div>
+            <div style={{fontSize:14,color:"#666",marginBottom:24,lineHeight:1.6}}>
+              This will permanently delete <strong>{clients.find(c=>c.id===confirmDeleteId)?.name}</strong> and all their sessions and data. This cannot be undone.
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>setConfirmDeleteId(null)}
+                style={{flex:1,padding:"11px",borderRadius:9,border:"1.5px solid #e0e0e0",background:"#fff",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",color:"#555"}}>
+                Cancel
+              </button>
+              <button onClick={()=>{ deleteClient(confirmDeleteId); setConfirmDeleteId(null); }}
+                style={{flex:1,padding:"11px",borderRadius:9,border:"none",background:"#c0392b",color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+                Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {toast&&<div style={{position:"fixed",bottom:24,right:24,background:"#1a1a1a",color:"#fff",padding:"12px 20px",borderRadius:10,fontSize:13,fontWeight:500,zIndex:999,animation:"fi .2s"}}>✓ {toast}<style>{`@keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style></div>}
     </div>
   );
