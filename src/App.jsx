@@ -848,7 +848,12 @@ function AddCoachModal({ onClose, onSave }) {
 
   async function handleSave() {
     if (!form.email||!form.password) return;
-    setSaving(true); await onSave(form); setSaving(false);
+    setSaving(true);
+    try {
+      await onSave(form);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
