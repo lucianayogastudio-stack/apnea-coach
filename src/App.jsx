@@ -71,6 +71,8 @@ function dbToClient(row) {
     competitionDate: row.competition_date||null,
     competitionName: row.competition_name||null,
     archived: row.archived||false,
+    avatarUrl: row.avatar_url||null,
+    email: row.email || row.profiles?.email || null,
   };
 }
 
@@ -757,25 +759,71 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions }) {
 
 // ── Add Client Modal ──────────────────────────────────────────────────────────
 function AddClientModal({ onClose, onSave, initialClient, isEditing }) {
-  const [form, setForm] = useState(initialClient || {name:"",age:"",level:"Competitive",goal:"",email:"",password:"",pb:{CWT:"",STA:"",DYN:""},planType:"weeks",planWeeks:"",planStartDate:"",competitionDate:"",competitionName:""});
+  const [form, setForm] = useState(initialClient || {name:"",age:"",level:"Competitive",goal:"",email:"",password:"",pb:{CWT:"",STA:"",DYN:""},planType:"weeks",planWeeks:"",planStartDate:"",competitionDate:"",competitionName:"",avatarUrl:""});
   const [saving, setSaving] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState(initialClient?.avatarUrl || null);
+
+  async function handleAvatarChange(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      setAvatarPreview(ev.target.result);
+      setForm(p => ({...p, avatarUrl: ev.target.result}));
+    };
+    reader.readAsDataURL(file);
+  }
 
   async function handleSave() {
     if (!form.name) return;
     if (!isEditing && (!form.email||!form.password)) return;
-    setSaving(true); await onSave(form); setSaving(false);
+    setSaving(true);
+    try {
+      await onSave(form);
+      onClose();
+    } catch(e) {
+      setSaving(false);
+    }
   }
 
   return (
     <Modal onClose={onClose}>
       <div style={{fontWeight:700,fontSize:18,marginBottom:20,letterSpacing:"-.02em"}}>{isEditing?"Edit Client":"New Client"}</div>
       <div style={{display:"flex",flexDirection:"column",gap:13}}>
+
+        {/* Avatar upload */}
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          <div style={{width:64,height:64,borderRadius:"50%",background:"#f0f0ec",border:"2px solid #e0e0e0",overflow:"hidden",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {avatarPreview
+              ? <img src={avatarPreview} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="avatar"/>
+              : <span style={{fontSize:24,color:"#bbb"}}>👤</span>
+            }
+          </div>
+          <div>
+            <div style={{fontSize:12,fontWeight:600,color:"#666",marginBottom:5}}>Profile Photo</div>
+            <label style={{display:"inline-block",padding:"7px 14px",background:"#f0f0ec",borderRadius:8,fontSize:12,fontWeight:600,color:"#555",cursor:"pointer"}}>
+              Upload Photo
+              <input type="file" accept="image/*" onChange={handleAvatarChange} style={{display:"none"}} />
+            </label>
+            {avatarPreview && <button onClick={()=>{setAvatarPreview(null);setForm(p=>({...p,avatarUrl:""}));}} style={{marginLeft:8,background:"none",border:"none",fontSize:12,color:"#c0392b",cursor:"pointer"}}>Remove</button>}
+          </div>
+        </div>
+
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
           <div><div style={{fontSize:12,fontWeight:600,color:"#666",marginBottom:6}}>Full Name</div><input style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,outline:"none",fontFamily:"inherit",color:"#1a1a1a"}} placeholder="Name" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} /></div>
           <div><div style={{fontSize:12,fontWeight:600,color:"#666",marginBottom:6}}>Age</div><input type="number" style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,outline:"none",fontFamily:"inherit",color:"#1a1a1a"}} placeholder="Age" value={form.age} onChange={e=>setForm(p=>({...p,age:e.target.value}))} /></div>
         </div>
         <div><div style={{fontSize:12,fontWeight:600,color:"#666",marginBottom:6}}>Level</div><select style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,outline:"none",fontFamily:"inherit",background:"#fff",color:"#1a1a1a"}} value={form.level} onChange={e=>setForm(p=>({...p,level:e.target.value}))}>{["Beginner","Intermediate","Advanced","Competitive"].map(l=><option key={l}>{l}</option>)}</select></div>
         <div><div style={{fontSize:12,fontWeight:600,color:"#666",marginBottom:6}}>Goal</div><input style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,outline:"none",fontFamily:"inherit",color:"#1a1a1a"}} placeholder="e.g. Break -80m CWT" value={form.goal} onChange={e=>setForm(p=>({...p,goal:e.target.value}))} /></div>
+
+        {/* Login details — show email when editing, full form when creating */}
+        {isEditing && initialClient?.email && (
+          <div style={{background:"#f8f8f6",border:"1px solid #e0e0e0",borderRadius:10,padding:"12px 16px"}}>
+            <div style={{fontSize:11,fontWeight:700,color:"#888",letterSpacing:".06em",textTransform:"uppercase",marginBottom:6}}>Login Email</div>
+            <div style={{fontSize:14,color:"#1a1a1a",fontWeight:500}}>{initialClient.email}</div>
+            <div style={{fontSize:11,color:"#aaa",marginTop:4}}>Share this with your client if they forget their login details.</div>
+          </div>
+        )}
         {!isEditing&&(
           <div style={{background:"#f0f7ff",border:"1px solid #c0d8f0",borderRadius:10,padding:"14px 16px"}}>
             <div style={{fontSize:11,fontWeight:700,color:"#005fa3",letterSpacing:".06em",textTransform:"uppercase",marginBottom:12}}>🔐 Client Login Details</div>
@@ -833,7 +881,7 @@ function AddClientModal({ onClose, onSave, initialClient, isEditing }) {
         </div>
 
         <div style={{display:"flex",gap:10,paddingTop:4}}>
-          <button onClick={handleSave} disabled={saving} style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"11px 22px",borderRadius:8,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:saving?0.6:1}}>{saving?"Creating...":"Add Client"}</button>
+          <button onClick={handleSave} disabled={saving} style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"11px 22px",borderRadius:8,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:saving?0.6:1}}>{saving ? (isEditing?"Saving...":"Creating...") : (isEditing?"Save Changes":"Add Client")}</button>
           <button onClick={onClose} style={{background:"transparent",color:"#1a1a1a",border:"1.5px solid #ddd",color:"#444",padding:"10px 20px",borderRadius:8,fontSize:14,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
         </div>
       </div>
@@ -913,7 +961,7 @@ function ClientCard({ client, done, pending, sessions, onClick }) {
       )}
       <div style={{padding:"16px 22px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div style={{display:"flex",alignItems:"center",gap:14}}>
-          <div style={{width:42,height:42,borderRadius:"50%",background:"#f0f0ec",color:"#1a1a1a",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:17,color:"#555"}}>{client.name.charAt(0)}</div>
+          <div style={{width:42,height:42,borderRadius:"50%",background:"#f0f0ec",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:17,color:"#555",overflow:"hidden",flexShrink:0}}>{client.avatarUrl ? <img src={client.avatarUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} alt={client.name}/> : client.name.charAt(0)}</div>
           <div>
             <div style={{fontWeight:600,fontSize:15}}>{client.name}</div>
             <div style={{fontSize:12,color:"#999",marginTop:2}}>{client.level} · {client.goal}</div>
@@ -1341,7 +1389,7 @@ export default function ApneaCoach() {
     if (!p||!currentUser) return;
     if (p.role==="coach") {
       // Load only THIS coach's clients
-      const {data:cr} = await supabase.from("clients").select("*").eq("coach_id",currentUser.id).order("created_at");
+      const {data:cr} = await supabase.from("clients").select("*, profiles(email)").eq("coach_id",currentUser.id).order("created_at");
       const clientIds = (cr||[]).map(c=>c.id);
       let sr = [];
       if (clientIds.length > 0) {
@@ -1365,12 +1413,14 @@ export default function ApneaCoach() {
       pb_cwt:form.pb.CWT?Number(form.pb.CWT):null, pb_sta:form.pb.STA||null, pb_dyn:form.pb.DYN?Number(form.pb.DYN):null,
       plan_type:form.planType||"weeks", plan_weeks:form.planWeeks?Number(form.planWeeks):null,
       plan_start_date:form.planStartDate||null, competition_date:form.competitionDate||null, competition_name:form.competitionName||null,
+      avatar_url: form.avatarUrl||null,
     }).eq("id", editClientModal.id);
     if (!error) {
       const updated = {...editClientModal, ...form, id:editClientModal.id,
         planType:form.planType, planWeeks:form.planWeeks?Number(form.planWeeks):null,
         planStartDate:form.planStartDate||null, competitionDate:form.competitionDate||null, competitionName:form.competitionName||null,
-        pb:{CWT:form.pb.CWT, STA:form.pb.STA, DYN:form.pb.DYN}};
+        pb:{CWT:form.pb.CWT, STA:form.pb.STA, DYN:form.pb.DYN},
+        avatarUrl:form.avatarUrl||null};
       setClients(prev=>prev.map(c=>c.id===editClientModal.id?updated:c));
       if (activeClient?.id===editClientModal.id) setActiveClient(updated);
       setEditClientModal(null);
@@ -1822,7 +1872,13 @@ export default function ApneaCoach() {
             <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:22}}>
               <div>
                 <div style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".07em",textTransform:"uppercase",marginBottom:4}}>Coach View</div>
-                <div style={{fontWeight:700,fontSize:20,letterSpacing:"-.02em"}}>{activeClient.name}</div>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  {activeClient.avatarUrl && <img src={activeClient.avatarUrl} style={{width:38,height:38,borderRadius:"50%",objectFit:"cover",border:"2px solid #ebebeb",flexShrink:0}} alt={activeClient.name}/>}
+                  <div>
+                    <div style={{fontWeight:700,fontSize:20,letterSpacing:"-.02em"}}>{activeClient.name}</div>
+                    {activeClient.email && <div style={{fontSize:11,color:"#aaa",marginTop:1}}>📧 {activeClient.email}</div>}
+                  </div>
+                </div>
                 <div style={{fontSize:13,color:"#999",marginTop:3}}>{fmtShort(weekStart)} – {fmtShort(addDays(weekStart,6))}</div>
                 <TimelineBadge client={activeClient} />
               </div>
@@ -1830,8 +1886,8 @@ export default function ApneaCoach() {
                 {[["‹ Prev",()=>setWeekStart(addDays(weekStart,-7))],["Today",()=>setWeekStart(mondayOf(new Date()))],["Next ›",()=>setWeekStart(addDays(weekStart,7))]].map(([l,fn])=>(
                   <button key={l} onClick={fn} style={{background:"transparent",color:"#1a1a1a",border:"1.5px solid #ddd",color:"#444",padding:"8px 13px",borderRadius:8,fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>{l}</button>
                 ))}
-                <button onClick={()=>setEditClientModal({...activeClient, planType:activeClient.planType||"weeks", planWeeks:activeClient.planWeeks||"", planStartDate:activeClient.planStartDate||"", competitionDate:activeClient.competitionDate||"", competitionName:activeClient.competitionName||"", pb:{CWT:activeClient.pb?.CWT||"", STA:activeClient.pb?.STA||"", DYN:activeClient.pb?.DYN||""}})}
-                  style={{background:"transparent",color:"#1a1a1a",border:"1.5px solid #ddd",color:"#555",padding:"8px 13px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>✏️ Edit</button>
+                <button onClick={()=>setEditClientModal({...activeClient, planType:activeClient.planType||"weeks", planWeeks:activeClient.planWeeks||"", planStartDate:activeClient.planStartDate||"", competitionDate:activeClient.competitionDate||"", competitionName:activeClient.competitionName||"", pb:{CWT:activeClient.pb?.CWT||"", STA:activeClient.pb?.STA||"", DYN:activeClient.pb?.DYN||""}, avatarUrl:activeClient.avatarUrl||"", email:activeClient.email||""})}
+                  style={{background:"transparent",border:"1.5px solid #ddd",color:"#555",padding:"8px 13px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>✏️ Edit</button>
                 {activeClient.archived ? (
                   <button onClick={()=>unarchiveClient(activeClient.id)} style={{background:"transparent",border:"1.5px solid #a5d6a7",color:"#2e7d32",padding:"8px 13px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Unarchive</button>
                 ) : (
@@ -1882,10 +1938,39 @@ export default function ApneaCoach() {
           <div>
             {/* Header */}
             {(()=>{ if(!activeClient && clients[0]) setActiveClient(clients[0]); return null; })()}
-            <div style={{marginBottom:28}}>
-              <div style={{fontWeight:700,fontSize:26,letterSpacing:"-.03em"}}>{activeClient?.name || clients[0]?.name || "Athlete"}</div>
-              <div style={{fontSize:13,color:"#aaa",marginTop:4}}>Athlete Dashboard</div>
-            </div>
+            {(()=>{
+              const client = activeClient || clients[0];
+              if (!client) return null;
+              return (
+                <div style={{marginBottom:28,display:"flex",alignItems:"center",gap:16}}>
+                  <label style={{cursor:"pointer",flexShrink:0}}>
+                    <div style={{width:72,height:72,borderRadius:"50%",background:"#f0f0ec",border:"2px dashed #ddd",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+                      {client.avatarUrl
+                        ? <img src={client.avatarUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} alt={client.name}/>
+                        : <span style={{fontSize:28}}>👤</span>
+                      }
+                      <div style={{position:"absolute",bottom:0,left:0,right:0,background:"rgba(0,0,0,0.4)",color:"#fff",fontSize:9,fontWeight:700,textAlign:"center",padding:"3px 0",letterSpacing:".05em"}}>PHOTO</div>
+                    </div>
+                    <input type="file" accept="image/*" style={{display:"none"}} onChange={async e=>{
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = async ev => {
+                        const url = ev.target.result;
+                        await supabase.from("clients").update({avatar_url:url}).eq("id",client.id);
+                        setClients(prev=>prev.map(c=>c.id===client.id?{...c,avatarUrl:url}:c));
+                        setActiveClient(prev=>prev?{...prev,avatarUrl:url}:prev);
+                      };
+                      reader.readAsDataURL(file);
+                    }}/>
+                  </label>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:26,letterSpacing:"-.03em"}}>{client.name}</div>
+                    <div style={{fontSize:12,color:"#aaa",marginTop:3}}>Tap photo to update</div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Training timeline progress */}
             {(activeClient.planType==="competition"&&activeClient.competitionDate) || (activeClient.planType==="weeks"&&activeClient.planWeeks&&activeClient.planStartDate) ? (()=>{
