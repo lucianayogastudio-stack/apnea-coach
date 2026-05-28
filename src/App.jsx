@@ -1408,16 +1408,17 @@ export default function ApneaCoach() {
 
     if (rpcError) { flash("Error: " + rpcError.message); return; }
 
+    // Optimistically update state with the returned client row — no refetch needed
+    if (result?.client) {
+      setClients(prev => [...prev, dbToClient(result.client)]);
+    }
+
     // Log activity
     await supabase.from("activity_log").insert({
       event_type: "client_added", coach_email: user.email, coach_id: user.id,
       details: `Added client: ${form.name} (${form.email})`,
     }).catch(()=>{});
 
-    // Reload clients to get the new one (coach session untouched)
-    const { data: updatedClients } = await supabase.from("clients").select("*").eq("coach_id", user.id).order("created_at");
-    if (updatedClients) setClients(updatedClients.map(dbToClient));
-    
     setAddClientModal(false);
     flash(`Client added! They can log in with ${form.email}`);
   }
