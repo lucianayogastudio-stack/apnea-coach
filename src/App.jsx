@@ -1159,6 +1159,7 @@ function TimelineBadgeClient({ client }) {
 
 function ClientCard({ client, done, pending, sessions, onClick }) {
   const tl = getTimeline(client);
+  const needsReply = sessions.filter(s=>s.feedback?.status==="completed" && s.feedback?.clientGymData && !s.feedback?.coachComment).length;
   return (
     <div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",overflow:"hidden",cursor:"pointer",transition:"box-shadow .15s"}}
       onClick={onClick}
@@ -1173,7 +1174,10 @@ function ClientCard({ client, done, pending, sessions, onClick }) {
         <div style={{display:"flex",alignItems:"center",gap:14}}>
           <div style={{width:42,height:42,borderRadius:"50%",background:"#f0f0ec",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:17,color:"#555",overflow:"hidden",flexShrink:0}}>{client.avatarUrl ? <img src={client.avatarUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} alt={client.name}/> : client.name.charAt(0)}</div>
           <div>
-            <div style={{fontWeight:600,fontSize:15}}>{client.name}</div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{fontWeight:600,fontSize:15}}>{client.name}</div>
+              {needsReply > 0 && <span style={{fontSize:11,fontWeight:700,background:"#fff8e1",color:"#e65100",border:"1px solid #ffcc02",borderRadius:20,padding:"2px 8px"}}>💬 {needsReply} to reply</span>}
+            </div>
             <div style={{fontSize:12,color:"#999",marginTop:2}}>{client.level} · {client.goal}</div>
             {tl && (
               <div style={{fontSize:11,marginTop:4,fontWeight:600,color:tl.isPast?"#ef5350":tl.type==="competition"?"#3a8ef4":"#4caf50"}}>
@@ -1876,12 +1880,19 @@ export default function ApneaCoach() {
         {view==="dashboard"&&(isCoach||isAdmin)&&(
           <div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,marginBottom:24}}>
-              {[["My Clients",clients.length],["Sessions Planned",sessions.length],["Best Depth",Math.max(0,...sessions.map(s=>Number(s.feedback?.actualDepth)).filter(Boolean))||"—"]].map(([l,v])=>(
-                <div key={l} style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:"20px 24px"}}>
-                  <div style={{fontSize:28,fontWeight:700,fontFamily:"monospace"}}>{v}</div>
-                  <div style={{fontSize:12,color:"#999",marginTop:4,fontWeight:500}}>{l}</div>
-                </div>
-              ))}
+              {(()=>{
+                const needsReply = sessions.filter(s=>s.feedback?.status==="completed" && s.feedback?.clientGymData && !s.feedback?.coachComment).length;
+                return [
+                  ["My Clients", clients.filter(c=>!c.archived).length],
+                  ["Sessions Planned", sessions.length],
+                  ["Needs Reply", needsReply||"✓"],
+                ].map(([l,v])=>(
+                  <div key={l} style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:"20px 24px"}}>
+                    <div style={{fontSize:28,fontWeight:700,fontFamily:"monospace",color:l==="Needs Reply"&&v!=="✓"?"#e65100":l==="Needs Reply"?"#2e7d32":"#1a1a1a"}}>{v}</div>
+                    <div style={{fontSize:12,color:"#999",marginTop:4,fontWeight:500}}>{l}</div>
+                  </div>
+                ));
+              })()}
             </div>
             <div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:"13px 20px",marginBottom:22,display:"flex",flexWrap:"wrap",gap:"8px 22px",alignItems:"center"}}>
               <span style={{fontSize:10,fontWeight:800,color:"#ccc",letterSpacing:".08em",textTransform:"uppercase"}}>Training Methods</span>
@@ -2271,7 +2282,7 @@ export default function ApneaCoach() {
             })()}
 
             {/* Progress charts */}
-            {sessions.filter(s=>s.clientId===activeClient.id).some(s=>s.method==="depth"||s.method==="pool-co2") && (
+            {sessions.filter(s=>s.clientId===activeClient.id).some(s=>s.method==="depth"||s.method==="pool-co2"||s.method==="static") && (
               <div style={{background:"#fff",borderRadius:14,border:"1px solid #ebebeb",padding:"20px 24px",marginBottom:20}}>
                 <div style={{fontWeight:700,fontSize:15,marginBottom:14}}>Progress Charts</div>
                 <ProgressCharts sessions={sessions.filter(s=>s.clientId===activeClient.id)} clientName={activeClient.name} />
@@ -2314,46 +2325,77 @@ export default function ApneaCoach() {
               hasClipboard={false}
               onClickSession={s=>setDayModal({session:s,role:"client"})}
               onMoveSession={handleMoveSession} />
+            {/* Week summary bar */}
+            {(()=>{
+              const weekSessions = weekDates.flatMap(d=>sessions.filter(s=>s.clientId===activeClient.id&&s.date===toISO(d)));
+              const done = weekSessions.filter(s=>s.feedback?.status==="completed").length;
+              const total = weekSessions.length;
+              const hasNew = weekSessions.some(s=>s.feedback?.coachComment && s.feedback?.status==="completed");
+              if (total===0) return null;
+              return (
+                <div style={{background:"#fff",border:"1px solid #ebebeb",borderRadius:12,padding:"14px 18px",marginBottom:16,display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+                  <div style={{flex:1,minWidth:160}}>
+                    <div style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase",marginBottom:6}}>Week Progress</div>
+                    <div style={{background:"#f0f0ec",borderRadius:20,height:8,overflow:"hidden"}}>
+                      <div style={{height:"100%",borderRadius:20,background:"#4caf50",width:`${total>0?(done/total*100):0}%`,transition:"width .4s"}}/>
+                    </div>
+                    <div style={{fontSize:12,color:"#888",marginTop:5}}>{done} of {total} sessions completed</div>
+                  </div>
+                  {hasNew && <div style={{fontSize:12,fontWeight:700,color:"#2e7d32",background:"#e8f5e9",padding:"6px 12px",borderRadius:20,border:"1px solid #a5d6a7"}}>💬 New coach feedback</div>}
+                </div>
+              );
+            })()}
             <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:12}}>This Week's Sessions</div>
             {weekDates.flatMap(d=>sessions.filter(s=>s.clientId===activeClient.id&&s.date===toISO(d))).length===0&&<div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:40,textAlign:"center",color:"#bbb",fontSize:14}}>No sessions planned this week.</div>}
-            {/* Progress Charts for athlete */}
-            {sessions.filter(s=>s.clientId===activeClient.id).some(s=>s.method==="depth"||s.method==="pool-co2") && (
-              <div style={{marginBottom:24}}>
-                <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:14}}>Your Progress</div>
-                <ProgressCharts sessions={sessions.filter(s=>s.clientId===activeClient.id)} clientName={activeClient.name} />
-              </div>
-            )}
 
             {weekDates.flatMap(d=>sessions.filter(s=>s.clientId===activeClient.id&&s.date===toISO(d))).map(s=>{
               const m=gm(s.method);
+              const sessionName = s.plan?.gymData?.sessionName || s.plan?.gymData?.name || null;
+              const hasCoachReply = s.feedback?.coachComment && s.feedback?.status==="completed";
               return(
                 <div key={s.id} style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",borderLeft:`4px solid ${m.dot}`,marginBottom:12,cursor:"pointer",transition:"box-shadow .15s"}}
                   onClick={()=>setDayModal({session:s,role:"client"})}
                   onMouseEnter={e=>e.currentTarget.style.boxShadow="0 2px 12px rgba(0,0,0,.07)"}
                   onMouseLeave={e=>e.currentTarget.style.boxShadow="none"}>
-                  <div style={{padding:"16px 20px"}}>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{padding:"14px 18px"}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                         <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 11px",borderRadius:20,fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`}}>{m.emoji} {m.label}</span>
-                        <span style={{fontSize:13,color:"#aaa"}}>{fmtFull(s.date)}</span>
+                        <span style={{fontSize:12,color:"#aaa"}}>{fmtFull(s.date)}</span>
                       </div>
                       <StatusBadge status={s.feedback?.status}/>
                     </div>
-                    {s.plan?.mainSet&&<div style={{fontSize:13,color:"#444",lineHeight:1.6}}>{s.plan.mainSet}</div>}
-                    {s.method==="depth"&&s.plan?.targetDepth&&(
-                      <div style={{marginTop:8,display:"flex",gap:16}}>
+                    {sessionName && <div style={{fontSize:14,fontWeight:600,color:"#1a1a1a",marginBottom:4}}>{sessionName}</div>}
+                    {s.plan?.mainSet&&!sessionName&&<div style={{fontSize:13,color:"#444",lineHeight:1.6,marginBottom:4}}>{s.plan.mainSet}</div>}
+                    {s.method==="depth"&&s.plan?.gymData?.dives&&(
+                      <div style={{fontSize:12,color:"#888",marginBottom:4}}>{s.plan.gymData.dives.length} dives planned{s.plan.gymData.location ? ` · 📍 ${s.plan.gymData.location}` : ""}</div>
+                    )}
+                    {s.method==="depth"&&s.plan?.targetDepth&&!s.plan?.gymData&&(
+                      <div style={{display:"flex",gap:14,marginBottom:4}}>
                         <div><span style={{fontSize:10,color:"#aaa",fontWeight:700,letterSpacing:".06em"}}>TARGET </span><span style={{fontFamily:"monospace",fontWeight:700}}>{s.plan.targetDepth}m</span></div>
                         {s.plan.openLine&&<div><span style={{fontSize:10,color:"#aaa",fontWeight:700,letterSpacing:".06em"}}>MODE </span><span style={{fontFamily:"monospace",fontWeight:700}}>Open Line</span></div>}
                         {s.feedback?.actualDepth&&<div><span style={{fontSize:10,color:"#aaa",fontWeight:700,letterSpacing:".06em"}}>ACTUAL </span><span style={{fontFamily:"monospace",fontWeight:700,color:"#2e7d32"}}>{s.feedback.actualDepth}m</span></div>}
                       </div>
                     )}
-                    {s.feedback?.clientNotes&&<div style={{marginTop:10,fontSize:12,color:"#666",fontStyle:"italic",borderTop:"1px solid #f5f4f0",paddingTop:8}}>"{s.feedback.clientNotes}"</div>}
-                    {s.feedback?.coachComment&&<div style={{marginTop:8,background:"#e8f5e9",border:"1px solid #c8e6c9",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#2e7d32"}}>💬 <strong>Coach:</strong> {s.feedback.coachComment}</div>}
-                    <div style={{marginTop:8,fontSize:11,color:"#ccc"}}>Tap to open full session →</div>
+                    {s.plan?.gymData?.sections&&<div style={{fontSize:12,color:"#888",marginBottom:4}}>{s.plan.gymData.sections?.reduce((a,sec)=>a+(sec.blocks?.reduce((b,bl)=>b+(bl.exercises?.length||0),0)||0),0)||""}{" exercises"}</div>}
+                    {hasCoachReply && (
+                      <div style={{marginTop:6,background:"#e8f5e9",border:"1px solid #c8e6c9",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#2e7d32"}}>
+                        💬 <strong>Coach:</strong> {s.feedback.coachComment.length > 80 ? s.feedback.coachComment.slice(0,80)+"…" : s.feedback.coachComment}
+                      </div>
+                    )}
+                    <div style={{marginTop:6,fontSize:11,color:"#ccc"}}>Tap to open →</div>
                   </div>
                 </div>
               );
             })}
+
+            {/* Progress Charts for athlete */}
+            {sessions.filter(s=>s.clientId===activeClient.id).some(s=>s.method==="depth"||s.method==="pool-co2"||s.method==="static") && (
+              <div style={{marginBottom:24,marginTop:8}}>
+                <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:14}}>Your Progress</div>
+                <ProgressCharts sessions={sessions.filter(s=>s.clientId===activeClient.id)} clientName={activeClient.name} />
+              </div>
+            )}
           </div>
         )}
       </div>
