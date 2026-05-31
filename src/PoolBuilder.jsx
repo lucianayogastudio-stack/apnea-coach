@@ -36,6 +36,7 @@ const BLOCK_TYPES = [
   { key:"distance",   label:"Distance",   desc:"Simple set — X reps × Y meters" },
   { key:"interval",   label:"Interval",   desc:"Starts / timed intervals with recovery" },
   { key:"overunder",  label:"Over/Under", desc:"Alternating surface + underwater lengths" },
+  { key:"maxeffort",  label:"Max Effort", desc:"All-out attempt — athlete logs distance achieved" },
   { key:"compound",   label:"Compound",   desc:"Complex multi-part set — write freely" },
 ];
 
@@ -51,13 +52,16 @@ function makeBlock(type) {
     // interval fields — e.g. "4x60s, 4x55s, 6x50s" starts
     intervalSets: [{ id:uid(), reps:"", interval:"", rest:"" }],
     intervalMeters: "",
+    // max effort fields
+    maxEffortReps: "1",
+    maxEffortRest: "",
     // compound field
     compoundText: "",
     // shared
     equipment: [],
     description: "",
     videoUrl: "",
-    log: { done:false, feeling:"", observations:"" },
+    log: { done:false, feeling:"", observations:"", achievedMeters:"" },
   };
 }
 
@@ -309,6 +313,41 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
           </div>
         )}
 
+        {/* MAX EFFORT type */}
+        {block.type === "maxeffort" && (
+          <div style={{ marginBottom:8 }}>
+            <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap", marginBottom:8 }}>
+              <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                <span style={{ fontSize:11, color:"#bbb", fontWeight:700, textTransform:"uppercase", letterSpacing:".05em" }}>Attempts</span>
+                {isClient
+                  ? <span style={{ fontWeight:700, fontSize:14 }}>{block.maxEffortReps || "1"}</span>
+                  : <input type="number" placeholder="1" value={block.maxEffortReps} onChange={e => upd("maxEffortReps", e.target.value)}
+                      style={{ width:52, padding:"5px 7px", border:"1.5px solid #e0e0e0", borderRadius:6, fontSize:13, fontFamily:"inherit", outline:"none", color:"#1a1a1a", textAlign:"center" }} />
+                }
+              </div>
+              <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                <span style={{ fontSize:11, color:"#bbb", fontWeight:700, textTransform:"uppercase", letterSpacing:".05em" }}>Rest between</span>
+                {isClient
+                  ? block.maxEffortRest && <span style={{ fontWeight:700, fontSize:14 }}>{block.maxEffortRest}</span>
+                  : <input placeholder="e.g. 5 min" value={block.maxEffortRest} onChange={e => upd("maxEffortRest", e.target.value)}
+                      style={{ width:90, padding:"5px 7px", border:"1.5px solid #e0e0e0", borderRadius:6, fontSize:13, fontFamily:"inherit", outline:"none", color:"#1a1a1a" }} />
+                }
+              </div>
+            </div>
+            <div style={{ background:"#fff5f0", border:"1px solid #ffd0b0", borderRadius:8, padding:"8px 12px", fontSize:12, color:"#b94a00", fontWeight:600 }}>
+              🔥 Max effort — athlete goes as far as possible and logs distance
+            </div>
+            {isClient && (
+              <div style={{ marginTop:10 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:"#bbb", letterSpacing:".06em", textTransform:"uppercase", marginBottom:5 }}>Distance achieved (m)</div>
+                <input type="number" placeholder="e.g. 125" value={block.log?.achievedMeters || ""}
+                  onChange={e => updLog("achievedMeters", e.target.value)}
+                  style={{ width:110, padding:"7px 10px", border:"1.5px solid #e0e0e0", borderRadius:7, fontSize:14, fontFamily:"inherit", outline:"none", color:"#1a1a1a", fontWeight:700 }} />
+              </div>
+            )}
+          </div>
+        )}
+
         {/* COMPOUND type */}
         {block.type === "compound" && (
           <div style={{ marginBottom:8 }}>
@@ -323,7 +362,7 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
         )}
 
         {/* Description / technique notes */}
-        {(block.type === "distance" || block.type === "interval") && (
+        {(block.type === "distance" || block.type === "interval" || block.type === "maxeffort") && (
           <div style={{ marginBottom:8 }}>
             {isClient ? (
               block.description && <div style={{ fontSize:13, color:"#555", lineHeight:1.65, whiteSpace:"pre-wrap", borderTop:"1px solid #f5f5f5", paddingTop:6 }}>{block.description}</div>

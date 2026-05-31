@@ -142,18 +142,20 @@ export default function CompletedSessionView({ method, coachPlan, clientLog, onR
               {sec.blocks?.map((block, bi) => {
                 const clientBlock = clientSec.blocks?.[bi] || block;
                 const log = clientBlock.log || {};
-                const blockDesc = block.type==="distance" ? `${block.discipline||""} ${block.meters||""}m`
-                  : block.type==="interval" ? `${block.sets||""}×${block.intervalMeters||""}m @ ${block.rest||""}`
-                  : block.type==="over-under" ? `Over/Under: ${block.description||""}`
+                const blockDesc = block.type==="distance" ? `${block.discipline||""} ${block.reps && block.reps!=="1" ? block.reps+"×" : ""}${block.meters||""}m`
+                  : block.type==="interval" ? `${block.discipline||""} ${block.intervalSets?.reduce((a,s)=>a+(Number(s.reps)||0),0)||""}×${block.intervalMeters||""}m intervals`
+                  : block.type==="overunder" ? `Over/Under: ${block.reps||"?"}×${block.meters||"?"}m`
+                  : block.type==="maxeffort" ? `🔥 Max Effort${block.maxEffortReps && block.maxEffortReps!=="1" ? " ×"+block.maxEffortReps : ""}${block.maxEffortRest ? " · rest "+block.maxEffortRest : ""}`
                   : block.description||"";
                 return (
                   <div key={block.id||bi} style={{background:"#fff",borderRadius:10,border:`1.5px solid ${log.done?"#a5d6a7":"#ebebeb"}`,marginBottom:8,overflow:"hidden"}}>
                     <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:log.done?"1px solid #f0f0f0":"none"}}>
-                      <span style={{flex:1,fontSize:13,fontWeight:600,color:"#1a1a1a"}}>{blockDesc}</span>
+                      <span style={{flex:1,fontSize:13,fontWeight:600,color:block.type==="maxeffort"?"#b94a00":"#1a1a1a"}}>{blockDesc}</span>
                       <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:20,background:log.done?"#e8f5e9":"#f5f4f0",color:log.done?"#2e7d32":"#aaa"}}>{log.done?"✓ Done":"Not done"}</span>
                     </div>
-                    {log.done && (log.feeling||log.observations) && (
+                    {log.done && (log.achievedMeters || log.feeling || log.observations) && (
                       <div style={{padding:"8px 14px",background:"#f8fdf8"}}>
+                        {log.achievedMeters && <div style={{fontSize:13,fontWeight:700,color:"#b94a00",marginBottom:4}}>🔥 {log.achievedMeters}m achieved</div>}
                         {log.feeling && <div style={{fontSize:12,color:"#555",marginBottom:2}}><span style={{color:"#aaa"}}>Feeling: </span>{log.feeling}</div>}
                         {log.observations && <div style={{fontSize:12,color:"#555"}}>{log.observations}</div>}
                       </div>
