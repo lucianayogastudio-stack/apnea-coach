@@ -1629,6 +1629,10 @@ export default function ApneaCoach() {
       }
       setClients((cr||[]).map(dbToClient));
       setSessions(sr.map(dbToSession));
+      // Load coach notes from client records
+      const notesMap = {};
+      (cr||[]).forEach(c=>{ if(c.coach_notes) notesMap[c.id]=c.coach_notes; });
+      setCoachNotes(notesMap);
     } else {
       const {data:cr} = await supabase.from("clients").select("*").eq("id",p.client_id).single();
       const {data:sr} = await supabase.from("sessions").select("*, feedback(*)").eq("client_id",p.client_id).order("date");
@@ -1640,6 +1644,15 @@ export default function ApneaCoach() {
       }
       setSessions((sr||[]).map(dbToSession));
     }
+  }
+
+  // ── Coach notes ──
+  async function saveCoachNotes(clientId, notes) {
+    setSavingNotes(true);
+    await supabase.from("clients").update({coach_notes: notes||null}).eq("id", clientId);
+    setCoachNotes(prev=>({...prev, [clientId]: notes}));
+    setSavingNotes(false);
+    flash("Notes saved!");
   }
 
   // ── Edit client profile ──
@@ -1779,6 +1792,10 @@ export default function ApneaCoach() {
     setSessions(prev=>prev.filter(s=>s.id!==id));
   }
 
+  const [newPBModal, setNewPBModal] = useState(null); // {type, value, clientId, sessionId}
+  const [coachNotes, setCoachNotes] = useState({}); // {clientId: "notes text"}
+  const [savingNotes, setSavingNotes] = useState(false);
+
   async function handleFeedbackSave(sessionId, fb) {
     // Store gym/static workout log as JSON in client_notes field
     const clientNotesValue = fb.gymData
@@ -1794,6 +1811,53 @@ export default function ApneaCoach() {
     if (!error) {
       setSessions(prev=>prev.map(s=>s.id===sessionId?{...s,feedback:{...fb, clientGymData: fb.gymData || s.feedback?.clientGymData, gymData: undefined}}:s));
       setDayModal(null); flash("Feedback saved!");
+
+      // ── PB detection ──
+      const session = sessions.find(s=>s.id===sessionId);
+      const client = session ? clients.find(c=>c.id===session.clientId) : null;
+      if (client && fb.status==="completed") {
+        const pbs = [];
+        // Depth PB — CWT (and other disciplines)
+        if (fb.actualDepth && Number(fb.actualDepth) > 0) {
+          const depth = Number(fb.actualDepth);
+          const currentPB = Number(client.pb?.CWT)||0;
+          if (depth > currentPB) pbs.push({type:"CWT",label:"Depth",unit:"m",value:depth,prev:currentPB||null,emoji:"🌊"});
+        }
+        // Static PB — best hold from roundLogs or actualTime
+        if (session?.method==="static" && fb.gymData) {
+          function toSecs(t){if(!t)return 0;const p=String(t).trim().split(":");if(p.length===2)return parseInt(p[0],10)*60+parseInt(p[1],10);return parseInt(p[0],10)||0;}
+          function fmtSecs(s){if(!s)return null;const m=Math.floor(s/60),sec=s%60;return`${m}:${String(sec).padStart(2,"0")}`;}
+          let bestSecs = 0;
+          (fb.gymData.exercises||[]).forEach(ex=>{
+            const logs = ex.log?.roundLogs?.map(toSecs).filter(Boolean) || [toSecs(ex.log?.actualTime)].filter(Boolean);
+            logs.forEach(s=>{ if(s>bestSecs) bestSecs=s; });
+          });
+          if (bestSecs > 0) {
+            const currentSTA = toSecs(client.pb?.STA)||0;
+            if (bestSecs > currentSTA) pbs.push({type:"STA",label:"Static Hold",unit:"",value:fmtSecs(bestSecs),valueRaw:bestSecs,prev:fmtSecs(currentSTA)||null,emoji:"🧘"});
+          }
+        }
+        if (pbs.length > 0) setNewPBModal({pbs, clientId:client.id, sessionId});
+      }
+    }
+  }
+
+  async function handleConfirmPB(pb, clientId) {
+    const updates = {};
+    if (pb.type==="CWT") updates.pb_cwt = pb.value;
+    if (pb.type==="STA") updates.pb_sta = pb.value;
+    if (pb.type==="DYN") updates.pb_dyn = pb.value;
+    const {error} = await supabase.from("clients").update(updates).eq("id",clientId);
+    if (!error) {
+      setClients(prev=>prev.map(c=>{
+        if (c.id!==clientId) return c;
+        const newPb = {...(c.pb||{})};
+        if (pb.type==="CWT") newPb.CWT = pb.value;
+        if (pb.type==="STA") newPb.STA = pb.value;
+        if (pb.type==="DYN") newPb.DYN = pb.value;
+        return {...c, pb:newPb};
+      }));
+      if (activeClient?.id===clientId) setActiveClient(prev=>prev?{...prev,pb:{...prev.pb,[pb.type]:pb.value}}:prev);
     }
   }
 
@@ -2233,6 +2297,28 @@ export default function ApneaCoach() {
               </div>
             </div>
 
+            {/* Coach Notes */}
+            {(()=>{
+              return (
+                <div style={{background:"#fff",borderRadius:14,border:"1px solid #ebebeb",padding:"18px 22px",marginTop:20,marginBottom:0}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                    <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>📝 Coach Notes</div>
+                    <div style={{fontSize:11,color:"#aaa"}}>Private — only you see this</div>
+                  </div>
+                  <textarea
+                    value={coachNotes[activeClient.id]||""}
+                    onChange={e=>setCoachNotes(p=>({...p,[activeClient.id]:e.target.value}))}
+                    placeholder={`Notes about ${activeClient.name.split(" ")[0]}… strengths, areas to work on, observations, next steps…`}
+                    style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:13,fontFamily:"inherit",outline:"none",resize:"vertical",minHeight:90,color:"#1a1a1a",lineHeight:1.65,boxSizing:"border-box"}}
+                  />
+                  <button onClick={()=>saveCoachNotes(activeClient.id, coachNotes[activeClient.id]||"")} disabled={savingNotes}
+                    style={{marginTop:8,background:"#1a1a1a",color:"#fff",border:"none",padding:"8px 18px",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:savingNotes?0.6:1}}>
+                    {savingNotes?"Saving…":"Save Notes"}
+                  </button>
+                </div>
+              );
+            })()}
+
             {/* Progress Charts */}
             <div style={{marginTop:24}}>
               <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:14}}>Progress Charts</div>
@@ -2321,9 +2407,9 @@ export default function ApneaCoach() {
             {/* PB stats */}
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20}}>
               {[
-                {label:"CWT PB",value:activeClient.pbCWT?activeClient.pbCWT+"m":"—",emoji:"🌊"},
-                {label:"STA PB",value:activeClient.pbSTA||"—",emoji:"🧘"},
-                {label:"DYN PB",value:activeClient.pbDYN?activeClient.pbDYN+"m":"—",emoji:"💧"},
+                {label:"CWT PB",value:activeClient.pb?.CWT?activeClient.pb.CWT+"m":"—",emoji:"🌊"},
+                {label:"STA PB",value:activeClient.pb?.STA||"—",emoji:"🧘"},
+                {label:"DYN PB",value:activeClient.pb?.DYN?activeClient.pb.DYN+"m":"—",emoji:"💧"},
               ].map((s,i)=>(
                 <div key={i} style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:"18px 20px",textAlign:"center"}}>
                   <div style={{fontSize:24,marginBottom:4}}>{s.emoji}</div>
@@ -2537,6 +2623,34 @@ export default function ApneaCoach() {
           onClose={()=>setCopyFromModal(null)}
           onCopy={s=>{ handleCopySession(s); setCopyFromModal(null); flash("Session copied! Click Paste on any day."); }}
         />
+      )}
+      {newPBModal && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#fff",borderRadius:20,padding:"32px 28px",maxWidth:400,width:"100%",textAlign:"center",boxShadow:"0 24px 64px rgba(0,0,0,.25)"}}>
+            <div style={{fontSize:52,marginBottom:8}}>🏆</div>
+            <div style={{fontWeight:800,fontSize:22,letterSpacing:"-.02em",marginBottom:6}}>New Personal Best!</div>
+            <div style={{fontSize:14,color:"#888",marginBottom:24}}>Amazing performance — a new record has been set!</div>
+            {newPBModal.pbs.map((pb,i)=>(
+              <div key={i} style={{background:"#fffbe6",border:"2px solid #ffe082",borderRadius:14,padding:"16px 20px",marginBottom:12}}>
+                <div style={{fontSize:28,marginBottom:4}}>{pb.emoji}</div>
+                <div style={{fontWeight:700,fontSize:15,color:"#7a6200",marginBottom:2}}>{pb.label} PB</div>
+                <div style={{fontWeight:800,fontSize:32,color:"#1a1a1a",fontFamily:"monospace",letterSpacing:"-.02em"}}>{pb.value}{pb.unit}</div>
+                {pb.prev && <div style={{fontSize:12,color:"#aaa",marginTop:4}}>Previous: {pb.prev}{pb.unit}</div>}
+              </div>
+            ))}
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:8}}>
+              <button onClick={async()=>{
+                for (const pb of newPBModal.pbs) await handleConfirmPB(pb, newPBModal.clientId);
+                setNewPBModal(null); flash("PB updated! 🏆");
+              }} style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"13px",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                ✓ Update PB record
+              </button>
+              <button onClick={()=>setNewPBModal(null)} style={{background:"transparent",color:"#aaa",border:"1.5px solid #e0e0e0",padding:"11px",borderRadius:10,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+                Keep old PB
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {toast&&<div style={{position:"fixed",bottom:24,right:24,background:"#1a1a1a",color:"#fff",padding:"12px 20px",borderRadius:10,fontSize:13,fontWeight:500,zIndex:999,animation:"fi .2s"}}>✓ {toast}<style>{`@keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style></div>}
     </div>
