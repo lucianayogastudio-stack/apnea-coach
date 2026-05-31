@@ -4,7 +4,7 @@ import GymStrengthBuilder from "./GymStrengthBuilder";
 import StaticBuilder from "./StaticBuilder";
 import PoolTechniqueBuilder from "./PoolTechniqueBuilder";
 import PoolBuilder from "./PoolBuilder";
-import DepthBuilder from "./DepthBuilder";
+import DepthBuilder, { CompletedDepthSessionView } from "./DepthBuilder";
 import DryEqBuilder from "./DryEqBuilder";
 import ProgressCharts from "./ProgressCharts";
 import MobilityBuilder from "./MobilityBuilder";
@@ -331,39 +331,69 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   }
 
   if (isDepthSess) {
+    const isCompleted = session.feedback?.status === "completed";
+    const clientLog = session.feedback?.clientGymData || null;
+    // Coach sees completed view if athlete has logged; client sees editable view always
+    const showCompletedView = !isClient && isCompleted && clientLog;
+
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
           <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`}}>{m.emoji} {m.label}</span>
-          <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?"Athlete View":"Coach View"}</span>
-          {!isClient&&onEdit&&<button onClick={()=>{onClose();onEdit&&onEdit(session);}} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>}
+          <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?"Athlete View": showCompletedView ? "Completed Session" : "Coach View"}</span>
+          {!isClient && !showCompletedView && onEdit&&<button onClick={()=>{onClose();onEdit&&onEdit(session);}} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>}
+          {!isClient && showCompletedView && (
+            <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:11,color:"#2e7d32",fontWeight:600,background:"#e8f5e9",padding:"4px 10px",borderRadius:20,border:"1px solid #a5d6a7"}}>✓ Athlete logged this session</span>
+              {fb.status && <button onClick={()=>setFb(p=>({...p,status:null}))} style={{background:"transparent",border:"1.5px solid #e0e0e0",color:"#888",padding:"5px 10px",borderRadius:7,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>↩ Reopen</button>}
+            </div>
+          )}
         </div>
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
-        <DepthBuilder
-          isClient={isClient}
-          initialData={(() => {
-            const cp = session.plan?.gymData || null;
-            const cl = session.feedback?.clientGymData || null;
-            if (isClient && cp && cl) {
-              return { ...cp,
-                dives: cp.dives ? cp.dives.map(dive => {
-                  const logged = cl.dives?.find(l => l.id === dive.id);
-                  return logged ? { ...dive, log: logged.log } : dive;
-                }) : [],
-                energyBefore: cl.energyBefore || null,
-                energyAfter: cl.energyAfter || null,
-                clientNotes: cl.clientNotes || "",
-              };
-            }
-            return cp;
-          })()}
-          onSave={async (data) => {
-            setSaving(true);
-            if (isClient) { await onSave({ ...fb, gymData:data, status: fb.status||"completed" }); }
-            else { await onSave({ ...fb, gymData:data }); }
-            setSaving(false); onClose();
-          }}
-        />
+
+        {showCompletedView ? (
+          <>
+            <CompletedDepthSessionView coachPlan={session.plan?.gymData} clientLog={clientLog} />
+            {/* Coach reply */}
+            <div style={{marginTop:16,borderTop:"1.5px solid #f0f0f0",paddingTop:16}}>
+              <div style={{fontSize:12,fontWeight:600,color:"#555",marginBottom:6}}>Reply to athlete</div>
+              <textarea value={fb.coachComment||""} onChange={e=>setFb(p=>({...p,coachComment:e.target.value}))}
+                placeholder="Leave feedback, encouragement or adjustments for next session..."
+                style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",resize:"vertical",minHeight:80,color:"#1a1a1a",background:"#fff",marginBottom:10}}/>
+              <button onClick={async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}} disabled={saving}
+                style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"10px 20px",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:saving?0.6:1}}>
+                {saving?"Saving...":"Save Reply"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <DepthBuilder
+            isClient={isClient}
+            initialData={(() => {
+              const cp = session.plan?.gymData || null;
+              const cl = session.feedback?.clientGymData || null;
+              if (isClient && cp && cl) {
+                return { ...cp,
+                  dives: cp.dives ? cp.dives.map(dive => {
+                    const logged = cl.dives?.find(l => l.id === dive.id);
+                    return logged ? { ...dive, log: logged.log } : dive;
+                  }) : [],
+                  energyBefore: cl.energyBefore || null,
+                  energyAfter: cl.energyAfter || null,
+                  clientNotes: cl.clientNotes || "",
+                  incident: cl.incident !== undefined ? cl.incident : null,
+                };
+              }
+              return cp;
+            })()}
+            onSave={async (data) => {
+              setSaving(true);
+              if (isClient) { await onSave({ ...fb, gymData:data, status: fb.status||"completed" }); }
+              else { await onSave({ ...fb, gymData:data }); }
+              setSaving(false); onClose();
+            }}
+          />
+        )}
       </Modal>
     );
   }
@@ -549,6 +579,30 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
         <div style={{marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:6}}>How did you feel?</div><textarea style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,background:"#fff",outline:"none",resize:"vertical",minHeight:68,fontFamily:"inherit",color:"#1a1a1a"}} placeholder="Describe your physical and mental state..." value={fb.feeling} onChange={e=>setFb(p=>({...p,feeling:e.target.value}))} /></div>
         {(fb.status==="partial"||fb.status==="missed")&&<div style={{marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:"#c62828",marginBottom:6}}>What was the limiting factor?</div><textarea style={{width:"100%",padding:"10px 12px",border:"1.5px solid #ef9a9a",borderRadius:8,fontSize:14,background:"#fff",outline:"none",resize:"vertical",minHeight:68,fontFamily:"inherit",color:"#1a1a1a"}} placeholder="e.g. Early contractions, equalization, mental block..." value={fb.limitingFactor} onChange={e=>setFb(p=>({...p,limitingFactor:e.target.value}))} /></div>}
         <div style={{marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:6}}>Additional observations</div><textarea style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,background:"#fff",outline:"none",resize:"vertical",minHeight:68,fontFamily:"inherit",color:"#1a1a1a"}} placeholder="Anything else for your coach..." value={fb.clientNotes} onChange={e=>setFb(p=>({...p,clientNotes:e.target.value}))} /></div>
+        {/* Incident report — shown to coach when athlete reported one */}
+        {!isClient && session.feedback?.clientGymData?.incident && typeof session.feedback.clientGymData.incident === "object" && session.feedback.clientGymData.incident.types?.length > 0 && (
+          <div style={{background:"#fff5f5",border:"2px solid #ef5350",borderRadius:10,padding:"14px 16px",marginBottom:14}}>
+            <div style={{fontSize:12,fontWeight:800,color:"#c62828",letterSpacing:".06em",textTransform:"uppercase",marginBottom:10}}>🚨 Incident Report from Athlete</div>
+            {[
+              {key:"lung_squeeze",label:"Lung Squeeze"},
+              {key:"trachea_squeeze",label:"Trachea Squeeze"},
+              {key:"samba",label:"Samba / Loss of Motor Control"},
+              {key:"uw_blackout",label:"Underwater Blackout"},
+              {key:"surface_blackout",label:"Surface Blackout"},
+            ].filter(i=>session.feedback.clientGymData.incident.types.includes(i.key)).map(i=>(
+              <div key={i.key} style={{marginBottom:6}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#c62828"}}>• {i.label}</div>
+                {i.key==="uw_blackout"&&session.feedback.clientGymData.incident.details?.uw_depth&&(
+                  <div style={{fontSize:12,color:"#555",marginLeft:14}}>Depth: {session.feedback.clientGymData.incident.details.uw_depth}m · Unconscious: {session.feedback.clientGymData.incident.details.uw_seconds||"?"}s</div>
+                )}
+                {i.key==="surface_blackout"&&session.feedback.clientGymData.incident.details?.surface_seconds&&(
+                  <div style={{fontSize:12,color:"#555",marginLeft:14}}>Unconscious: {session.feedback.clientGymData.incident.details.surface_seconds}s</div>
+                )}
+              </div>
+            ))}
+            {session.feedback.clientGymData.incident.notes&&<div style={{fontSize:13,color:"#555",marginTop:8,paddingTop:8,borderTop:"1px solid #ef9a9a",lineHeight:1.6}}>{session.feedback.clientGymData.incident.notes}</div>}
+          </div>
+        )}
         {!isClient&&<div style={{background:"#f8f8f6",color:"#1a1a1a",borderRadius:10,padding:"13px 16px",marginBottom:14}}><div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#aaa",marginBottom:8}}>Your reply to the athlete</div><textarea style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,background:"#fff",outline:"none",resize:"vertical",minHeight:68,fontFamily:"inherit",color:"#1a1a1a"}} placeholder="Leave feedback, encouragement or adjustments..." value={fb.coachComment} onChange={e=>setFb(p=>({...p,coachComment:e.target.value}))} /></div>}
         {isClient&&session.feedback?.coachComment&&<div style={{background:"#e8f5e9",border:"1px solid #a5d6a7",borderRadius:10,padding:"13px 16px",marginBottom:14}}><div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#2e7d32",marginBottom:6}}>💬 Coach's Response</div><div style={{fontSize:14,color:"#1b5e20",lineHeight:1.65}}>{session.feedback.coachComment}</div></div>}
         <div style={{display:"flex",gap:10}}>

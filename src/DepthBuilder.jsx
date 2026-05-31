@@ -260,6 +260,138 @@ function AthleteTable({ dives, onChange }) {
   );
 }
 
+
+// ── Completed Session Summary (coach read-only view) ─────────────────────────
+export function CompletedDepthSessionView({ coachPlan, clientLog }) {
+  const data = clientLog;
+  const DISC_COLORS = {
+    CWT:  {bg:"#e8f0ff",color:"#1a2fa3",border:"#6a7ef4"},
+    CWTB: {bg:"#e6f4ff",color:"#005fa3",border:"#6ab0f4"},
+    CNF:  {bg:"#edf6e6",color:"#2d7a2d",border:"#7ec87e"},
+    FIM:  {bg:"#fffbe6",color:"#7a6200",border:"#e8cc4d"},
+    MONO: {bg:"#fdf0fb",color:"#8b1f7a",border:"#d97ec8"},
+    DRILL:{bg:"#f5f4f0",color:"#555",   border:"#ccc"},
+  };
+
+  const energyLabels = ["","Very tired 😴","Tired 😪","Ok 😐","Good 🙂","Fully charged ⚡"];
+  const dives = coachPlan?.dives || [];
+  const loggedDives = data?.dives || [];
+
+  return (
+    <div style={{fontFamily:"'DM Sans','Helvetica Neue',sans-serif"}}>
+      {/* Session header */}
+      <div style={{marginBottom:20}}>
+        {coachPlan?.sessionName && <div style={{fontWeight:700,fontSize:17,marginBottom:4}}>{coachPlan.sessionName}</div>}
+        {coachPlan?.location && <div style={{fontSize:12,color:"#aaa",marginBottom:4}}>📍 {coachPlan.location}</div>}
+        <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"#e8f5e9",border:"1px solid #a5d6a7",borderRadius:20,padding:"4px 12px",fontSize:12,fontWeight:700,color:"#2e7d32"}}>
+          ✓ Session Completed
+        </div>
+      </div>
+
+      {/* Coach session notes */}
+      {coachPlan?.coachNotes && (
+        <div style={{background:"#fffbe6",border:"1px solid #ffe082",borderRadius:10,padding:"12px 14px",marginBottom:16}}>
+          <div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#a07a00",marginBottom:4}}>Coach Session Notes</div>
+          <div style={{fontSize:13,color:"#5a4800",lineHeight:1.7}}>{coachPlan.coachNotes}</div>
+        </div>
+      )}
+
+      {/* Energy before */}
+      {data?.energyBefore && (
+        <div style={{display:"flex",gap:12,marginBottom:16,flexWrap:"wrap"}}>
+          <div style={{background:"#f8f8f6",borderRadius:10,padding:"10px 14px",flex:1}}>
+            <div style={{fontSize:10,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase",marginBottom:4}}>Energy Before</div>
+            <div style={{fontSize:15,fontWeight:700}}>{data.energyBefore}/5 — {energyLabels[data.energyBefore]}</div>
+          </div>
+          {data?.energyAfter && (
+            <div style={{background:"#f8f8f6",borderRadius:10,padding:"10px 14px",flex:1}}>
+              <div style={{fontSize:10,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase",marginBottom:4}}>Energy After</div>
+              <div style={{fontSize:15,fontWeight:700}}>{data.energyAfter}/5 — {energyLabels[data.energyAfter]}</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Dives */}
+      <div style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".07em",textTransform:"uppercase",marginBottom:10}}>Dives</div>
+      {dives.map((dive, i) => {
+        const disc = DISC_COLORS[dive.discipline] || DISC_COLORS.DRILL;
+        const logged = loggedDives.find(l => l.id === dive.id) || dive;
+        const log = logged.log || {};
+        const statusColor = log.status==="completed" ? "#2e7d32" : log.status==="early-turn" ? "#e65100" : log.status==="missed" ? "#c62828" : "#aaa";
+        const statusBg = log.status==="completed" ? "#f1f8f1" : log.status==="early-turn" ? "#fff8e1" : log.status==="missed" ? "#fff5f5" : "#fafaf8";
+        const statusLabel = log.status==="completed" ? "✓ Completed" : log.status==="early-turn" ? "↩ Early turn" : log.status==="missed" ? "✗ Missed" : "Not logged";
+
+        return (
+          <div key={dive.id} style={{background:"#fff",borderRadius:12,border:"1.5px solid #ebebeb",marginBottom:12,overflow:"hidden"}}>
+            {/* Dive header */}
+            <div style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",borderBottom:"1px solid #f5f5f5"}}>
+              <span style={{fontSize:12,fontWeight:700,color:"#bbb"}}>#{i+1}</span>
+              <span style={{padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:700,background:disc.bg,color:disc.color,border:"1px solid "+disc.border}}>{dive.discipline}</span>
+              <span style={{fontSize:11,color:"#888",background:"#f5f4f0",padding:"2px 8px",borderRadius:6,fontWeight:600}}>{dive.lungVolume}</span>
+              <span style={{fontWeight:700,fontSize:15,color:"#1a2fa3"}}>
+                {dive.openLine ? "Open"+(dive.openLineMax?" (max "+dive.openLineMax+"m)":"") : dive.targetDepth ? dive.targetDepth+"m" : "—"}
+              </span>
+              {dive.hang && <span style={{padding:"2px 8px",borderRadius:6,fontSize:11,fontWeight:700,background:"#fffbe6",color:"#7a6200",border:"1px solid #e8cc4d"}}>⏱ {dive.hang}s hang</span>}
+              <div style={{marginLeft:"auto",padding:"4px 12px",borderRadius:20,fontSize:11,fontWeight:700,background:statusBg,color:statusColor,border:"1px solid "+statusColor+"44"}}>{statusLabel}</div>
+            </div>
+
+            {/* Coach instructions */}
+            {(dive.coachNotes || dive.drillNotes) && (
+              <div style={{padding:"10px 16px",background:"#fffbe6",borderBottom:"1px solid #f5f5f5"}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#a07a00",letterSpacing:".06em",textTransform:"uppercase",marginBottom:4}}>Coach Instructions</div>
+                <div style={{fontSize:13,color:"#5a4800",lineHeight:1.7}}>{dive.coachNotes || dive.drillNotes}</div>
+              </div>
+            )}
+
+            {/* Athlete execution */}
+            {log.status && (
+              <div style={{padding:"10px 16px",background:"#f8fdf8"}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#2e7d32",letterSpacing:".06em",textTransform:"uppercase",marginBottom:8}}>Athlete Execution</div>
+                <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom: log.reason ? 8 : 0}}>
+                  {log.actualDepth && <div style={{fontSize:13}}><span style={{color:"#aaa",fontSize:11}}>Depth: </span><strong>{log.actualDepth}m</strong></div>}
+                  {log.turnDepth && <div style={{fontSize:13}}><span style={{color:"#aaa",fontSize:11}}>Turned at: </span><strong>{log.turnDepth}m</strong></div>}
+                  {log.diveTime && <div style={{fontSize:13}}><span style={{color:"#aaa",fontSize:11}}>Time: </span><strong>{log.diveTime}</strong></div>}
+                </div>
+                {log.reason && <div style={{fontSize:13,color:"#555",lineHeight:1.6}}><span style={{color:"#aaa",fontSize:11,fontWeight:600}}>Notes: </span>{log.reason}</div>}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Athlete session notes */}
+      {data?.clientNotes && (
+        <div style={{background:"#f0f7ff",border:"1px solid #c0d8f0",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
+          <div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#005fa3",marginBottom:4}}>Athlete Notes</div>
+          <div style={{fontSize:13,color:"#1a1a1a",lineHeight:1.7}}>{data.clientNotes}</div>
+        </div>
+      )}
+
+      {/* Incident report */}
+      {data?.incident && typeof data.incident === "object" && data.incident.types?.length > 0 && (
+        <div style={{background:"#fff5f5",border:"2px solid #ef5350",borderRadius:10,padding:"14px 16px",marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:800,color:"#c62828",letterSpacing:".06em",textTransform:"uppercase",marginBottom:10}}>🚨 Incident Report</div>
+          {[
+            {key:"lung_squeeze",label:"Lung Squeeze"},
+            {key:"trachea_squeeze",label:"Trachea Squeeze"},
+            {key:"samba",label:"Samba / Loss of Motor Control"},
+            {key:"uw_blackout",label:"Underwater Blackout"},
+            {key:"surface_blackout",label:"Surface Blackout"},
+          ].filter(inc=>data.incident.types.includes(inc.key)).map(inc=>(
+            <div key={inc.key} style={{marginBottom:6}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#c62828"}}>• {inc.label}</div>
+              {inc.key==="uw_blackout"&&data.incident.details?.uw_depth&&<div style={{fontSize:12,color:"#555",marginLeft:14}}>Depth: {data.incident.details.uw_depth}m · Unconscious: {data.incident.details.uw_seconds||"?"}s</div>}
+              {inc.key==="surface_blackout"&&data.incident.details?.surface_seconds&&<div style={{fontSize:12,color:"#555",marginLeft:14}}>Unconscious: {data.incident.details.surface_seconds}s</div>}
+            </div>
+          ))}
+          {data.incident.notes&&<div style={{fontSize:13,color:"#555",marginTop:8,paddingTop:8,borderTop:"1px solid #ef9a9a",lineHeight:1.6}}>{data.incident.notes}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Depth Builder ────────────────────────────────────────────────────────
 export default function DepthBuilder({ initialData, onSave, isClient }) {
   const [sessionName,   setSessionName]   = useState((initialData && initialData.sessionName) || "");
@@ -270,6 +402,8 @@ export default function DepthBuilder({ initialData, onSave, isClient }) {
   const [energyBefore,  setEnergyBefore]  = useState((initialData && initialData.energyBefore) || null);
   const [energyAfter,   setEnergyAfter]   = useState((initialData && initialData.energyAfter)  || null);
   const [clientNotes,   setClientNotes]   = useState((initialData && initialData.clientNotes)  || "");
+  const [incident,      setIncident]      = useState((initialData && initialData.incident)     || null);
+  // incident = null (not answered) | false (no incident) | { types: [], details: {} }
   const [saving,        setSaving]        = useState(false);
   const [logMode,       setLogMode]       = useState(false);
 
@@ -282,7 +416,7 @@ export default function DepthBuilder({ initialData, onSave, isClient }) {
 
   async function handleSave() {
     setSaving(true);
-    await onSave({ sessionName, location, coachNotes, dives, energyBefore, energyAfter, clientNotes });
+    await onSave({ sessionName, location, coachNotes, dives, energyBefore, energyAfter, clientNotes, incident });
     setSaving(false);
   }
 
@@ -435,6 +569,75 @@ export default function DepthBuilder({ initialData, onSave, isClient }) {
         <textarea value={clientNotes} onChange={e => setClientNotes(e.target.value)}
           placeholder="How did the session go? Water conditions, how you felt during dives, any concerns..."
           style={{ width:"100%", padding:"9px 12px", border:"1.5px solid #e0e0e0", borderRadius:8, fontSize:13, fontFamily:"inherit", outline:"none", resize:"vertical", minHeight:72, color:"#1a1a1a", background:"#fff" }} />
+      </div>
+
+      {/* Incident Report */}
+      <div style={{ background:"#fff", borderRadius:12, border:"1.5px solid #ebebeb", padding:"16px", marginBottom:14 }}>
+        <div style={{ fontSize:13, fontWeight:700, color:"#1a1a1a", marginBottom:12 }}>🚨 Incident Report</div>
+        <div style={{ fontSize:13, color:"#555", marginBottom:10 }}>Did anything go wrong during this session?</div>
+        <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+          {[["no", "✅ No incidents"], ["yes", "⚠️ Report an incident"]].map(([val, label]) => (
+            <button key={val} onClick={() => setIncident(val === "no" ? false : { types:[], details:{} })}
+              style={{ flex:1, padding:"9px", borderRadius:8, border:`2px solid ${incident === false && val==="no" ? "#4caf50" : incident && val==="yes" ? "#ef5350" : "#e0e0e0"}`, background: incident === false && val==="no" ? "#f1f8f1" : incident && val==="yes" ? "#fff5f5" : "#fff", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit", color: incident === false && val==="no" ? "#2e7d32" : incident && val==="yes" ? "#c62828" : "#555" }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {incident && typeof incident === "object" && (
+          <div style={{ borderTop:"1px solid #f0f0f0", paddingTop:12 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:"#c62828", marginBottom:10, letterSpacing:".04em", textTransform:"uppercase" }}>Select all that apply</div>
+            {[
+              { key:"lung_squeeze",    label:"Lung Squeeze" },
+              { key:"trachea_squeeze", label:"Trachea Squeeze" },
+              { key:"samba",           label:"Samba / Loss of Motor Control" },
+              { key:"uw_blackout",     label:"Underwater Blackout" },
+              { key:"surface_blackout",label:"Surface Blackout" },
+            ].map(inc => {
+              const selected = incident.types?.includes(inc.key);
+              return (
+                <div key={inc.key} style={{ marginBottom:8 }}>
+                  <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", padding:"8px 10px", borderRadius:8, background: selected ? "#fff5f5" : "#fafaf8", border:`1.5px solid ${selected ? "#ef5350" : "#f0f0f0"}` }}>
+                    <input type="checkbox" checked={selected} onChange={e => {
+                      const types = e.target.checked
+                        ? [...(incident.types||[]), inc.key]
+                        : (incident.types||[]).filter(t=>t!==inc.key);
+                      setIncident(p => ({...p, types}));
+                    }} style={{ width:16, height:16, accentColor:"#ef5350", cursor:"pointer" }} />
+                    <span style={{ fontSize:13, fontWeight:500, color:"#1a1a1a" }}>{inc.label}</span>
+                  </label>
+                  {selected && inc.key === "uw_blackout" && (
+                    <div style={{ display:"flex", gap:8, marginTop:6, marginLeft:26 }}>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:11, color:"#aaa", marginBottom:3 }}>Depth when it occurred (m)</div>
+                        <input type="number" placeholder="e.g. 45" value={incident.details?.uw_depth||""} onChange={e=>setIncident(p=>({...p,details:{...p.details,uw_depth:e.target.value}}))}
+                          style={{ width:"100%", padding:"6px 10px", border:"1.5px solid #ef9a9a", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", color:"#1a1a1a" }} />
+                      </div>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:11, color:"#aaa", marginBottom:3 }}>Seconds to regain consciousness</div>
+                        <input type="number" placeholder="e.g. 30" value={incident.details?.uw_seconds||""} onChange={e=>setIncident(p=>({...p,details:{...p.details,uw_seconds:e.target.value}}))}
+                          style={{ width:"100%", padding:"6px 10px", border:"1.5px solid #ef9a9a", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", color:"#1a1a1a" }} />
+                      </div>
+                    </div>
+                  )}
+                  {selected && inc.key === "surface_blackout" && (
+                    <div style={{ marginTop:6, marginLeft:26 }}>
+                      <div style={{ fontSize:11, color:"#aaa", marginBottom:3 }}>Seconds to regain consciousness</div>
+                      <input type="number" placeholder="e.g. 15" value={incident.details?.surface_seconds||""} onChange={e=>setIncident(p=>({...p,details:{...p.details,surface_seconds:e.target.value}}))}
+                        style={{ width:"60%", padding:"6px 10px", border:"1.5px solid #ef9a9a", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", color:"#1a1a1a" }} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            <div style={{ marginTop:10 }}>
+              <div style={{ fontSize:12, fontWeight:600, color:"#555", marginBottom:5 }}>Additional notes</div>
+              <textarea value={incident.notes||""} onChange={e=>setIncident(p=>({...p,notes:e.target.value}))}
+                placeholder="What happened? Conditions, how you felt, any other details..."
+                style={{ width:"100%", padding:"8px 10px", border:"1.5px solid #ef9a9a", borderRadius:8, fontSize:13, fontFamily:"inherit", outline:"none", resize:"vertical", minHeight:60, color:"#1a1a1a" }} />
+            </div>
+          </div>
+        )}
       </div>
 
       <button onClick={handleSave} disabled={saving}
