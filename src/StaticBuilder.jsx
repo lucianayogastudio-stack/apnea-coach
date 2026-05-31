@@ -514,16 +514,68 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
           )}
           {!exercise.log?.status && <div style={{fontSize:10,fontWeight:800,letterSpacing:".07em",textTransform:"uppercase",color:"#aaa",margin:"12px 0 10px"}}>Your Log</div>}
           <div style={{display:"flex",flexWrap:"wrap",gap:10,marginBottom:10}}>
-            {exercise.log?.status !== "skipped" && (isContraction||isHold||isTable||exercise.templateKey==="max-effort") && (
-              <Field label="Actual hold time" half>
+            {/* Per-round logging for holds, contractions, max-effort */}
+            {exercise.log?.status !== "skipped" && (isContraction||isHold||exercise.templateKey==="max-effort") && (() => {
+              const rounds = Math.min(parseInt(exercise.rounds)||1, 20);
+              if (rounds <= 1) {
+                // Single round — keep simple single input
+                return (
+                  <>
+                    <Field label="Actual hold time" half>
+                      <input value={exercise.log?.actualTime||""} onChange={e=>updLog("actualTime",e.target.value)}
+                        style={inpGreen} placeholder="e.g. 2:15" />
+                    </Field>
+                    {isContraction && (
+                      <Field label="First contraction at" half>
+                        <input value={exercise.log?.actualContraction||""} onChange={e=>updLog("actualContraction",e.target.value)}
+                          style={inpGreen} placeholder="e.g. 1:45" />
+                      </Field>
+                    )}
+                  </>
+                );
+              }
+              // Multiple rounds — per-round grid
+              return (
+                <div style={{width:"100%"}}>
+                  <div style={{fontSize:10,fontWeight:800,color:"#2e7d32",letterSpacing:".07em",textTransform:"uppercase",marginBottom:8}}>
+                    Per-round times — {rounds} rounds
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {Array.from({length:rounds},(_,i)=>{
+                      const holdVal = exercise.log?.roundLogs?.[i]||"";
+                      const contrVal = exercise.log?.roundContractions?.[i]||"";
+                      return (
+                        <div key={i} style={{display:"grid",gridTemplateColumns:`32px 1fr${isContraction?" 1fr":""}`,gap:6,alignItems:"center"}}>
+                          <div style={{fontSize:12,fontWeight:700,color:"#bbb",textAlign:"center",background:"#f0f0ec",borderRadius:6,padding:"4px 0"}}>{i+1}</div>
+                          <input placeholder={exercise.holdTime||"m:ss"} value={holdVal}
+                            onChange={e=>{
+                              const logs=[...(exercise.log?.roundLogs||Array(rounds).fill(""))];
+                              logs[i]=e.target.value;
+                              onChange({...exercise,log:{...exercise.log,roundLogs:logs}});
+                            }}
+                            style={{...inpGreen,margin:0,padding:"6px 10px"}} />
+                          {isContraction && (
+                            <input placeholder="Contraction at" value={contrVal}
+                              onChange={e=>{
+                                const logs=[...(exercise.log?.roundContractions||Array(rounds).fill(""))];
+                                logs[i]=e.target.value;
+                                onChange({...exercise,log:{...exercise.log,roundContractions:logs}});
+                              }}
+                              style={{...inpGreen,margin:0,padding:"6px 10px"}} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {exercise.restBetween && <div style={{fontSize:11,color:"#aaa",marginTop:6}}>Rest between rounds: {exercise.restBetween}</div>}
+                </div>
+              );
+            })()}
+            {/* Table types already have their own round logging above */}
+            {exercise.log?.status !== "skipped" && isTable && (
+              <Field label="Overall hold time" half>
                 <input value={exercise.log?.actualTime||""} onChange={e=>updLog("actualTime",e.target.value)}
                   style={inpGreen} placeholder="e.g. 2:15" />
-              </Field>
-            )}
-            {exercise.log?.status !== "skipped" && isContraction && (
-              <Field label="First contraction at" half>
-                <input value={exercise.log?.actualContraction||""} onChange={e=>updLog("actualContraction",e.target.value)}
-                  style={inpGreen} placeholder="e.g. 1:45" />
               </Field>
             )}
             <Field label={exercise.log?.status==="skipped"?"Why did you skip?":"How did you feel?"}>

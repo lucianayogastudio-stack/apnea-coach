@@ -305,12 +305,35 @@ export default function CompletedSessionView({ method, coachPlan, clientLog, onR
                     </div>
                   )}
 
-                  {logStatus && !isTable && (log.actualTime||log.actualContraction||log.feeling||log.limitingFactor) && (
+                  {logStatus && !isTable && (log.actualTime||log.actualContraction||log.roundLogs?.some(Boolean)||log.roundContractions?.some(Boolean)||log.feeling||log.limitingFactor) && (
                     <div style={{padding:"8px 14px",background:ss.logBg}}>
-                      <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:4}}>
-                        {log.actualTime && <span style={{fontSize:13}}><span style={{color:"#aaa",fontSize:11}}>Time: </span><strong>{log.actualTime}</strong></span>}
-                        {log.actualContraction && <span style={{fontSize:13}}><span style={{color:"#aaa",fontSize:11}}>First contraction: </span><strong>{log.actualContraction}</strong></span>}
-                      </div>
+                      {/* Per-round grid if multiple rounds */}
+                      {(log.roundLogs?.some(Boolean)||log.roundContractions?.some(Boolean)) ? (
+                        <div style={{marginBottom:8}}>
+                          <div style={{fontSize:10,fontWeight:800,color:ss.color,letterSpacing:".06em",textTransform:"uppercase",marginBottom:6}}>Round Results</div>
+                          <div style={{borderRadius:8,overflow:"hidden",border:"1px solid #ebebeb"}}>
+                            <div style={{display:"grid",gridTemplateColumns:`36px 1fr${log.roundContractions?.some(Boolean)?" 1fr":""}`,background:"#f8f8f6",padding:"5px 10px",gap:8}}>
+                              {["Rd","Hold Time",...(log.roundContractions?.some(Boolean)?["Contraction"]:[])].map(h=>(
+                                <div key={h} style={{fontSize:10,fontWeight:800,color:"#bbb",letterSpacing:".07em",textTransform:"uppercase"}}>{h}</div>
+                              ))}
+                            </div>
+                            {(log.roundLogs||[]).map((val,idx)=>(
+                              <div key={idx} style={{display:"grid",gridTemplateColumns:`36px 1fr${log.roundContractions?.some(Boolean)?" 1fr":""}`,padding:"6px 10px",gap:8,borderTop:"1px solid #f0f0f0",background:idx%2===0?"#fff":"#fafaf8"}}>
+                                <div style={{fontSize:12,color:"#bbb",fontWeight:700}}>{idx+1}</div>
+                                <div style={{fontSize:13,fontWeight:700,color:val?ss.color:"#ddd",fontFamily:"monospace"}}>{val||"—"}</div>
+                                {log.roundContractions?.some(Boolean) && (
+                                  <div style={{fontSize:13,color:log.roundContractions?.[idx]?"#555":"#ddd",fontFamily:"monospace"}}>{log.roundContractions?.[idx]||"—"}</div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:4}}>
+                          {log.actualTime && <span style={{fontSize:13}}><span style={{color:"#aaa",fontSize:11}}>Time: </span><strong>{log.actualTime}</strong></span>}
+                          {log.actualContraction && <span style={{fontSize:13}}><span style={{color:"#aaa",fontSize:11}}>First contraction: </span><strong>{log.actualContraction}</strong></span>}
+                        </div>
+                      )}
                       {log.feeling && <div style={{fontSize:12,color:"#555",marginBottom:2}}><span style={{color:"#aaa"}}>{logStatus==="skipped"?"Reason: ":"Feeling: "}</span>{log.feeling}</div>}
                       {log.limitingFactor && <div style={{fontSize:12,color:"#555"}}><span style={{color:"#aaa"}}>Limiting factor: </span>{log.limitingFactor}</div>}
                     </div>
