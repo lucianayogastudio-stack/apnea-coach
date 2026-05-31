@@ -204,28 +204,41 @@ export default function ProgressCharts({ sessions, clientName }) {
     const clientData = s.feedback?.clientGymData;
     const loggedDives = clientData?.dives || [];
 
-    // Path 1: DepthBuilder per-dive logs
-    if (planDives.length > 0) {
+    // Path 1: DepthBuilder per-dive logs with individual statuses
+    if (planDives.length > 0 && loggedDives.length > 0) {
       const allDives = planDives.map(pd => {
         const logged = loggedDives.find(l => l.id === pd.id);
         return logged ? { ...pd, log: logged.log } : pd;
       });
       const completed = allDives.filter(d => d.log?.status === "completed");
       if (completed.length > 0) {
-        // Use actualDepth if logged, otherwise fall back to targetDepth
         const depths = completed.map(d => Number(d.log?.actualDepth) || Number(d.targetDepth) || 0).filter(Boolean);
         if (depths.length > 0) return { x: s.date, y: Math.max(...depths) };
       }
     }
 
-    // Path 2: session-level actualDepth (old simple feedback form)
-    if (s.feedback?.actualDepth && Number(s.feedback.actualDepth) > 0 && s.feedback?.status === "completed") {
+    // Path 2: DepthBuilder session completed, use deepest target depth from plan dives
+    if (planDives.length > 0 && s.feedback?.status === "completed") {
+      const depths = planDives.map(d => Number(d.targetDepth)||0).filter(Boolean);
+      if (depths.length > 0) return { x: s.date, y: Math.max(...depths) };
+    }
+
+    // Path 3: session-level actualDepth (simple feedback form)
+    if (s.feedback?.actualDepth && Number(s.feedback.actualDepth) > 0) {
       return { x: s.date, y: Number(s.feedback.actualDepth) };
     }
 
-    // Path 3: session-level actualDepth without requiring completed status
-    if (s.feedback?.actualDepth && Number(s.feedback.actualDepth) > 0) {
-      return { x: s.date, y: Number(s.feedback.actualDepth) };
+    // Path 4: old sessions — use plan.targetDepth if session was marked completed
+    if (s.feedback?.status === "completed" && s.plan?.targetDepth && Number(s.plan.targetDepth) > 0) {
+      return { x: s.date, y: Number(s.plan.targetDepth) };
+    }
+
+    // Path 5: any session with a target depth (even without completed status — shows planned depth)
+    if (s.plan?.gymData?.dives?.length > 0) {
+      const depths = s.plan.gymData.dives.map(d => Number(d.targetDepth)||0).filter(Boolean);
+      if (depths.length > 0 && s.feedback?.status === "completed") {
+        return { x: s.date, y: Math.max(...depths) };
+      }
     }
 
     return null;
@@ -246,15 +259,16 @@ export default function ProgressCharts({ sessions, clientName }) {
     const planDives  = s.plan?.gymData?.dives || [];
     const clientData = s.feedback?.clientGymData;
     const loggedDives = clientData?.dives || [];
-    if (planDives.length > 0) {
+    if (planDives.length > 0 && loggedDives.length > 0) {
       const allDives = planDives.map(pd => {
         const logged = loggedDives.find(l => l.id === pd.id);
         return logged ? { ...pd, log: logged.log } : pd;
       });
-      return a + allDives.filter(d => d.log?.status === "completed").length;
+      const n = allDives.filter(d => d.log?.status === "completed").length;
+      if (n > 0) return a + n;
     }
-    // Fallback: count the whole session as 1 completed dive if it has actualDepth
-    if (s.feedback?.actualDepth && Number(s.feedback.actualDepth) > 0) return a + 1;
+    // Old sessions: count as 1 completed if session is marked completed
+    if (s.feedback?.status === "completed") return a + 1;
     return a;
   }, 0);
 
