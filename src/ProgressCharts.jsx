@@ -350,23 +350,40 @@ export default function ProgressCharts({ sessions, clientName }) {
 
     exercises.forEach(ex => {
       const logged = loggedExercises.find(l => l.id === ex.id) || ex;
+      const isCompleted = logged.log?.status === "completed" || logged.log?.done === true;
 
-      // Try every possible time field — new and old formats
-      const candidates = [
-        logged.log?.actualTime,          // new per-round log
-        ...(logged.log?.roundLogs || []), // per-round array
-        ex.targetTime,                   // planned target time
-        ex.holdTime,                     // CO2/O2 table hold time
-        ex.duration,                     // some older fields
+      // Priority 1: actual logged times from the athlete
+      const actualCandidates = [
+        logged.log?.actualTime,
+        ...(logged.log?.roundLogs || []),
       ];
-
-      candidates.forEach(t => {
+      actualCandidates.forEach(t => {
         const secs = timeToSeconds(t);
         if (secs && (!bestSecs || secs > bestSecs)) bestSecs = secs;
       });
+
+      // Priority 2: if exercise was completed but no actual time entered, use planned target
+      if (!bestSecs && isCompleted) {
+        const planned = [ex.targetTime, ex.holdTime, ex.duration, logged.targetTime, logged.holdTime];
+        planned.forEach(t => {
+          const secs = timeToSeconds(t);
+          if (secs && (!bestSecs || secs > bestSecs)) bestSecs = secs;
+        });
+      }
     });
 
-    // Fallback: if session completed and no exercise times, check if there's a holdTime on the session gymData itself
+    // Priority 3: session completed, use any exercise planned times
+    if (!bestSecs && s.feedback?.status === "completed") {
+      exercises.forEach(ex => {
+        const planned = [ex.targetTime, ex.holdTime, ex.duration];
+        planned.forEach(t => {
+          const secs = timeToSeconds(t);
+          if (secs && (!bestSecs || secs > bestSecs)) bestSecs = secs;
+        });
+      });
+    }
+
+    // Priority 4: session-level fallback
     if (!bestSecs && s.feedback?.status === "completed") {
       const t = timeToSeconds(s.plan.gymData.holdTime || s.plan.gymData.targetTime);
       if (t) bestSecs = t;
