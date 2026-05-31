@@ -18,14 +18,16 @@ function fmtDateShort(iso) {
 
 // ── Mini SVG Line Chart ───────────────────────────────────────────────────────
 function LineChart({ data, color, yLabel, height, showDots, formatY, referenceLines }) {
-  if (!data || data.length < 2) return null;
+  if (!data || data.length < 1) return null;
+  // If only 1 point, duplicate it so the line renders (shows as a dot)
+  const chartData = data.length === 1 ? [data[0], {...data[0], x: data[0].x + "_"}] : data;
 
   const W = 600, H = height || 180;
   const PAD = { top: 20, right: 20, bottom: 40, left: 48 };
   const chartW = W - PAD.left - PAD.right;
   const chartH = H - PAD.top - PAD.bottom;
 
-  const yVals = data.map(d => d.y);
+  const yVals = chartData.map(d => d.y);
   const yMin  = Math.min(...yVals);
   const yMax  = Math.max(...yVals);
   const yRange = yMax - yMin || 1;
@@ -34,11 +36,11 @@ function LineChart({ data, color, yLabel, height, showDots, formatY, referenceLi
   const yLo = Math.max(0, yMin - yPad);
   const yHi = yMax + yPad;
 
-  function xPos(i)   { return PAD.left + (i / (data.length - 1)) * chartW; }
+  function xPos(i)   { return PAD.left + (chartData.length < 2 ? chartW/2 : (i / (chartData.length - 1)) * chartW); }
   function yPos(val) { return PAD.top + chartH - ((val - yLo) / (yHi - yLo)) * chartH; }
 
-  const points = data.map((d, i) => `${xPos(i)},${yPos(d.y)}`).join(" ");
-  const areaPoints = `${xPos(0)},${PAD.top + chartH} ${points} ${xPos(data.length - 1)},${PAD.top + chartH}`;
+  const points = chartData.map((d, i) => `${xPos(i)},${yPos(d.y)}`).join(" ");
+  const areaPoints = `${xPos(0)},${PAD.top + chartH} ${points} ${xPos(chartData.length - 1)},${PAD.top + chartH}`;
 
   // Y axis ticks
   const yTicks = 4;
@@ -82,9 +84,9 @@ function LineChart({ data, color, yLabel, height, showDots, formatY, referenceLi
       {/* Line */}
       <polyline points={points} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
 
-      {/* Dots */}
-      {showDots && data.map((d, i) => (
-        <circle key={i} cx={xPos(i)} cy={yPos(d.y)} r="4" fill="#fff" stroke={color} strokeWidth="2.5" />
+      {/* Dots — always show on real data points, not the duplicated one */}
+      {data.map((d, i) => (
+        <circle key={i} cx={xPos(i)} cy={yPos(d.y)} r="5" fill="#fff" stroke={color} strokeWidth="2.5" />
       ))}
 
       {/* X axis labels — show every Nth */}
@@ -193,25 +195,40 @@ export default function ProgressCharts({ sessions, clientName }) {
 
   // ── Parse depth sessions ──
   const depthSessions = sessions
-    .filter(s => s.method === "depth" && s.plan?.gymData?.dives)
+    .filter(s => s.method === "depth")
     .sort((a, b) => a.date.localeCompare(b.date));
 
   // Per-session: deepest completed dive
-  // Athlete logs are in feedback.clientGymData, merged with plan dives
   const depthOverTime = depthSessions.map(s => {
-    const planDives  = s.plan.gymData.dives || [];
+    const planDives  = s.plan?.gymData?.dives || [];
     const clientData = s.feedback?.clientGymData;
-    const loggedDives = clientData?.dives || planDives;
+    const loggedDives = clientData?.dives || [];
 
-    // Try client log first, fall back to plan dives
-    const allDives = planDives.map(pd => {
-      const logged = loggedDives.find(l => l.id === pd.id);
-      return logged ? { ...pd, log: logged.log } : pd;
-    });
+    // Path 1: DepthBuilder per-dive logs
+    if (planDives.length > 0) {
+      const allDives = planDives.map(pd => {
+        const logged = loggedDives.find(l => l.id === pd.id);
+        return logged ? { ...pd, log: logged.log } : pd;
+      });
+      const completed = allDives.filter(d => d.log?.status === "completed");
+      if (completed.length > 0) {
+        // Use actualDepth if logged, otherwise fall back to targetDepth
+        const depths = completed.map(d => Number(d.log?.actualDepth) || Number(d.targetDepth) || 0).filter(Boolean);
+        if (depths.length > 0) return { x: s.date, y: Math.max(...depths) };
+      }
+    }
 
-    const completed = allDives.filter(d => d.log && d.log.status === "completed" && d.log.actualDepth);
-    const maxDepth = completed.length > 0 ? Math.max(...completed.map(d => Number(d.log.actualDepth))) : null;
-    return maxDepth ? { x: s.date, y: maxDepth, label: fmtDateShort(s.date) } : null;
+    // Path 2: session-level actualDepth (old simple feedback form)
+    if (s.feedback?.actualDepth && Number(s.feedback.actualDepth) > 0 && s.feedback?.status === "completed") {
+      return { x: s.date, y: Number(s.feedback.actualDepth) };
+    }
+
+    // Path 3: session-level actualDepth without requiring completed status
+    if (s.feedback?.actualDepth && Number(s.feedback.actualDepth) > 0) {
+      return { x: s.date, y: Number(s.feedback.actualDepth) };
+    }
+
+    return null;
   }).filter(Boolean);
 
   // PB over time — running maximum
@@ -228,12 +245,17 @@ export default function ProgressCharts({ sessions, clientName }) {
   const completedDives = depthSessions.reduce((a, s) => {
     const planDives  = s.plan?.gymData?.dives || [];
     const clientData = s.feedback?.clientGymData;
-    const loggedDives = clientData?.dives || planDives;
-    const allDives = planDives.map(pd => {
-      const logged = loggedDives.find(l => l.id === pd.id);
-      return logged ? { ...pd, log: logged.log } : pd;
-    });
-    return a + allDives.filter(d => d.log && d.log.status === "completed").length;
+    const loggedDives = clientData?.dives || [];
+    if (planDives.length > 0) {
+      const allDives = planDives.map(pd => {
+        const logged = loggedDives.find(l => l.id === pd.id);
+        return logged ? { ...pd, log: logged.log } : pd;
+      });
+      return a + allDives.filter(d => d.log?.status === "completed").length;
+    }
+    // Fallback: count the whole session as 1 completed dive if it has actualDepth
+    if (s.feedback?.actualDepth && Number(s.feedback.actualDepth) > 0) return a + 1;
+    return a;
   }, 0);
 
   // ── Parse pool sessions ──
@@ -377,8 +399,8 @@ export default function ProgressCharts({ sessions, clientName }) {
           <ChartCard
             title="Depth Over Time"
             subtitle="Deepest completed dive per session"
-            isEmpty={depthOverTime.length < 2}
-            emptyMsg="Need at least 2 logged depth sessions to show this chart">
+            isEmpty={depthOverTime.length < 1}
+            emptyMsg="Log depth sessions with actual depth to see your progress">
             <LineChart
               data={depthOverTime}
               color="#3a4df4"
@@ -393,8 +415,8 @@ export default function ProgressCharts({ sessions, clientName }) {
           <ChartCard
             title="Personal Best Progression"
             subtitle="How your best depth has improved over time"
-            isEmpty={pbOverTime.length < 2}
-            emptyMsg="Need at least 2 logged depth sessions to show this chart">
+            isEmpty={pbOverTime.length < 1}
+            emptyMsg="Log depth sessions with actual depth to see your progress">
             <LineChart
               data={pbOverTime}
               color="#ef5350"
@@ -421,8 +443,8 @@ export default function ProgressCharts({ sessions, clientName }) {
           <ChartCard
             title="Training Volume"
             subtitle="Total meters swum per pool session"
-            isEmpty={poolMetersOverTime.length < 2}
-            emptyMsg="Need at least 2 logged pool sessions to show this chart">
+            isEmpty={poolMetersOverTime.length < 1}
+            emptyMsg="Log pool sessions to see your training volume">
             <BarChart
               data={poolMetersOverTime}
               color="#4db84d"
@@ -436,8 +458,8 @@ export default function ProgressCharts({ sessions, clientName }) {
           <ChartCard
             title="Longest Dynamic Dive"
             subtitle="Longest DYN / DYNB / DNF set per session (excludes freestyle and breaststroke)"
-            isEmpty={longestDynOverTime.length < 2}
-            emptyMsg="Need dynamic disciplines (DYN, DYNB, DNF) logged in at least 2 sessions">
+            isEmpty={longestDynOverTime.length < 1}
+            emptyMsg="Log DYN, DYNB or DNF sets to see your dynamic distance">
             <LineChart
               data={longestDynOverTime}
               color="#3a8ef4"
@@ -462,8 +484,8 @@ export default function ProgressCharts({ sessions, clientName }) {
           <ChartCard
             title="Best Hold Per Session"
             subtitle="Longest breath-hold recorded each session"
-            isEmpty={staticOverTime.length < 2}
-            emptyMsg="Need at least 2 logged static sessions to show this chart">
+            isEmpty={staticOverTime.length < 1}
+            emptyMsg="Log static holds to see your progress">
             <LineChart
               data={staticOverTime}
               color="#9333ea"
@@ -478,8 +500,8 @@ export default function ProgressCharts({ sessions, clientName }) {
           <ChartCard
             title="STA Personal Best Progression"
             subtitle="Running best breath-hold over time"
-            isEmpty={staticPBOverTime.length < 2}
-            emptyMsg="Need at least 2 logged static sessions to show this chart">
+            isEmpty={staticPBOverTime.length < 1}
+            emptyMsg="Log static holds to see your progress">
             <LineChart
               data={staticPBOverTime}
               color="#ef5350"
