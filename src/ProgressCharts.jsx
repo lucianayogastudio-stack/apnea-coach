@@ -347,11 +347,31 @@ export default function ProgressCharts({ sessions, clientName }) {
     const loggedExercises = clientData?.exercises || [];
 
     let bestSecs = null;
+
     exercises.forEach(ex => {
       const logged = loggedExercises.find(l => l.id === ex.id) || ex;
-      const t = timeToSeconds(logged.log?.actualTime || ex.targetTime);
-      if (t && (!bestSecs || t > bestSecs)) bestSecs = t;
+
+      // Try every possible time field — new and old formats
+      const candidates = [
+        logged.log?.actualTime,          // new per-round log
+        ...(logged.log?.roundLogs || []), // per-round array
+        ex.targetTime,                   // planned target time
+        ex.holdTime,                     // CO2/O2 table hold time
+        ex.duration,                     // some older fields
+      ];
+
+      candidates.forEach(t => {
+        const secs = timeToSeconds(t);
+        if (secs && (!bestSecs || secs > bestSecs)) bestSecs = secs;
+      });
     });
+
+    // Fallback: if session completed and no exercise times, check if there's a holdTime on the session gymData itself
+    if (!bestSecs && s.feedback?.status === "completed") {
+      const t = timeToSeconds(s.plan.gymData.holdTime || s.plan.gymData.targetTime);
+      if (t) bestSecs = t;
+    }
+
     return bestSecs ? { x: s.date, y: bestSecs } : null;
   }).filter(Boolean);
 
