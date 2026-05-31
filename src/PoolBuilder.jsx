@@ -188,11 +188,12 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
           {isClient && (
             <div style={{ display:"flex", gap:3 }}>
               {[
-                { status:"completed", emoji:"✓", color:"#4caf50", bg:"#4caf50", title:"Completed" },
-                { status:"partial",   emoji:"~", color:"#f59e0b", bg:"#f59e0b", title:"Partial / didn't finish" },
-                { status:"skipped",   emoji:"✗", color:"#ef5350", bg:"#ef5350", title:"Skipped" },
+                { status:"completed", emoji:"✓", color:"#4caf50", title:"Completed" },
+                { status:"partial",   emoji:"~", color:"#f59e0b", title:"Partial / didn't finish" },
+                { status:"skipped",   emoji:"✗", color:"#ef5350", title:"Skipped" },
               ].map(opt => {
                 const active = block.log?.status === opt.status;
+                const anySelected = !!block.log?.status;
                 return (
                   <button key={opt.status} title={opt.title}
                     onClick={() => {
@@ -201,7 +202,16 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
                       updLog("done", newStatus === "completed");
                       setShowLog(true);
                     }}
-                    style={{ width:26, height:26, borderRadius:"50%", border:"2px solid " + (active ? opt.color : "#e0e0e0"), background: active ? opt.bg : "transparent", color: active ? "#fff" : "#ccc", fontSize:11, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s" }}>
+                    style={{
+                      width:26, height:26, borderRadius:"50%",
+                      border:"2px solid " + (active ? opt.color : anySelected ? "#e8e8e8" : "#d0d0d0"),
+                      background: active ? opt.color : "transparent",
+                      color: active ? "#fff" : anySelected ? "#ddd" : "#bbb",
+                      fontSize:12, fontWeight:800, cursor:"pointer",
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                      transition:"all .15s",
+                      opacity: anySelected && !active ? 0.4 : 1,
+                    }}>
                     {opt.emoji}
                   </button>
                 );
