@@ -312,11 +312,15 @@ function ExerciseRow({ exercise, onChange, onRemove, isClient, showLabel }) {
         )}
       </div>
 
-      {showNotes&&(
+      {showNotes&&exercise.notes&&(
         <div style={{padding:"0 14px 12px"}}>
-          <textarea value={exercise.notes} onChange={e=>onChange({...exercise,notes:e.target.value})}
-            placeholder="Notes (e.g. slow eccentric, keep core tight...)"
-            style={{width:"100%",padding:"8px 10px",border:"1.5px solid #e0e0e0",borderRadius:7,fontSize:12,fontFamily:"inherit",outline:"none",resize:"vertical",minHeight:50,color:"#555",background:"#fafaf8",color:"#1a1a1a"}} />
+          {isClient ? (
+            <div style={{background:"#fffbe6",border:"1px solid #ffe082",borderRadius:7,padding:"8px 10px",fontSize:12,color:"#5a4800",lineHeight:1.6}}>{exercise.notes}</div>
+          ) : (
+            <textarea value={exercise.notes} onChange={e=>onChange({...exercise,notes:e.target.value})}
+              placeholder="Notes (e.g. slow eccentric, keep core tight...)"
+              style={{width:"100%",padding:"8px 10px",border:"1.5px solid #e0e0e0",borderRadius:7,fontSize:12,fontFamily:"inherit",outline:"none",resize:"vertical",minHeight:50,color:"#1a1a1a",background:"#fafaf8"}} />
+          )}
         </div>
       )}
 
@@ -577,9 +581,13 @@ export default function MobilityBuilder({ initialData, onSave, isClient }) {
       {!isClient&&(
         <div style={{marginBottom:16}}>
           <div style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase",marginBottom:5}}>Coach Notes (visible to client)</div>
-          <textarea value={coachNotes} onChange={e=>setCoachNotes(e.target.value)}
-            placeholder="General instructions, focus points, safety notes..."
-            style={{width:"100%",padding:"9px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",resize:"vertical",minHeight:56,color:"#1a1a1a"}} />
+          {isClient ? (
+            <div style={{background:"#fffbe6",border:"1px solid #ffe082",borderRadius:8,padding:"9px 12px",fontSize:13,color:"#5a4800",lineHeight:1.6,minHeight:40}}>{coachNotes}</div>
+          ) : (
+            <textarea value={coachNotes} onChange={e=>setCoachNotes(e.target.value)}
+              placeholder="General instructions, focus points, safety notes..."
+              style={{width:"100%",padding:"9px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",resize:"vertical",minHeight:56,color:"#1a1a1a"}} />
+          )}
         </div>
       )}
 
