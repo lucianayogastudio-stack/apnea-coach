@@ -186,8 +186,27 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
 
         <div style={{ display:"flex", gap:5, alignItems:"center" }}>
           {isClient && (
-            <button onClick={() => { updLog("done", !(block.log && block.log.done)); setShowLog(true); }}
-              style={{ width:28, height:28, borderRadius:"50%", border:"2px solid " + (block.log && block.log.done ? "#4caf50" : "#e0e0e0"), background: block.log && block.log.done ? "#4caf50" : "transparent", color: block.log && block.log.done ? "#fff" : "#ccc", fontSize:12, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s" }}>✓</button>
+            <div style={{ display:"flex", gap:3 }}>
+              {[
+                { status:"completed", emoji:"✓", color:"#4caf50", bg:"#4caf50", title:"Completed" },
+                { status:"partial",   emoji:"~", color:"#f59e0b", bg:"#f59e0b", title:"Partial / didn't finish" },
+                { status:"skipped",   emoji:"✗", color:"#ef5350", bg:"#ef5350", title:"Skipped" },
+              ].map(opt => {
+                const active = block.log?.status === opt.status;
+                return (
+                  <button key={opt.status} title={opt.title}
+                    onClick={() => {
+                      const newStatus = active ? null : opt.status;
+                      updLog("status", newStatus);
+                      updLog("done", newStatus === "completed");
+                      setShowLog(true);
+                    }}
+                    style={{ width:26, height:26, borderRadius:"50%", border:"2px solid " + (active ? opt.color : "#e0e0e0"), background: active ? opt.bg : "transparent", color: active ? "#fff" : "#ccc", fontSize:11, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s" }}>
+                    {opt.emoji}
+                  </button>
+                );
+              })}
+            </div>
           )}
           {isClient && (
             <button onClick={() => setShowLog(v => !v)}
@@ -335,16 +354,8 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
               </div>
             </div>
             <div style={{ background:"#fff5f0", border:"1px solid #ffd0b0", borderRadius:8, padding:"8px 12px", fontSize:12, color:"#b94a00", fontWeight:600 }}>
-              🔥 Max effort — athlete goes as far as possible and logs distance
+              🔥 Max effort — athlete goes as far as possible and logs distance achieved
             </div>
-            {isClient && (
-              <div style={{ marginTop:10 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:"#bbb", letterSpacing:".06em", textTransform:"uppercase", marginBottom:5 }}>Distance achieved (m)</div>
-                <input type="number" placeholder="e.g. 125" value={block.log?.achievedMeters || ""}
-                  onChange={e => updLog("achievedMeters", e.target.value)}
-                  style={{ width:110, padding:"7px 10px", border:"1.5px solid #e0e0e0", borderRadius:7, fontSize:14, fontFamily:"inherit", outline:"none", color:"#1a1a1a", fontWeight:700 }} />
-              </div>
-            )}
           </div>
         )}
 
@@ -413,21 +424,39 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
       )}
 
       {/* Client log */}
-      {isClient && showLog && (
-        <div style={{ padding:"10px 14px", background:"#fafaf8",color:"#1a1a1a", borderTop:"1px solid #f5f5f5" }}>
-          <div style={{ fontSize:10, fontWeight:800, letterSpacing:".07em", textTransform:"uppercase", color:"#aaa", marginBottom:8 }}>Your Log</div>
+      {isClient && (block.log?.status || showLog) && (
+        <div style={{
+          padding:"10px 14px",
+          background: block.log?.status==="completed" ? "#f1f8f1" : block.log?.status==="partial" ? "#fffbeb" : block.log?.status==="skipped" ? "#fff5f5" : "#fafaf8",
+          borderTop:"1px solid #f5f5f5"
+        }}>
+          {block.log?.status && (
+            <div style={{ fontSize:11, fontWeight:800, letterSpacing:".06em", textTransform:"uppercase", marginBottom:8,
+              color: block.log.status==="completed" ? "#2e7d32" : block.log.status==="partial" ? "#b45309" : "#c62828" }}>
+              {block.log.status==="completed" ? "✓ Completed" : block.log.status==="partial" ? "~ Partial — didn't finish" : "✗ Skipped"}
+            </div>
+          )}
+          {!block.log?.status && <div style={{ fontSize:10, fontWeight:800, letterSpacing:".07em", textTransform:"uppercase", color:"#aaa", marginBottom:8 }}>Your Log</div>}
           <div style={{ marginBottom:8 }}>
             <div style={{ fontSize:12, fontWeight:600, color:"#555", marginBottom:4 }}>How did it feel?</div>
             <input value={(block.log && block.log.feeling) || ""} onChange={e => updLog("feeling", e.target.value)}
               placeholder="Relaxed / hard / lost rhythm / felt strong..."
-              style={{ width:"100%", padding:"7px 10px", border:"1.5px solid #a5d6a7", borderRadius:6, fontSize:13, fontFamily:"inherit", outline:"none", color:"#1a1a1a", background:"#f1f8f1" }} />
+              style={{ width:"100%", padding:"7px 10px", border:"1.5px solid " + (block.log?.status==="completed" ? "#a5d6a7" : block.log?.status==="partial" ? "#fcd34d" : block.log?.status==="skipped" ? "#fca5a5" : "#e0e0e0"), borderRadius:6, fontSize:13, fontFamily:"inherit", outline:"none", color:"#1a1a1a", background:"#fff" }} />
           </div>
           <div>
             <div style={{ fontSize:12, fontWeight:600, color:"#555", marginBottom:4 }}>Observations</div>
             <textarea value={(block.log && block.log.observations) || ""} onChange={e => updLog("observations", e.target.value)}
-              placeholder="What were you struggling with? Any technique notes..."
-              style={{ width:"100%", padding:"7px 10px", border:"1.5px solid #a5d6a7", borderRadius:6, fontSize:13, fontFamily:"inherit", outline:"none", resize:"vertical", minHeight:52, color:"#1a1a1a", background:"#f1f8f1" }} />
+              placeholder={block.log?.status==="skipped" ? "Why did you skip? Fatigue, injury, time..." : "What were you struggling with? Any technique notes..."}
+              style={{ width:"100%", padding:"7px 10px", border:"1.5px solid " + (block.log?.status==="completed" ? "#a5d6a7" : block.log?.status==="partial" ? "#fcd34d" : block.log?.status==="skipped" ? "#fca5a5" : "#e0e0e0"), borderRadius:6, fontSize:13, fontFamily:"inherit", outline:"none", resize:"vertical", minHeight:52, color:"#1a1a1a", background:"#fff" }} />
           </div>
+          {block.type==="maxeffort" && block.log?.status!=="skipped" && (
+            <div style={{ marginTop:8 }}>
+              <div style={{ fontSize:12, fontWeight:600, color:"#555", marginBottom:4 }}>Distance achieved (m)</div>
+              <input type="number" placeholder="e.g. 125" value={block.log?.achievedMeters || ""}
+                onChange={e => updLog("achievedMeters", e.target.value)}
+                style={{ width:110, padding:"7px 10px", border:"1.5px solid " + (block.log?.status==="completed" ? "#a5d6a7" : "#fcd34d"), borderRadius:7, fontSize:14, fontFamily:"inherit", outline:"none", color:"#1a1a1a", fontWeight:700 }} />
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -147,14 +147,21 @@ export default function CompletedSessionView({ method, coachPlan, clientLog, onR
                   : block.type==="overunder" ? `Over/Under: ${block.reps||"?"}×${block.meters||"?"}m`
                   : block.type==="maxeffort" ? `🔥 Max Effort${block.maxEffortReps && block.maxEffortReps!=="1" ? " ×"+block.maxEffortReps : ""}${block.maxEffortRest ? " · rest "+block.maxEffortRest : ""}`
                   : block.description||"";
+                const statusMap = {
+                  completed: { label:"✓ Completed", bg:"#e8f5e9", color:"#2e7d32", border:"#a5d6a7" },
+                  partial:   { label:"~ Partial",   bg:"#fffbeb", color:"#b45309", border:"#fcd34d" },
+                  skipped:   { label:"✗ Skipped",   bg:"#fff5f5", color:"#c62828", border:"#fca5a5" },
+                };
+                const logStatus = log.status || (log.done ? "completed" : null);
+                const ss = statusMap[logStatus] || { label:"Not logged", bg:"#f5f4f0", color:"#aaa", border:"#ddd" };
                 return (
-                  <div key={block.id||bi} style={{background:"#fff",borderRadius:10,border:`1.5px solid ${log.done?"#a5d6a7":"#ebebeb"}`,marginBottom:8,overflow:"hidden"}}>
-                    <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:log.done?"1px solid #f0f0f0":"none"}}>
+                  <div key={block.id||bi} style={{background:"#fff",borderRadius:10,border:`1.5px solid ${logStatus?"#ebebeb":"#ebebeb"}`,marginBottom:8,overflow:"hidden"}}>
+                    <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:logStatus?"1px solid #f0f0f0":"none"}}>
                       <span style={{flex:1,fontSize:13,fontWeight:600,color:block.type==="maxeffort"?"#b94a00":"#1a1a1a"}}>{blockDesc}</span>
-                      <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:20,background:log.done?"#e8f5e9":"#f5f4f0",color:log.done?"#2e7d32":"#aaa"}}>{log.done?"✓ Done":"Not done"}</span>
+                      <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:20,background:ss.bg,color:ss.color,border:`1px solid ${ss.border}`}}>{ss.label}</span>
                     </div>
-                    {log.done && (log.achievedMeters || log.feeling || log.observations) && (
-                      <div style={{padding:"8px 14px",background:"#f8fdf8"}}>
+                    {logStatus && (log.achievedMeters || log.feeling || log.observations) && (
+                      <div style={{padding:"8px 14px",background: logStatus==="completed"?"#f8fdf8":logStatus==="partial"?"#fffbeb":"#fff5f5"}}>
                         {log.achievedMeters && <div style={{fontSize:13,fontWeight:700,color:"#b94a00",marginBottom:4}}>🔥 {log.achievedMeters}m achieved</div>}
                         {log.feeling && <div style={{fontSize:12,color:"#555",marginBottom:2}}><span style={{color:"#aaa"}}>Feeling: </span>{log.feeling}</div>}
                         {log.observations && <div style={{fontSize:12,color:"#555"}}>{log.observations}</div>}
