@@ -10,8 +10,8 @@ const EXERCISE_TEMPLATES = [
     bg: "#edf6e6",
     border: "#7ec87e",
     description: "Decreasing rest times to build CO₂ tolerance",
-    fields: ["rounds", "holdTime", "breathTime", "notes"],
-    defaults: { rounds: 8, holdTime: "1:00", breathTime: "2:00", notes: "" },
+    fields: ["rounds", "holdTime", "breathTime", "increment", "notes"],
+    defaults: { rounds: 8, holdTime: "1:00", breathTime: "2:30", increment: "0:15", notes: "" },
   },
   {
     key: "o2-table",
@@ -21,8 +21,8 @@ const EXERCISE_TEMPLATES = [
     bg: "#e6f4ff",
     border: "#6ab0f4",
     description: "Increasing hold times to build O₂ efficiency",
-    fields: ["rounds", "holdTime", "breathTime", "notes"],
-    defaults: { rounds: 8, holdTime: "1:00", breathTime: "2:00", notes: "" },
+    fields: ["rounds", "holdTime", "breathTime", "increment", "notes"],
+    defaults: { rounds: 8, holdTime: "1:00", breathTime: "2:00", increment: "0:15", notes: "" },
   },
   {
     key: "ratio-breathing",
@@ -283,21 +283,102 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
               {isClient ? <div style={{fontSize:14,fontWeight:600}}>{exercise.rounds}</div>
                 : <input type="number" value={exercise.rounds} onChange={e=>upd("rounds",e.target.value)} style={inp} />}
             </Field>
-            <Field label="Hold time (m:ss)" half>
+            <Field label={exercise.templateKey==="co2-table"?"Hold time (m:ss) — fixed":"Starting hold (m:ss)"} half>
               {isClient ? <div style={{fontSize:14,fontWeight:600}}>{exercise.holdTime}</div>
                 : <input value={exercise.holdTime} onChange={e=>upd("holdTime",e.target.value)} style={inp} placeholder="1:00" />}
             </Field>
-            <Field label={exercise.templateKey==="co2-table"?"Breath time (m:ss) — decreasing":"Breath time (m:ss) — fixed"} >
+            <Field label={exercise.templateKey==="co2-table"?"Starting rest (m:ss) — decreasing":"Rest time (m:ss) — fixed"} half>
               {isClient ? <div style={{fontSize:14,fontWeight:600}}>{exercise.breathTime}</div>
                 : <input value={exercise.breathTime} onChange={e=>upd("breathTime",e.target.value)} style={inp} placeholder="2:00" />}
             </Field>
-            {isClient && (
-              <div style={{width:"100%",background:"#f0f8ff",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#005fa3"}}>
-                {exercise.templateKey==="co2-table"
-                  ? `Protocol: ${exercise.rounds} rounds · Hold ${exercise.holdTime} · Breathe starts at ${exercise.breathTime} and decreases each round`
-                  : `Protocol: ${exercise.rounds} rounds · Hold ${exercise.holdTime} · Breathe ${exercise.breathTime} (fixed) — hold time increases each round`}
-              </div>
-            )}
+            <Field label={exercise.templateKey==="co2-table"?"Rest decreases by (m:ss)":"Hold increases by (m:ss)"} half>
+              {isClient ? <div style={{fontSize:14,fontWeight:600}}>{exercise.increment||"0:15"}</div>
+                : <input value={exercise.increment||"0:15"} onChange={e=>upd("increment",e.target.value)} style={inp} placeholder="0:15" />}
+            </Field>
+            {/* Round-by-round table */}
+            {(()=>{
+              function toSecs(t) {
+                if (!t) return 0;
+                const p = String(t).trim().split(":");
+                if (p.length===2) return parseInt(p[0],10)*60+parseInt(p[1],10);
+                return parseInt(p[0],10)||0;
+              }
+              function fmtSecs(s) {
+                if (s <= 0) return "0:00";
+                const m=Math.floor(s/60), sec=s%60;
+                return `${m}:${String(sec).padStart(2,"0")}`;
+              }
+              const rounds = Math.min(parseInt(exercise.rounds)||8, 20);
+              const holdSecs = toSecs(exercise.holdTime);
+              const breathSecs = toSecs(exercise.breathTime);
+              const incrSecs = toSecs(exercise.increment||"0:15");
+              if (!holdSecs || !breathSecs || rounds < 1) return null;
+              const isCo2 = exercise.templateKey==="co2-table";
+              const rows = Array.from({length:rounds},(_,i)=>({
+                round: i+1,
+                hold:  isCo2 ? holdSecs : holdSecs + i*incrSecs,
+                rest:  isCo2 ? Math.max(breathSecs - i*incrSecs, 15) : breathSecs,
+              }));
+              const totalSecs = rows.reduce((a,r)=>a+r.hold+r.rest,0);
+              const totalMins = Math.round(totalSecs/60);
+              return (
+                <div style={{width:"100%",marginTop:4}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                    <div style={{fontSize:11,fontWeight:800,color:isCo2?"#2d7a2d":"#005fa3",letterSpacing:".06em",textTransform:"uppercase"}}>
+                      {isCo2?"CO₂ Table":"O₂ Table"} — {rounds} rounds · ~{totalMins} min total
+                    </div>
+                  </div>
+                  <div style={{borderRadius:10,overflow:"hidden",border:"1.5px solid "+tmpl.border}}>
+                    {/* Header */}
+                    <div style={{display:"grid",gridTemplateColumns:"36px 1fr 1fr",background:tmpl.bg,padding:"7px 12px",gap:8}}>
+                      {["Round","Hold","Rest"].map(h=>(
+                        <div key={h} style={{fontSize:10,fontWeight:800,color:tmpl.color,letterSpacing:".07em",textTransform:"uppercase"}}>{h}</div>
+                      ))}
+                    </div>
+                    {rows.map((r,i)=>(
+                      <div key={i} style={{display:"grid",gridTemplateColumns:"36px 1fr 1fr",padding:"8px 12px",gap:8,borderTop:"1px solid "+tmpl.border+"44",background:i%2===0?"#fff":"#fafaf8"}}>
+                        <div style={{fontSize:13,fontWeight:700,color:"#bbb"}}>{r.round}</div>
+                        <div style={{fontSize:14,fontWeight:700,color:tmpl.color,fontFamily:"monospace"}}>{fmtSecs(r.hold)}</div>
+                        <div style={{fontSize:14,fontWeight:600,color:"#555",fontFamily:"monospace",display:"flex",alignItems:"center",gap:6}}>
+                          {fmtSecs(r.rest)}
+                          {isCo2 && i>0 && <span style={{fontSize:10,color:"#aaa",fontWeight:500}}>-{fmtSecs(incrSecs)}</span>}
+                          {!isCo2 && i===0 && <span style={{fontSize:10,color:"#aaa",fontWeight:500}}>fixed</span>}
+                        </div>
+                      </div>
+                    ))}
+                    {/* Totals row */}
+                    <div style={{display:"grid",gridTemplateColumns:"36px 1fr 1fr",padding:"8px 12px",gap:8,borderTop:"1.5px solid "+tmpl.border,background:tmpl.bg}}>
+                      <div style={{fontSize:10,fontWeight:800,color:tmpl.color,letterSpacing:".05em",textTransform:"uppercase",gridColumn:"1/3"}}>Total hold</div>
+                      <div style={{fontSize:12,fontWeight:700,color:tmpl.color,fontFamily:"monospace"}}>{fmtSecs(rows.reduce((a,r)=>a+r.hold,0))}</div>
+                    </div>
+                  </div>
+                  {/* Athlete log: per-round actual hold times */}
+                  {isClient && exercise.log?.status !== "skipped" && (
+                    <div style={{marginTop:10}}>
+                      <div style={{fontSize:10,fontWeight:800,color:"#bbb",letterSpacing:".07em",textTransform:"uppercase",marginBottom:6}}>Log your actual times</div>
+                      <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                        {rows.map((r,i)=>{
+                          const val = exercise.log?.roundLogs?.[i]||"";
+                          return (
+                            <div key={i} style={{display:"grid",gridTemplateColumns:"36px 1fr 1fr",gap:8,alignItems:"center"}}>
+                              <div style={{fontSize:12,color:"#bbb",fontWeight:700}}>{r.round}</div>
+                              <div style={{fontSize:12,color:"#555",fontFamily:"monospace"}}>{fmtSecs(r.hold)} hold</div>
+                              <input placeholder="Actual (m:ss)" value={val}
+                                onChange={e=>{
+                                  const logs = [...(exercise.log?.roundLogs||Array(rounds).fill(""))];
+                                  logs[i]=e.target.value;
+                                  onChange({...exercise,log:{...exercise.log,roundLogs:logs}});
+                                }}
+                                style={{padding:"4px 8px",border:"1.5px solid #a5d6a7",borderRadius:6,fontSize:12,fontFamily:"monospace",outline:"none",color:"#2e7d32",width:"100%"}} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 

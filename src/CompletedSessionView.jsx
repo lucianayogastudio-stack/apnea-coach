@@ -254,6 +254,25 @@ export default function CompletedSessionView({ method, coachPlan, clientLog, onR
                 skipped:  {label:"✗ Skipped",  bg:"#fff5f5",color:"#c62828",border:"#fca5a5",logBg:"#fff5f5"},
               };
               const ss = ssMap[logStatus] || {label:"Not logged",bg:"#f5f4f0",color:"#aaa",border:"#ddd",logBg:"#f8f8f6"};
+              const isTable = ex.templateKey==="co2-table"||ex.templateKey==="o2-table";
+
+              // Compute round table for CO2/O2
+              function toSecs(t){if(!t)return 0;const p=String(t).trim().split(":");if(p.length===2)return parseInt(p[0],10)*60+parseInt(p[1],10);return parseInt(p[0],10)||0;}
+              function fmtSecs(s){if(s<=0)return"0:00";const m=Math.floor(s/60),sec=s%60;return`${m}:${String(sec).padStart(2,"0")}`;}
+              const tableRows = isTable ? (()=>{
+                const rounds=Math.min(parseInt(ex.rounds)||8,20);
+                const holdSecs=toSecs(ex.holdTime);
+                const breathSecs=toSecs(ex.breathTime);
+                const incrSecs=toSecs(ex.increment||"0:15");
+                const isCo2=ex.templateKey==="co2-table";
+                return Array.from({length:rounds},(_,idx)=>({
+                  round:idx+1,
+                  hold: isCo2?holdSecs:holdSecs+idx*incrSecs,
+                  rest: isCo2?Math.max(breathSecs-idx*incrSecs,15):breathSecs,
+                  actual: log.roundLogs?.[idx]||null,
+                }));
+              })() : null;
+
               return (
                 <div key={ex.id||i} style={{background:"#fff",borderRadius:12,border:`1.5px solid ${logStatus?ss.border:"#ebebeb"}`,marginBottom:10,overflow:"hidden"}}>
                   <div style={{padding:"10px 14px",borderBottom:"1px solid #f5f5f5",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
@@ -262,12 +281,42 @@ export default function CompletedSessionView({ method, coachPlan, clientLog, onR
                     <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,background:ss.bg,color:ss.color,border:`1px solid ${ss.border}`}}>{ss.label}</span>
                   </div>
                   {ex.description && <div style={{padding:"8px 14px",background:"#fffbe6",fontSize:13,color:"#5a4800",lineHeight:1.6}}>{ex.description}</div>}
-                  {logStatus && (log.actualTime||log.actualContraction||log.feeling||log.limitingFactor) && (
+
+                  {/* Table display for CO2/O2 */}
+                  {isTable && tableRows && (
+                    <div style={{padding:"10px 14px"}}>
+                      <div style={{borderRadius:8,overflow:"hidden",border:"1px solid #ebebeb"}}>
+                        <div style={{display:"grid",gridTemplateColumns:"36px 1fr 1fr"+(log.roundLogs?.some(Boolean)?" 1fr":""),background:"#f8f8f6",padding:"6px 12px",gap:8}}>
+                          {["Rd","Hold","Rest",...(log.roundLogs?.some(Boolean)?["Actual"]:[])].map(h=>(
+                            <div key={h} style={{fontSize:10,fontWeight:800,color:"#bbb",letterSpacing:".07em",textTransform:"uppercase"}}>{h}</div>
+                          ))}
+                        </div>
+                        {tableRows.map((r,idx)=>(
+                          <div key={idx} style={{display:"grid",gridTemplateColumns:"36px 1fr 1fr"+(log.roundLogs?.some(Boolean)?" 1fr":""),padding:"7px 12px",gap:8,borderTop:"1px solid #f0f0f0",background:idx%2===0?"#fff":"#fafaf8"}}>
+                            <div style={{fontSize:12,color:"#bbb",fontWeight:700}}>{r.round}</div>
+                            <div style={{fontSize:13,fontWeight:700,color:ex.templateKey==="o2-table"?"#005fa3":"#2d7a2d",fontFamily:"monospace"}}>{fmtSecs(r.hold)}</div>
+                            <div style={{fontSize:13,color:"#555",fontFamily:"monospace"}}>{fmtSecs(r.rest)}</div>
+                            {log.roundLogs?.some(Boolean) && (
+                              <div style={{fontSize:13,fontWeight:700,color:r.actual?"#2e7d32":"#ddd",fontFamily:"monospace"}}>{r.actual||"—"}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {logStatus && !isTable && (log.actualTime||log.actualContraction||log.feeling||log.limitingFactor) && (
                     <div style={{padding:"8px 14px",background:ss.logBg}}>
                       <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:4}}>
                         {log.actualTime && <span style={{fontSize:13}}><span style={{color:"#aaa",fontSize:11}}>Time: </span><strong>{log.actualTime}</strong></span>}
                         {log.actualContraction && <span style={{fontSize:13}}><span style={{color:"#aaa",fontSize:11}}>First contraction: </span><strong>{log.actualContraction}</strong></span>}
                       </div>
+                      {log.feeling && <div style={{fontSize:12,color:"#555",marginBottom:2}}><span style={{color:"#aaa"}}>{logStatus==="skipped"?"Reason: ":"Feeling: "}</span>{log.feeling}</div>}
+                      {log.limitingFactor && <div style={{fontSize:12,color:"#555"}}><span style={{color:"#aaa"}}>Limiting factor: </span>{log.limitingFactor}</div>}
+                    </div>
+                  )}
+                  {logStatus && isTable && (log.feeling||log.limitingFactor) && (
+                    <div style={{padding:"8px 14px",background:ss.logBg}}>
                       {log.feeling && <div style={{fontSize:12,color:"#555",marginBottom:2}}><span style={{color:"#aaa"}}>{logStatus==="skipped"?"Reason: ":"Feeling: "}</span>{log.feeling}</div>}
                       {log.limitingFactor && <div style={{fontSize:12,color:"#555"}}><span style={{color:"#aaa"}}>Limiting factor: </span>{log.limitingFactor}</div>}
                     </div>
