@@ -32,8 +32,13 @@ function toISO(d) { return d.toISOString().slice(0,10); }
 function fmtShort(d) { return d.toLocaleDateString("en-US", { month:"short", day:"numeric" }); }
 function fmtFull(iso) {
   if (!iso) return "";
-  const [y,mo,day] = iso.split("-");
-  return new Date(Number(y),Number(mo)-1,Number(day)).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
+  if (iso.length === 10) {
+    // Pure date string like "2026-05-27" — parse as local to avoid UTC shift
+    const [y,mo,day] = iso.split("-");
+    return new Date(Number(y),Number(mo)-1,Number(day)).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
+  }
+  // Fallback for full datetime strings
+  return new Date(iso).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
 }
 
 function dbToSession(row) {
@@ -373,8 +378,8 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   if (isDepthSess) {
     const isCompleted = session.feedback?.status === "completed";
     const clientLog = session.feedback?.clientGymData || null;
-    // Coach sees completed view if athlete has logged; client sees editable view always
-    const showCompletedView = (!isClient && isCompleted && clientLog) || (isClient && isCompleted && clientLog);
+    // Show completed view if status=completed (coach always, athlete always)
+    const showCompletedView = isCompleted && clientLog;
 
     return (
       <Modal onClose={onClose} wide>
@@ -529,9 +534,8 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
 
   // Gym strength sessions use the dedicated builder
   if (isGym) {
-    const isCompleted_gym_strength = !isClient && session.feedback?.status==="completed" && session.feedback?.clientGymData;
-    // Athlete sees read-only view if session is completed
-    const athleteCompleted = isClient && session.feedback?.status==="completed" && session.feedback?.clientGymData;
+    const isCompleted_gym_strength = session.feedback?.status==="completed" && session.feedback?.clientGymData;
+    const athleteCompleted = false; // merged into isCompleted_gym_strength
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -539,7 +543,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
           <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?"Athlete View":"Coach View"}</span>
         </div>
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
-        {isCompleted_gym_strength || athleteCompleted ? (
+        {isCompleted_gym_strength ? (
           <>
             <CompletedSessionView
               method="gym-strength"
