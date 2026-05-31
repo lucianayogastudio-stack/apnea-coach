@@ -218,30 +218,31 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
 
         <div style={{ display:"flex", gap:5, alignItems:"center" }}>
           {isClient && (
-            <div style={{ display:"flex", gap:3 }}>
+            <div style={{ display:"flex", gap:4 }}>
               {[
-                { status:"completed", emoji:"✓", color:"#4caf50", title:"Completed" },
-                { status:"partial",   emoji:"~", color:"#f59e0b", title:"Partial / didn't finish" },
-                { status:"skipped",   emoji:"✗", color:"#ef5350", title:"Skipped" },
+                { status:"completed", emoji:"✓", color:"#4caf50", dimColor:"#e8f5e9" },
+                { status:"partial",   emoji:"~", color:"#f59e0b", dimColor:"#fff8e1" },
+                { status:"skipped",   emoji:"✗", color:"#ef5350", dimColor:"#fce4ec" },
               ].map(opt => {
                 const active = block.log?.status === opt.status;
                 const anySelected = !!block.log?.status;
                 return (
-                  <button key={opt.status} title={opt.title}
+                  <button key={opt.status} title={opt.status}
                     onClick={() => {
                       const newStatus = active ? null : opt.status;
                       onChange({ ...block, log: { ...block.log, status: newStatus, done: newStatus === "completed" } });
                       setShowLog(true);
                     }}
                     style={{
-                      width:26, height:26, borderRadius:"50%",
-                      border:"2px solid " + (active ? opt.color : anySelected ? "#e8e8e8" : "#d0d0d0"),
-                      background: active ? opt.color : "transparent",
-                      color: active ? "#fff" : anySelected ? "#ddd" : "#bbb",
-                      fontSize:12, fontWeight:800, cursor:"pointer",
+                      width:28, height:28, borderRadius:"50%",
+                      border: active ? `2.5px solid ${opt.color}` : "2px solid #e0e0e0",
+                      background: active ? opt.color : anySelected ? opt.dimColor : "#f5f5f5",
+                      color: active ? "#fff" : anySelected ? opt.color : "#bbb",
+                      fontSize:13, fontWeight:900, cursor:"pointer",
                       display:"flex", alignItems:"center", justifyContent:"center",
                       transition:"all .15s",
-                      opacity: anySelected && !active ? 0.4 : 1,
+                      opacity: anySelected && !active ? 0.35 : 1,
+                      lineHeight:1,
                     }}>
                     {opt.emoji}
                   </button>

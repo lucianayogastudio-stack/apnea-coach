@@ -30,10 +30,14 @@
   }
 }
 
-/* Force all inputs and textareas to always be white — prevents dark mode OS from darkening them */
+/* Force all inputs, textareas, selects and buttons to always be light — prevents dark mode OS from darkening them */
 input, textarea, select {
   background-color: #fff !important;
   color: #1a1a1a !important;
+  color-scheme: light;
+}
+
+button {
   color-scheme: light;
 }
 
