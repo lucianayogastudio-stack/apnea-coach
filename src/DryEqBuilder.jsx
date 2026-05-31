@@ -92,9 +92,10 @@ function DrillCard({ drill, index, onChange, onRemove, isClient }) {
   function updLog(f, v) { onChange({ ...drill, log: { ...drill.log, [f]: v } }); }
 
   const isDone = drill.log && drill.log.done;
+  const logStatus = drill.log?.status || (isDone ? "completed" : null);
 
   return (
-    <div style={{ background:"#fff", borderRadius:12, border:"1.5px solid " + (isDone ? "#a5d6a7" : "#ebebeb"), marginBottom:12, overflow:"hidden", transition:"border-color .2s" }}>
+    <div style={{ background:"#fff", borderRadius:12, border:"1.5px solid " + (logStatus==="completed"?"#a5d6a7":logStatus==="partial"?"#fcd34d":logStatus==="skipped"?"#fca5a5":"#ebebeb"), marginBottom:12, overflow:"hidden", transition:"border-color .2s" }}>
       {/* Header */}
       <div style={{ padding:"12px 16px", borderBottom:"1px solid #f5f5f5", display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
         <span style={{ fontSize:13, fontWeight:700, color:"#bbb", flexShrink:0 }}>{index}.</span>
@@ -140,8 +141,33 @@ function DrillCard({ drill, index, onChange, onRemove, isClient }) {
         {/* Action buttons */}
         <div style={{ display:"flex", gap:5 }}>
           {isClient && (
-            <button onClick={() => { updLog("done", !isDone); setShowLog(true); }}
-              style={{ width:30, height:30, borderRadius:"50%", border:"2px solid " + (isDone ? "#4caf50" : "#e0e0e0"), background: isDone ? "#4caf50" : "transparent", color: isDone ? "#fff" : "#ccc", fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s" }}>✓</button>
+            <div style={{ display:"flex", gap:4 }}>
+              {[
+                { s:"completed", emoji:"✓", color:"#4caf50", dim:"#e8f5e9" },
+                { s:"partial",   emoji:"~", color:"#f59e0b", dim:"#fff8e1" },
+                { s:"skipped",   emoji:"✗", color:"#ef5350", dim:"#fce4ec" },
+              ].map(opt => {
+                const active = logStatus === opt.s;
+                const any = !!logStatus;
+                return (
+                  <button key={opt.s} title={opt.s}
+                    onClick={() => {
+                      const ns = active ? null : opt.s;
+                      onChange({...drill, log:{...drill.log, status:ns, done:ns==="completed"}});
+                      setShowLog(true);
+                    }}
+                    style={{ width:28, height:28, borderRadius:"50%",
+                      border: active ? `2.5px solid ${opt.color}` : "2px solid #e0e0e0",
+                      background: active ? opt.color : any ? opt.dim : "#f5f5f5",
+                      color: active ? "#fff" : any ? opt.color : "#bbb",
+                      fontSize:13, fontWeight:900, cursor:"pointer",
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                      transition:"all .15s", opacity: any && !active ? 0.35 : 1, lineHeight:1 }}>
+                    {opt.emoji}
+                  </button>
+                );
+              })}
+            </div>
           )}
           {isClient && (
             <button onClick={() => setShowLog(v => !v)}
@@ -218,16 +244,33 @@ function DrillCard({ drill, index, onChange, onRemove, isClient }) {
       )}
 
       {/* Client log */}
-      {isClient && showLog && (
-        <div style={{ padding:"12px 16px", background:"#fafaf8" }}>
-          <div style={{ marginBottom:14 }}>
-            <SelfAssessment value={drill.log?.selfAssessment} onChange={v => updLog("selfAssessment", v)} isClient={isClient} />
-          </div>
+      {isClient && (logStatus || showLog) && (
+        <div style={{ padding:"12px 16px",
+          background: logStatus==="completed"?"#f1f8f1":logStatus==="partial"?"#fffbeb":logStatus==="skipped"?"#fff5f5":"#fafaf8" }}>
+          {logStatus && (
+            <div style={{ fontSize:11, fontWeight:800, letterSpacing:".06em", textTransform:"uppercase", marginBottom:10,
+              color: logStatus==="completed"?"#2e7d32":logStatus==="partial"?"#b45309":"#c62828" }}>
+              {logStatus==="completed"?"✓ Completed":logStatus==="partial"?"~ Partial":"✗ Skipped"}
+            </div>
+          )}
+          {logStatus !== "skipped" && (
+            <div style={{ marginBottom:14 }}>
+              <SelfAssessment value={drill.log?.selfAssessment} onChange={v => updLog("selfAssessment", v)} isClient={isClient} />
+            </div>
+          )}
           <div>
-            <div style={{ fontSize:12, fontWeight:600, color:"#555", marginBottom:5 }}>What did you feel? What was hard?</div>
+            <div style={{ fontSize:12, fontWeight:600, color:"#555", marginBottom:5 }}>
+              {logStatus==="skipped" ? "Why did you skip?" : "What did you feel? What was hard?"}
+            </div>
             <textarea value={drill.log?.notes || ""} onChange={e => updLog("notes", e.target.value)}
-              placeholder="e.g. Could feel the soft palate moving but struggled to hold pressure. Cheeks kept relaxing after 5 seconds..."
-              style={{ width:"100%", padding:"8px 10px", border:"1.5px solid #a5d6a7", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", resize:"vertical", minHeight:72, color:"#1a1a1a", background:"#f1f8f1" }} />
+              placeholder={logStatus==="skipped"
+                ? "Fatigue, injury, not enough time..."
+                : "e.g. Could feel the soft palate moving but struggled to hold pressure..."}
+              style={{ width:"100%", padding:"8px 10px",
+                border: "1.5px solid " + (logStatus==="completed"?"#a5d6a7":logStatus==="partial"?"#fcd34d":logStatus==="skipped"?"#fca5a5":"#a5d6a7"),
+                borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", resize:"vertical", minHeight:72,
+                color:"#1a1a1a",
+                background: logStatus==="completed"?"#f1f8f1":logStatus==="partial"?"#fffbeb":logStatus==="skipped"?"#fff5f5":"#f1f8f1" }} />
           </div>
         </div>
       )}
@@ -251,7 +294,7 @@ export default function DryEqBuilder({ initialData, onSave, isClient }) {
   function removeDrill(id)          { setDrills(prev => prev.filter(d => d.id !== id)); }
   function addDrill()               { setDrills(prev => [...prev, makeDrill()]); }
 
-  const doneCount  = drills.filter(d => d.log && d.log.done).length;
+  const doneCount  = drills.filter(d => d.log?.status === "completed").length;
   const totalCount = drills.length;
   const progress   = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
 

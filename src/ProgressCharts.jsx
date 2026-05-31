@@ -161,12 +161,17 @@ function BarChart({ data, color, yLabel, height, formatY }) {
 }
 
 // ── Chart Card ────────────────────────────────────────────────────────────────
-function ChartCard({ title, subtitle, children, isEmpty, emptyMsg }) {
+function ChartCard({ title, subtitle, children, isEmpty, emptyMsg, usesPlannedData }) {
   return (
     <div style={{ background:"#fff", borderRadius:12, border:"1px solid #ebebeb", padding:"18px 20px", marginBottom:16 }}>
       <div style={{ marginBottom:12 }}>
         <div style={{ fontWeight:700, fontSize:15, color:"#1a1a1a" }}>{title}</div>
         {subtitle && <div style={{ fontSize:12, color:"#aaa", marginTop:3 }}>{subtitle}</div>}
+        {usesPlannedData && (
+          <div style={{ fontSize:11, color:"#f59e0b", marginTop:5, display:"flex", alignItems:"center", gap:4 }}>
+            <span>⚠️</span> Some points show planned targets — log actual times for accurate data
+          </div>
+        )}
       </div>
       {isEmpty ? (
         <div style={{ padding:"24px 0", textAlign:"center", color:"#ccc", fontSize:13 }}>{emptyMsg || "Not enough data yet"}</div>
@@ -285,12 +290,23 @@ export default function ProgressCharts({ sessions, clientName }) {
   }).filter(Boolean);
 
   // Longest dynamic dive per pool session (DYN, DYNB, DNF only)
+  // First try athlete-logged max effort, then fall back to planned distances
   const longestDynOverTime = poolSessions.map(s => {
     const sections = s.plan.gymData.sections || [];
+    const clientSections = s.feedback?.clientGymData?.sections || [];
     let longestM = 0;
-    sections.forEach(sec => {
-      (sec.blocks || []).forEach(bl => {
+
+    sections.forEach((sec, si) => {
+      const clientSec = clientSections[si] || sec;
+      (sec.blocks || []).forEach((bl, bi) => {
         if (!DYNAMIC_DISCIPLINES.includes(bl.discipline)) return;
+        // Priority 1: athlete-logged max effort achieved meters
+        const clientBl = (clientSec.blocks || [])[bi] || bl;
+        if (clientBl.log?.achievedMeters && Number(clientBl.log.achievedMeters) > longestM) {
+          longestM = Number(clientBl.log.achievedMeters);
+          return;
+        }
+        // Priority 2: planned distance
         if (bl.type === "distance") {
           const m = Number(bl.meters) || 0;
           if (m > longestM) longestM = m;
@@ -303,6 +319,13 @@ export default function ProgressCharts({ sessions, clientName }) {
     });
     return longestM > 0 ? { x: s.date, y: longestM } : null;
   }).filter(Boolean);
+
+  // DYN PB progression — running max of longest dynamic per session
+  let runningDynPB = 0;
+  const dynPBOverTime = longestDynOverTime.map(d => {
+    if (d.y > runningDynPB) runningDynPB = d.y;
+    return { x: d.x, y: runningDynPB };
+  });
 
   const totalPoolSessions  = poolSessions.length;
   const avgMeters = poolMetersOverTime.length > 0
@@ -451,7 +474,8 @@ export default function ProgressCharts({ sessions, clientName }) {
             title="Depth Over Time"
             subtitle="Deepest completed dive per session"
             isEmpty={depthOverTime.length < 1}
-            emptyMsg="Log depth sessions with actual depth to see your progress">
+            emptyMsg="Log depth sessions with actual depth to see your progress"
+            usesPlannedData={depthSessions.some(s => !s.feedback?.actualDepth && !(s.feedback?.clientGymData?.dives?.some(d => d.log?.actualDepth)))}>
             <LineChart
               data={depthOverTime}
               color="#3a4df4"
@@ -508,7 +532,7 @@ export default function ProgressCharts({ sessions, clientName }) {
           {/* Longest dynamic dive per session */}
           <ChartCard
             title="Longest Dynamic Dive"
-            subtitle="Longest DYN / DYNB / DNF set per session (excludes freestyle and breaststroke)"
+            subtitle="Longest DYN / DYNB / DNF per session"
             isEmpty={longestDynOverTime.length < 1}
             emptyMsg="Log DYN, DYNB or DNF sets to see your dynamic distance">
             <LineChart
@@ -520,6 +544,22 @@ export default function ProgressCharts({ sessions, clientName }) {
               referenceLines={longestDyn ? [{ value: longestDyn, color:"#ef5350", label:"Best " + longestDyn + "m" }] : null}
             />
           </ChartCard>
+
+          {/* DYN PB progression */}
+          {dynPBOverTime.length > 0 && (
+            <ChartCard
+              title="Dynamic PB Progression"
+              subtitle="Running personal best in DYN / DYNB / DNF over time">
+              <LineChart
+                data={dynPBOverTime}
+                color="#ef5350"
+                yLabel="Meters"
+                height={160}
+                showDots={false}
+                formatY={v => Math.round(v) + "m"}
+              />
+            </ChartCard>
+          )}
         </div>
       )}
 

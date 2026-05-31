@@ -76,7 +76,7 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
   const inpGreen = { ...inp, border:"1.5px solid #a5d6a7", background:"#f1f8f1", color:"#2e7d32" };
 
   return (
-    <div style={{ background:"#fff", borderRadius:12, border:"1.5px solid " + (exercise.log && exercise.log.done ? "#a5d6a7" : "#ebebeb"), marginBottom:12, overflow:"hidden" }}>
+    <div style={{ background:"#fff", borderRadius:12, border:"1.5px solid " + (exercise.log?.status==="completed"?"#a5d6a7":exercise.log?.status==="partial"?"#fcd34d":exercise.log?.status==="skipped"?"#fca5a5":"#ebebeb"), marginBottom:12, overflow:"hidden" }}>
       {/* Header */}
       <div style={{ padding:"12px 16px", borderBottom:"1px solid #f5f5f5", display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
         <span style={{ fontSize:13, fontWeight:700, color:"#bbb", flexShrink:0 }}>{index}.</span>
@@ -121,10 +121,33 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
 
         <div style={{ display:"flex", gap:6, alignItems:"center" }}>
           {isClient && (
-            <button onClick={() => { updLog("done", !exercise.log.done); setShowLog(true); }}
-              style={{ width:30, height:30, borderRadius:"50%", border:"2px solid " + (exercise.log && exercise.log.done ? "#4caf50" : "#e0e0e0"), background: exercise.log && exercise.log.done ? "#4caf50" : "transparent", color: exercise.log && exercise.log.done ? "#fff" : "#ccc", fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s" }}>
-              ✓
-            </button>
+            <div style={{ display:"flex", gap:4 }}>
+              {[
+                { s:"completed", emoji:"✓", color:"#4caf50", dim:"#e8f5e9" },
+                { s:"partial",   emoji:"~", color:"#f59e0b", dim:"#fff8e1" },
+                { s:"skipped",   emoji:"✗", color:"#ef5350", dim:"#fce4ec" },
+              ].map(opt => {
+                const active = exercise.log?.status === opt.s;
+                const any = !!exercise.log?.status;
+                return (
+                  <button key={opt.s} title={opt.s}
+                    onClick={() => {
+                      const ns = active ? null : opt.s;
+                      onChange({...exercise, log:{...exercise.log, status:ns, done:ns==="completed"}});
+                      setShowLog(true);
+                    }}
+                    style={{ width:28, height:28, borderRadius:"50%",
+                      border: active ? `2.5px solid ${opt.color}` : "2px solid #e0e0e0",
+                      background: active ? opt.color : any ? opt.dim : "#f5f5f5",
+                      color: active ? "#fff" : any ? opt.color : "#bbb",
+                      fontSize:13, fontWeight:900, cursor:"pointer",
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                      transition:"all .15s", opacity: any && !active ? 0.35 : 1, lineHeight:1 }}>
+                    {opt.emoji}
+                  </button>
+                );
+              })}
+            </div>
           )}
           {isClient && (
             <button onClick={() => setShowLog(v => !v)}
@@ -203,20 +226,31 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
       )}
 
       {/* Client log */}
-      {isClient && showLog && (
-        <div style={{ padding:"12px 16px", background:"#fafaf8",color:"#1a1a1a" }}>
-          <div style={{ fontSize:10, fontWeight:800, letterSpacing:".07em", textTransform:"uppercase", color:"#aaa", marginBottom:10 }}>Your Log</div>
+      {isClient && (exercise.log?.status || showLog) && (
+        <div style={{ padding:"12px 16px",
+          background: exercise.log?.status==="completed"?"#f1f8f1":exercise.log?.status==="partial"?"#fffbeb":exercise.log?.status==="skipped"?"#fff5f5":"#fafaf8" }}>
+          {exercise.log?.status && (
+            <div style={{ fontSize:11, fontWeight:800, letterSpacing:".06em", textTransform:"uppercase", marginBottom:8,
+              color: exercise.log.status==="completed"?"#2e7d32":exercise.log.status==="partial"?"#b45309":"#c62828" }}>
+              {exercise.log.status==="completed"?"✓ Completed":exercise.log.status==="partial"?"~ Partial":"✗ Skipped"}
+            </div>
+          )}
+          {!exercise.log?.status && <div style={{ fontSize:10, fontWeight:800, letterSpacing:".07em", textTransform:"uppercase", color:"#aaa", marginBottom:10 }}>Your Log</div>}
           <div style={{ marginBottom:10 }}>
-            <div style={{ fontSize:12, fontWeight:600, color:"#555", marginBottom:5 }}>How did it feel?</div>
-            <input value={exercise.log.feeling || ""} onChange={e => updLog("feeling", e.target.value)}
-              placeholder="Relaxed / tense / struggled with timing..." style={inpGreen} />
+            <div style={{ fontSize:12, fontWeight:600, color:"#555", marginBottom:5 }}>
+              {exercise.log?.status==="skipped"?"Why did you skip?":"How did it feel?"}
+            </div>
+            <input value={exercise.log?.feeling || ""} onChange={e => updLog("feeling", e.target.value)}
+              placeholder={exercise.log?.status==="skipped"?"Fatigue, injury, time...":"Relaxed / tense / struggled with timing..."} style={inpGreen} />
           </div>
-          <div>
-            <div style={{ fontSize:12, fontWeight:600, color:"#555", marginBottom:5 }}>Observations / what were you struggling with?</div>
-            <textarea value={exercise.log.observations || ""} onChange={e => updLog("observations", e.target.value)}
-              placeholder="e.g. Legs kept bending, lost rhythm after 50m..."
-              style={{ ...inpGreen, resize:"vertical", minHeight:60 }} />
-          </div>
+          {exercise.log?.status !== "skipped" && (
+            <div>
+              <div style={{ fontSize:12, fontWeight:600, color:"#555", marginBottom:5 }}>Observations / what were you struggling with?</div>
+              <textarea value={exercise.log?.observations || ""} onChange={e => updLog("observations", e.target.value)}
+                placeholder="e.g. Legs kept bending, lost rhythm after 50m..."
+                style={{ ...inpGreen, resize:"vertical", minHeight:60 }} />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -263,7 +297,7 @@ export default function PoolTechniqueBuilder({ initialData, onSave, isClient }) 
   function removeExercise(id)          { setExercises(prev => prev.filter(e => e.id !== id)); }
   function addExercise()               { setExercises(prev => [...prev, makeExercise()]); }
 
-  const doneCount  = exercises.filter(e => e.log && e.log.done).length;
+  const doneCount  = exercises.filter(e => e.log?.status === "completed").length;
   const totalCount = exercises.length;
   const progress   = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
   const totalM     = exercises.reduce((sum, ex) => sum + (Number(ex.reps) || 1) * (Number(ex.meters) || 0), 0);
