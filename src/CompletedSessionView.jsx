@@ -25,34 +25,47 @@ export default function CompletedSessionView({ method, coachPlan, clientLog, onR
                   <div key={block.id||bi} style={{background:"#fff",borderRadius:12,border:"1.5px solid #ebebeb",marginBottom:10,overflow:"hidden"}}>
                     <div style={{padding:"10px 14px",borderBottom:"1px solid #f5f5f5",fontWeight:700,fontSize:14}}>{block.type === "superset" ? "Superset" : block.type === "circuit" ? "Circuit" : ""}</div>
                     {block.exercises?.map((ex, ei) => {
-                      const clientEx = clientBlock.exercises?.[ei] || ex;
+                      const clientEx = clientBlock.exercises?.find(e=>e.id===ex.id) || clientBlock.exercises?.[ei] || ex;
+                      const allDone = clientEx.sets?.every(s=>s.done);
+                      const someDone = clientEx.sets?.some(s=>s.done);
+                      const status = allDone ? "completed" : someDone ? "modified" : "skipped";
+                      const statusStyles = {
+                        completed:{label:"✓ Completed",bg:"#e8f5e9",color:"#2e7d32",border:"#a5d6a7"},
+                        modified: {label:"~ Modified", bg:"#fff8e1",color:"#e65100",border:"#ffcc02"},
+                        skipped:  {label:"✗ Skipped",  bg:"#fff5f5",color:"#c62828",border:"#ef9a9a"},
+                      };
+                      const ss = statusStyles[status];
                       return (
-                        <div key={ex.id||ei} style={{padding:"10px 14px",borderBottom:"1px solid #f9f9f9"}}>
-                          <div style={{fontWeight:600,fontSize:14,marginBottom:8}}>{ex.name}</div>
-                          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                            <thead>
-                              <tr style={{borderBottom:"1px solid #f0f0f0"}}>
-                                <th style={{textAlign:"left",padding:"4px 8px",color:"#bbb",fontWeight:700,textTransform:"uppercase",fontSize:10}}>#</th>
-                                <th style={{textAlign:"left",padding:"4px 8px",color:"#bbb",fontWeight:700,textTransform:"uppercase",fontSize:10}}>Planned</th>
-                                <th style={{textAlign:"left",padding:"4px 8px",color:"#4caf50",fontWeight:700,textTransform:"uppercase",fontSize:10}}>✓ Actual</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {ex.sets?.map((set, si2) => {
-                                const clientSet = clientEx.sets?.[si2] || set;
-                                const planned = [set.reps&&`${set.reps} reps`, set.weight&&`${set.weight}kg`, set.duration&&set.duration].filter(Boolean).join(" · ") || "—";
-                                const actual = clientSet.done ? [clientSet.actualReps&&`${clientSet.actualReps} reps`, clientSet.actualWeight&&`${clientSet.actualWeight}kg`, clientSet.actualDuration&&clientSet.actualDuration].filter(Boolean).join(" · ") || "Done ✓" : "Not done";
-                                return (
-                                  <tr key={set.id||si2} style={{borderBottom:"1px solid #f9f9f9",background:clientSet.done?"#f8fdf8":"transparent"}}>
-                                    <td style={{padding:"5px 8px",color:"#bbb"}}>{si2+1}</td>
-                                    <td style={{padding:"5px 8px",color:"#555"}}>{planned}</td>
-                                    <td style={{padding:"5px 8px",color:clientSet.done?"#2e7d32":"#ccc",fontWeight:clientSet.done?600:400}}>{actual}</td>
-                                  </tr>
-                                );
+                        <div key={ex.id||ei} style={{borderBottom:"1px solid #f9f9f9"}}>
+                          {/* Exercise header */}
+                          <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+                            <div style={{fontWeight:600,fontSize:14,flex:1}}>{ex.name}</div>
+                            <span style={{padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:700,background:ss.bg,color:ss.color,border:"1px solid "+ss.border}}>{ss.label}</span>
+                          </div>
+                          {/* Coach plan — yellow */}
+                          <div style={{padding:"0 14px 10px"}}>
+                            <div style={{fontSize:10,fontWeight:800,color:"#a07a00",letterSpacing:".06em",textTransform:"uppercase",marginBottom:5}}>📋 Coach Plan</div>
+                            <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                              {ex.sets?.map((set,si2)=>{
+                                const p = [set.reps&&`${set.reps} reps`,set.weight&&`${set.weight}kg`,set.duration&&set.duration,set.distance&&`${set.distance}m`].filter(Boolean).join(" · ")||"—";
+                                return <div key={si2} style={{background:"#fffbe6",border:"1px solid #ffe082",borderRadius:7,padding:"4px 10px",fontSize:12,color:"#5a4800"}}>Set {si2+1}: {p}</div>;
                               })}
-                            </tbody>
-                          </table>
-                          {clientEx.notes && <div style={{fontSize:12,color:"#555",marginTop:6,padding:"6px 8px",background:"#f0f7ff",borderRadius:6}}>{clientEx.notes}</div>}
+                            </div>
+                            {ex.coachNotes&&<div style={{marginTop:6,fontSize:12,color:"#5a4800",lineHeight:1.6,background:"#fffbe6",padding:"6px 10px",borderRadius:7}}>{ex.coachNotes}</div>}
+                          </div>
+                          {/* Athlete execution — green */}
+                          {clientEx.sets?.some(s=>s.done!==undefined) && (
+                            <div style={{padding:"0 14px 10px",background:"#f8fdf8"}}>
+                              <div style={{fontSize:10,fontWeight:800,color:"#2e7d32",letterSpacing:".06em",textTransform:"uppercase",marginBottom:5}}>🏋️ Athlete Execution</div>
+                              <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                                {clientEx.sets?.map((s,si2)=>{
+                                  const a = s.done ? [s.actualReps&&`${s.actualReps} reps`,s.actualWeight&&`${s.actualWeight}kg`,s.actualDuration&&s.actualDuration].filter(Boolean).join(" · ")||"Done ✓" : "Skipped";
+                                  return <div key={si2} style={{background:s.done?"#e8f5e9":"#fff5f5",border:`1px solid ${s.done?"#a5d6a7":"#ef9a9a"}`,borderRadius:7,padding:"4px 10px",fontSize:12,color:s.done?"#2e7d32":"#c62828"}}>Set {si2+1}: {a}</div>;
+                                })}
+                              </div>
+                              {clientEx.notes&&<div style={{marginTop:6,fontSize:12,color:"#555",padding:"6px 10px",background:"#e8f5e9",borderRadius:7}}>{clientEx.notes}</div>}
+                            </div>
+                          )}
                         </div>
                       );
                     })}

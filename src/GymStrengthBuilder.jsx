@@ -514,6 +514,164 @@ function Section({ section, onChange, onRemove, isClient }) {
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
+
+// ── Completed Gym Session View (coach read-only) ──────────────────────────────
+export function CompletedGymSessionView({ coachPlan, clientLog }) {
+  if (!coachPlan) return null;
+
+  const sections = coachPlan.sections || [];
+  const loggedSections = clientLog?.sections || [];
+
+  function findLoggedEx(exId) {
+    for (const sec of loggedSections) {
+      for (const blk of (sec.blocks||[])) {
+        for (const ex of (blk.exercises||[])) {
+          if (ex.id === exId) return ex;
+        }
+      }
+    }
+    return null;
+  }
+
+  const STATUS_LABELS = {
+    completed: { label:"✓ Completed",    bg:"#e8f5e9", color:"#2e7d32", border:"#a5d6a7" },
+    modified:  { label:"~ Modified",     bg:"#fff8e1", color:"#e65100", border:"#ffcc02" },
+    skipped:   { label:"✗ Skipped",      bg:"#fff5f5", color:"#c62828", border:"#ef9a9a" },
+  };
+
+  return (
+    <div style={{fontFamily:"'DM Sans','Helvetica Neue',sans-serif"}}>
+      {/* Header */}
+      <div style={{marginBottom:16}}>
+        {coachPlan.workoutName && <div style={{fontWeight:700,fontSize:17,marginBottom:4}}>{coachPlan.workoutName}</div>}
+        <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"#e8f5e9",border:"1px solid #a5d6a7",borderRadius:20,padding:"4px 12px",fontSize:12,fontWeight:700,color:"#2e7d32"}}>
+          ✓ Session Completed
+        </div>
+      </div>
+
+      {/* Coach session notes */}
+      {coachPlan.coachNotes && (
+        <div style={{background:"#fffbe6",border:"1px solid #ffe082",borderRadius:10,padding:"12px 14px",marginBottom:16}}>
+          <div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#a07a00",marginBottom:4}}>Coach Notes</div>
+          <div style={{fontSize:13,color:"#5a4800",lineHeight:1.7}}>{coachPlan.coachNotes}</div>
+        </div>
+      )}
+
+      {/* Sections */}
+      {sections.map((sec, si) => (
+        <div key={sec.id||si} style={{marginBottom:20}}>
+          {sec.name && <div style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".07em",textTransform:"uppercase",marginBottom:10}}>{sec.name}</div>}
+          {(sec.blocks||[]).map((block, bi) => {
+            const blockType = block.type || "single";
+            const blockLabel = blockType === "superset" ? "Superset" : blockType === "circuit" ? "Circuit" : null;
+
+            return (
+              <div key={block.id||bi} style={{background:"#fff",borderRadius:12,border:"1.5px solid #ebebeb",marginBottom:10,overflow:"hidden"}}>
+                {blockLabel && (
+                  <div style={{padding:"6px 14px",background:blockType==="superset"?"#f3e5f5":"#fbe9e7",fontSize:11,fontWeight:700,color:blockType==="superset"?"#7b1fa2":"#bf360c",letterSpacing:".05em",textTransform:"uppercase"}}>
+                    {blockLabel}
+                  </div>
+                )}
+                {(block.exercises||[]).map((ex, ei) => {
+                  const loggedEx = findLoggedEx(ex.id);
+                  const logSets = loggedEx?.sets || [];
+                  const status = logSets.length > 0
+                    ? (logSets.every(s=>s.status==="completed") ? "completed"
+                      : logSets.some(s=>s.status==="completed") ? "modified"
+                      : "skipped")
+                    : null;
+                  const statusStyle = status ? STATUS_LABELS[status] : null;
+                  const plannedSets = ex.sets || [];
+
+                  return (
+                    <div key={ex.id||ei} style={{borderBottom:"1px solid #f5f5f5"}}>
+                      {/* Exercise header */}
+                      <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                        <div style={{flex:1}}>
+                          <div style={{fontWeight:600,fontSize:14,color:"#1a1a1a"}}>{ex.name}</div>
+                          {ex.videoUrl && <div style={{fontSize:11,color:"#3a8ef4",marginTop:2}}>📹 Video attached</div>}
+                        </div>
+                        {statusStyle && (
+                          <span style={{padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:700,background:statusStyle.bg,color:statusStyle.color,border:"1px solid "+statusStyle.border}}>
+                            {statusStyle.label}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Coach plan sets */}
+                      {plannedSets.length > 0 && (
+                        <div style={{padding:"0 14px 10px"}}>
+                          <div style={{fontSize:10,fontWeight:800,color:"#a07a00",letterSpacing:".06em",textTransform:"uppercase",marginBottom:6,background:"#fffbe6",padding:"4px 8px",borderRadius:6,display:"inline-block"}}>
+                            📋 Coach Plan
+                          </div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:6}}>
+                            {plannedSets.map((s,i) => (
+                              <div key={i} style={{background:"#fffbe6",border:"1px solid #ffe082",borderRadius:7,padding:"5px 10px",fontSize:12,color:"#5a4800"}}>
+                                Set {i+1}: {s.reps ? s.reps+" reps" : ""}{s.weight ? " @ "+s.weight+"kg" : ""}{s.duration ? " "+s.duration : ""}{s.distance ? " "+s.distance+"m" : ""}
+                              </div>
+                            ))}
+                          </div>
+                          {ex.coachNotes && (
+                            <div style={{marginTop:8,fontSize:13,color:"#5a4800",lineHeight:1.7,background:"#fffbe6",padding:"8px 10px",borderRadius:7}}>
+                              {ex.coachNotes}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Athlete execution */}
+                      {logSets.length > 0 && (
+                        <div style={{padding:"0 14px 10px",background:"#f8fdf8"}}>
+                          <div style={{fontSize:10,fontWeight:800,color:"#2e7d32",letterSpacing:".06em",textTransform:"uppercase",marginBottom:6,padding:"4px 8px",background:"#e8f5e9",borderRadius:6,display:"inline-block"}}>
+                            🏋️ Athlete Execution
+                          </div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:6}}>
+                            {logSets.map((s,i) => {
+                              const st = STATUS_LABELS[s.status] || STATUS_LABELS.completed;
+                              return (
+                                <div key={i} style={{background:st.bg,border:"1px solid "+st.border,borderRadius:7,padding:"5px 10px",fontSize:12,color:st.color}}>
+                                  Set {i+1}: {s.reps ? s.reps+" reps" : ""}{s.weight ? " @ "+s.weight+"kg" : ""}{s.duration ? " "+s.duration : ""} {s.status==="skipped"?"(skipped)":s.status==="modified"?"(modified)":""}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {logSets.some(s=>s.notes) && (
+                            <div style={{marginTop:8}}>
+                              {logSets.filter(s=>s.notes).map((s,i)=>(
+                                <div key={i} style={{fontSize:12,color:"#555",marginBottom:3}}>Set {i+1}: {s.notes}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+
+      {/* Athlete session notes */}
+      {clientLog?.clientNotes && (
+        <div style={{background:"#f0f7ff",border:"1px solid #c0d8f0",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
+          <div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#005fa3",marginBottom:4}}>Athlete Notes</div>
+          <div style={{fontSize:13,color:"#1a1a1a",lineHeight:1.7}}>{clientLog.clientNotes}</div>
+        </div>
+      )}
+
+      {/* Rating */}
+      {clientLog?.rating && (
+        <div style={{background:"#f8f8f6",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>Session Rating</div>
+          <div>{"⭐".repeat(clientLog.rating)} <span style={{fontSize:12,color:"#888"}}>{clientLog.rating}/5</span></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function GymStrengthBuilder({ initialData, onSave, isClient }) {
   const defaultSections = [
     { id:uid(), name:"Warm-up",  blocks:[] },

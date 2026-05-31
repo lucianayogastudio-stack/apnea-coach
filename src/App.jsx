@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase";
-import GymStrengthBuilder from "./GymStrengthBuilder";
+import GymStrengthBuilder, { CompletedGymSessionView } from "./GymStrengthBuilder";
 import StaticBuilder from "./StaticBuilder";
 import PoolTechniqueBuilder from "./PoolTechniqueBuilder";
 import PoolBuilder from "./PoolBuilder";
