@@ -1813,7 +1813,10 @@ export default function ApneaCoach() {
     setSessions(prev=>prev.filter(s=>s.id!==id));
   }
 
-  const [newPBModal, setNewPBModal] = useState(null); // {type, value, clientId, sessionId}
+  const [newPBModal, setNewPBModal] = useState(null); // {pbs, clientId, sessionId, athleteName}
+  const [coachPBNotifs, setCoachPBNotifs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("apnea_coachPBNotifs")||"[]"); } catch { return []; }
+  }); // [{athleteName, pbs, seenAt}]
   const [coachNotes, setCoachNotes] = useState({}); // {clientId: "notes text"}
   const [savingNotes, setSavingNotes] = useState(false);
 
@@ -1837,17 +1840,25 @@ export default function ApneaCoach() {
       const session = sessions.find(s=>s.id===sessionId);
       const client = session ? clients.find(c=>c.id===session.clientId) : null;
       if (client && fb.status==="completed") {
+        function toSecs(t){if(!t)return 0;const p=String(t).trim().split(":");if(p.length===2)return parseInt(p[0],10)*60+parseInt(p[1],10);return parseInt(p[0],10)||0;}
+        function fmtSecs(s){if(!s)return null;const m=Math.floor(s/60),sec=s%60;return`${m}:${String(sec).padStart(2,"0")}`;}
+
         const pbs = [];
-        // Depth PB — CWT (and other disciplines)
+
+        // 1️⃣ Depth PB (CWT) — from session-level actualDepth
         if (fb.actualDepth && Number(fb.actualDepth) > 0) {
           const depth = Number(fb.actualDepth);
           const currentPB = Number(client.pb?.CWT)||0;
-          if (depth > currentPB) pbs.push({type:"CWT",label:"Depth",unit:"m",value:depth,prev:currentPB||null,emoji:"🌊"});
+          // Triggers if no PB set yet (first time) OR beats existing
+          if (depth > currentPB) pbs.push({
+            type:"CWT", label:"Depth", unit:"m", value:depth,
+            prev: currentPB > 0 ? currentPB : null, emoji:"🌊",
+            isFirst: currentPB === 0,
+          });
         }
-        // Static PB — best hold from roundLogs or actualTime
+
+        // 2️⃣ Static PB (STA) — best hold from per-round logs or single actualTime
         if (session?.method==="static" && fb.gymData) {
-          function toSecs(t){if(!t)return 0;const p=String(t).trim().split(":");if(p.length===2)return parseInt(p[0],10)*60+parseInt(p[1],10);return parseInt(p[0],10)||0;}
-          function fmtSecs(s){if(!s)return null;const m=Math.floor(s/60),sec=s%60;return`${m}:${String(sec).padStart(2,"0")}`;}
           let bestSecs = 0;
           (fb.gymData.exercises||[]).forEach(ex=>{
             const logs = ex.log?.roundLogs?.map(toSecs).filter(Boolean) || [toSecs(ex.log?.actualTime)].filter(Boolean);
@@ -1855,10 +1866,46 @@ export default function ApneaCoach() {
           });
           if (bestSecs > 0) {
             const currentSTA = toSecs(client.pb?.STA)||0;
-            if (bestSecs > currentSTA) pbs.push({type:"STA",label:"Static Hold",unit:"",value:fmtSecs(bestSecs),valueRaw:bestSecs,prev:fmtSecs(currentSTA)||null,emoji:"🧘"});
+            if (bestSecs > currentSTA) pbs.push({
+              type:"STA", label:"Static Hold", unit:"", value:fmtSecs(bestSecs), valueRaw:bestSecs,
+              prev: currentSTA > 0 ? fmtSecs(currentSTA) : null, emoji:"🧘",
+              isFirst: currentSTA === 0,
+            });
           }
         }
-        if (pbs.length > 0) setNewPBModal({pbs, clientId:client.id, sessionId});
+
+        // 3️⃣ Dynamic PB (DYN) — from pool max effort blocks
+        if (session?.method==="pool-co2" && fb.gymData) {
+          let bestDyn = 0;
+          (fb.gymData.sections||[]).forEach(sec=>{
+            (sec.blocks||[]).forEach(bl=>{
+              if (bl.type==="maxeffort" && bl.log?.achievedMeters) {
+                const m = Number(bl.log.achievedMeters);
+                if (m > bestDyn) bestDyn = m;
+              }
+            });
+          });
+          if (bestDyn > 0) {
+            const currentDYN = Number(client.pb?.DYN)||0;
+            if (bestDyn > currentDYN) pbs.push({
+              type:"DYN", label:"Dynamic Distance", unit:"m", value:bestDyn,
+              prev: currentDYN > 0 ? currentDYN : null, emoji:"💧",
+              isFirst: currentDYN === 0,
+            });
+          }
+        }
+
+        if (pbs.length > 0) {
+          // Show celebration to athlete
+          setNewPBModal({pbs, clientId:client.id, sessionId, athleteName:client.name});
+          // Store notification for coach
+          const notif = {athleteName:client.name, pbs, date:new Date().toISOString()};
+          setCoachPBNotifs(prev=>{
+            const updated = [notif, ...prev].slice(0,20);
+            try { localStorage.setItem("apnea_coachPBNotifs", JSON.stringify(updated)); } catch {}
+            return updated;
+          });
+        }
       }
     }
   }
@@ -2014,6 +2061,45 @@ export default function ApneaCoach() {
               <span style={{fontSize:10,fontWeight:800,color:"#ccc",letterSpacing:".08em",textTransform:"uppercase"}}>Training Methods</span>
               {METHODS.map(m=><div key={m.key} style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:9,height:9,borderRadius:"50%",background:m.dot}}/><span style={{fontSize:12,fontWeight:500,color:"#555"}}>{m.emoji} {m.label}</span></div>)}
             </div>
+            {/* Coach PB notifications */}
+            {isCoach && coachPBNotifs.length > 0 && (
+              <div style={{background:"#fffbe6",border:"1.5px solid #ffe082",borderRadius:12,padding:"14px 18px",marginBottom:20}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                  <div style={{fontSize:13,fontWeight:700,color:"#7a6200"}}>🏆 Recent Personal Bests</div>
+                  <button onClick={()=>{
+                    setCoachPBNotifs([]);
+                    try { localStorage.setItem("apnea_coachPBNotifs","[]"); } catch {}
+                  }} style={{background:"transparent",border:"none",fontSize:11,color:"#aaa",cursor:"pointer",fontFamily:"inherit"}}>
+                    Clear all
+                  </button>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {coachPBNotifs.slice(0,5).map((notif,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:10,fontSize:13}}>
+                      <div style={{flexShrink:0}}>
+                        {notif.pbs.map(p=>p.emoji).join(" ")}
+                      </div>
+                      <div style={{flex:1}}>
+                        <span style={{fontWeight:600,color:"#1a1a1a"}}>{notif.athleteName.split(" ")[0]}</span>
+                        <span style={{color:"#888"}}> — </span>
+                        {notif.pbs.map((pb,j)=>(
+                          <span key={j} style={{color:"#7a6200",fontWeight:600}}>
+                            {pb.isFirst ? `first ${pb.label} logged: ` : `new ${pb.label} PB: `}
+                            <span style={{fontFamily:"monospace"}}>{pb.value}{pb.unit}</span>
+                            {pb.prev && <span style={{color:"#aaa",fontWeight:400}}> (was {pb.prev}{pb.unit})</span>}
+                            {j < notif.pbs.length-1 ? " · " : ""}
+                          </span>
+                        ))}
+                      </div>
+                      <div style={{fontSize:11,color:"#bbb",flexShrink:0}}>
+                        {new Date(notif.date).toLocaleDateString("en-US",{month:"short",day:"numeric"})}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:12}}>Your Clients</div>
             {clients.filter(c=>!c.archived).length===0&&<div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:40,textAlign:"center",color:"#bbb",fontSize:14}}>No active clients yet. Click "+ Add Client" to get started.</div>}
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -2721,25 +2807,36 @@ export default function ApneaCoach() {
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:20,padding:"32px 28px",maxWidth:400,width:"100%",textAlign:"center",boxShadow:"0 24px 64px rgba(0,0,0,.25)"}}>
             <div style={{fontSize:52,marginBottom:8}}>🏆</div>
-            <div style={{fontWeight:800,fontSize:22,letterSpacing:"-.02em",marginBottom:6}}>New Personal Best!</div>
-            <div style={{fontSize:14,color:"#888",marginBottom:24}}>Amazing performance — a new record has been set!</div>
+            <div style={{fontWeight:800,fontSize:22,letterSpacing:"-.02em",marginBottom:6}}>
+              {newPBModal.pbs.every(p=>p.isFirst) ? "First PB Logged!" : "New Personal Best!"}
+            </div>
+            <div style={{fontSize:14,color:"#888",marginBottom:24,lineHeight:1.5}}>
+              {newPBModal.pbs.every(p=>p.isFirst)
+                ? "You've logged your first record — this is your baseline. Let's beat it! 💪"
+                : "Amazing performance — a new record has been set!"}
+            </div>
             {newPBModal.pbs.map((pb,i)=>(
               <div key={i} style={{background:"#fffbe6",border:"2px solid #ffe082",borderRadius:14,padding:"16px 20px",marginBottom:12}}>
                 <div style={{fontSize:28,marginBottom:4}}>{pb.emoji}</div>
-                <div style={{fontWeight:700,fontSize:15,color:"#7a6200",marginBottom:2}}>{pb.label} PB</div>
+                <div style={{fontWeight:700,fontSize:15,color:"#7a6200",marginBottom:2}}>
+                  {pb.isFirst ? `First ${pb.label} logged` : `${pb.label} PB`}
+                </div>
                 <div style={{fontWeight:800,fontSize:32,color:"#1a1a1a",fontFamily:"monospace",letterSpacing:"-.02em"}}>{pb.value}{pb.unit}</div>
-                {pb.prev && <div style={{fontSize:12,color:"#aaa",marginTop:4}}>Previous: {pb.prev}{pb.unit}</div>}
+                {pb.prev
+                  ? <div style={{fontSize:12,color:"#aaa",marginTop:4}}>Previous best: {pb.prev}{pb.unit}</div>
+                  : <div style={{fontSize:12,color:"#4caf50",marginTop:4}}>Your first logged result 🎯</div>
+                }
               </div>
             ))}
             <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:8}}>
               <button onClick={async()=>{
                 for (const pb of newPBModal.pbs) await handleConfirmPB(pb, newPBModal.clientId);
-                setNewPBModal(null); flash("PB updated! 🏆");
+                setNewPBModal(null); flash("PB saved! 🏆");
               }} style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"13px",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-                ✓ Update PB record
+                ✓ {newPBModal.pbs.every(p=>p.isFirst) ? "Save as my PB" : "Update PB record"}
               </button>
               <button onClick={()=>setNewPBModal(null)} style={{background:"transparent",color:"#aaa",border:"1.5px solid #e0e0e0",padding:"11px",borderRadius:10,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
-                Keep old PB
+                {newPBModal.pbs.every(p=>p.isFirst) ? "Skip for now" : "Keep old PB"}
               </button>
             </div>
           </div>
