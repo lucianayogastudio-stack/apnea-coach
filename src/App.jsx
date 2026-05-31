@@ -1186,7 +1186,13 @@ function ClientCard({ client, done, pending, sessions, onClick }) {
                   : `📆 Week ${tl.currentWeek} of ${tl.totalWeeks} · ${tl.weeksLeft}w left`}
               </div>
             )}
-            <div style={{display:"flex",gap:4,marginTop:5}}>{sessions.slice(0,8).map(s=>{const m=gm(s.method);return<div key={s.id} title={m.label} style={{width:9,height:9,borderRadius:"50%",background:m.dot}}/>;})}</div>
+            <div style={{display:"flex",gap:4,marginTop:5}}>
+              {[...sessions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10).map(s=>{
+                const m=gm(s.method);
+                const done=!!s.feedback?.status;
+                return <div key={s.id} title={`${m.label}${done?" · "+s.feedback.status:""}`} style={{width:9,height:9,borderRadius:"50%",background:done?m.dot:"#ddd",opacity:done?1:0.5}}/>;
+              })}
+            </div>
           </div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:24}}>
