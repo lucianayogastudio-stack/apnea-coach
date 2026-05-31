@@ -181,7 +181,7 @@ function ExercisePicker({ onAdd, onClose }) {
 
 // ── Single Exercise Row ───────────────────────────────────────────────────────
 function ExerciseRow({ exercise, onChange, onRemove, isClient, showLabel }) {
-  const [showNotes,  setShowNotes]  = useState(!!exercise.notes);
+  const [showNotes,  setShowNotes]  = useState(!!exercise.notes || false);
   const [showVideo,  setShowVideo]  = useState(false);
   const [editVideo,  setEditVideo]  = useState(false);
   const [videoInput, setVideoInput] = useState(exercise.videoUrl||"");
@@ -220,11 +220,11 @@ function ExerciseRow({ exercise, onChange, onRemove, isClient, showLabel }) {
               {TRACK_TYPES.map(t=><option key={t.key} value={t.key}>{t.label}</option>)}
             </select>
           )}
-          <button onClick={()=>setShowNotes(v=>!v)} style={{background:showNotes?"#f0f0ec":"transparent",border:"1.5px solid #e0e0e0",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",color:"#888"}}>📝</button>
-          <button onClick={()=>{ if(isClient&&videoInfo){setShowVideo(v=>!v);}else if(!isClient){setEditVideo(v=>!v);} }}
+          {!isClient && <button onClick={()=>setShowNotes(v=>!v)} style={{background:showNotes?"#f0f0ec":"transparent",border:"1.5px solid #e0e0e0",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",color:"#888"}}>📝</button>}
+          {(!isClient || exercise.videoUrl) && <button onClick={()=>{ if(isClient&&videoInfo){setShowVideo(v=>!v);}else if(!isClient){setEditVideo(v=>!v);} }}
             style={{background:(showVideo||editVideo)?"#fff0e0":"transparent",border:`1.5px solid ${exercise.videoUrl?"#f4a96a":"#e0e0e0"}`,borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",color:exercise.videoUrl?"#b85c00":"#888"}}>
             🎥
-          </button>
+          </button>}
           {!isClient&&<button onClick={onRemove} style={{background:"transparent",color:"#1a1a1a",border:"1.5px solid #e8c5c5",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",color:"#c0392b"}}>✕</button>}
         </div>
       </div>
