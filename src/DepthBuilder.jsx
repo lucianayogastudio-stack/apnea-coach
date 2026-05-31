@@ -203,12 +203,27 @@ function AthleteTable({ dives, onChange }) {
                 {/* Status buttons */}
                 <td style={{ padding:"10px 6px" }}>
                   <div style={{ display:"flex", gap:4 }}>
-                    <button onClick={() => updLog(dive.id, "status", log.status === "completed" ? null : "completed")}
-                      title="Completed" style={{ width:26, height:26, borderRadius:"50%", border:"2px solid " + (isCompleted ? "#4caf50" : "#e0e0e0"), background: isCompleted ? "#4caf50" : "transparent", color: isCompleted ? "#fff" : "#ccc", fontSize:12, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s" }}>✓</button>
-                    <button onClick={() => updLog(dive.id, "status", log.status === "early-turn" ? null : "early-turn")}
-                      title="Early turn" style={{ width:26, height:26, borderRadius:"50%", border:"2px solid " + (isEarlyTurn ? "#ff9800" : "#e0e0e0"), background: isEarlyTurn ? "#ff9800" : "transparent", color: isEarlyTurn ? "#fff" : "#ccc", fontSize:11, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, transition:"all .15s" }}>↩</button>
-                    <button onClick={() => updLog(dive.id, "status", log.status === "missed" ? null : "missed")}
-                      title="Missed / DNF" style={{ width:26, height:26, borderRadius:"50%", border:"2px solid " + (isMissed ? "#ef5350" : "#e0e0e0"), background: isMissed ? "#ef5350" : "transparent", color: isMissed ? "#fff" : "#ccc", fontSize:12, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s" }}>✗</button>
+                    {[
+                      { s:"completed",  emoji:"✓", color:"#4caf50", dim:"#e8f5e9" },
+                      { s:"early-turn", emoji:"↩", color:"#ff9800", dim:"#fff8e1" },
+                      { s:"missed",     emoji:"✗", color:"#ef5350", dim:"#fce4ec" },
+                    ].map(opt => {
+                      const active = log.status === opt.s;
+                      const any = !!log.status;
+                      return (
+                        <button key={opt.s} title={opt.s}
+                          onClick={() => updLog(dive.id, "status", active ? null : opt.s)}
+                          style={{ width:28, height:28, borderRadius:"50%",
+                            border: active ? `2.5px solid ${opt.color}` : "2px solid #e0e0e0",
+                            background: active ? opt.color : any ? opt.dim : "#f5f5f5",
+                            color: active ? "#fff" : any ? opt.color : "#bbb",
+                            fontSize:13, fontWeight:900, cursor:"pointer",
+                            display:"flex", alignItems:"center", justifyContent:"center",
+                            transition:"all .15s", opacity: any && !active ? 0.35 : 1, lineHeight:1 }}>
+                          {opt.emoji}
+                        </button>
+                      );
+                    })}
                   </div>
                 </td>
 

@@ -1558,6 +1558,16 @@ export default function ApneaCoach() {
   const [adminData,      setAdminData]      = useState(null); // {coaches, allClients}
   const [editClientModal, setEditClientModal] = useState(null); // client being edited
   const [copyFromModal,  setCopyFromModal]  = useState(null); // clientId to copy from
+  // Notifications — track when coach last checked, show badge for new completions since then
+  const [lastSeenAt, setLastSeenAt] = useState(() => {
+    try { return localStorage.getItem("apnea_lastSeen") || new Date(0).toISOString(); } catch { return new Date(0).toISOString(); }
+  });
+
+  function markAllSeen() {
+    const now = new Date().toISOString();
+    setLastSeenAt(now);
+    try { localStorage.setItem("apnea_lastSeen", now); } catch {}
+  }
 
   function flash(msg) { setToast(msg); setTimeout(()=>setToast(""),2400); }
 
@@ -1855,14 +1865,34 @@ export default function ApneaCoach() {
               <span style={{fontWeight:700,fontSize:16,letterSpacing:"-.02em"}}>ApneaCoach</span>
             </div>
             <div style={{display:"flex",gap:2}}>
-              {[
-                {key:"dashboard",label: profile?.role==="client" ? "📊 Dashboard" : "📋 Dashboard"},
-                ...(isAdmin?[{key:"adminView",label:"👑 Admin"}]:[]),
-                ...(isCoach&&activeClient?[{key:"coachWeek",label:`📅 ${activeClient.name.split(" ")[0]}'s Week`},{key:"clientWeek",label:"🏊 Client View"}]:[]),
-                ...(profile?.role==="client"?[{key:"clientWeek",label:"📅 My Week"}]:[])
-              ].map(t=>(
-                <button key={t.key} onClick={()=>{ if(profile?.role==="client"&&!activeClient&&clients[0]) setActiveClient(clients[0]); setView(t.key); }} style={{padding:"8px 15px",borderRadius:8,border:"none",fontSize:13,cursor:"pointer",fontFamily:"inherit",transition:"all .15s",background:view===t.key?"#f0f0ec":"transparent",color:view===t.key?"#1a1a1a":"#888",fontWeight:view===t.key?600:500}}>{t.label}</button>
-              ))}
+              {(()=>{
+                // Count new completions since coach last visited dashboard
+                const newCompletions = isCoach ? sessions.filter(s =>
+                  s.feedback?.status === "completed" &&
+                  s.feedback?.clientGymData &&
+                  !s.feedback?.coachComment
+                ).length : 0;
+
+                return [
+                  {key:"dashboard", label: profile?.role==="client" ? "📊 Dashboard" : "📋 Dashboard", badge: isCoach && newCompletions > 0 ? newCompletions : 0},
+                  ...(isAdmin?[{key:"adminView",label:"👑 Admin",badge:0}]:[]),
+                  ...(isCoach&&activeClient?[{key:"coachWeek",label:`📅 ${activeClient.name.split(" ")[0]}'s Week`,badge:0},{key:"clientWeek",label:"🏊 Client View",badge:0}]:[]),
+                  ...(profile?.role==="client"?[{key:"clientWeek",label:"📅 My Week",badge:0}]:[])
+                ].map(t=>(
+                  <button key={t.key} onClick={()=>{
+                    if(profile?.role==="client"&&!activeClient&&clients[0]) setActiveClient(clients[0]);
+                    setView(t.key);
+                    if(t.key==="dashboard"&&isCoach) markAllSeen();
+                  }} style={{padding:"8px 15px",borderRadius:8,border:"none",fontSize:13,cursor:"pointer",fontFamily:"inherit",transition:"all .15s",background:view===t.key?"#f0f0ec":"transparent",color:view===t.key?"#1a1a1a":"#888",fontWeight:view===t.key?600:500,position:"relative"}}>
+                    {t.label}
+                    {t.badge > 0 && (
+                      <span style={{position:"absolute",top:3,right:3,background:"#ef5350",color:"#fff",borderRadius:"50%",width:16,height:16,fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>
+                        {t.badge > 9 ? "9+" : t.badge}
+                      </span>
+                    )}
+                  </button>
+                ));
+              })()}
             </div>
           </div>
           <div style={{display:"flex",gap:10,alignItems:"center"}}>

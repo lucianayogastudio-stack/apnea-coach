@@ -205,7 +205,7 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
   const isCustom = exercise.templateKey==="custom";
 
   return (
-    <div style={{background:"#fff",borderRadius:12,border:`1.5px solid ${exercise.log?.done?"#a5d6a7":"#ebebeb"}`,marginBottom:12,overflow:"hidden",transition:"border-color .2s"}}>
+    <div style={{background:"#fff",borderRadius:12,border:`1.5px solid ${exercise.log?.status==="completed"?"#a5d6a7":exercise.log?.status==="partial"?"#fcd34d":exercise.log?.status==="skipped"?"#fca5a5":"#ebebeb"}`,marginBottom:12,overflow:"hidden",transition:"border-color .2s"}}>
       {/* Header */}
       <div style={{padding:"12px 16px",borderBottom:"1px solid #f5f5f5",display:"flex",alignItems:"center",gap:12}}>
         <div style={{width:34,height:34,borderRadius:9,background:tmpl.bg,border:`1.5px solid ${tmpl.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{tmpl.emoji}</div>
@@ -223,10 +223,33 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
         </div>
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
           {isClient && (
-            <button onClick={()=>{ updLog("done",!exercise.log?.done); setShowLog(true); }}
-              style={{width:30,height:30,borderRadius:"50%",border:`2px solid ${exercise.log?.done?"#4caf50":"#e0e0e0"}`,background:exercise.log?.done?"#4caf50":"transparent",color:exercise.log?.done?"#fff":"#ccc",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .15s"}}>
-              ✓
-            </button>
+            <div style={{display:"flex",gap:4}}>
+              {[
+                { s:"completed", emoji:"✓", color:"#4caf50", dim:"#e8f5e9" },
+                { s:"partial",   emoji:"~", color:"#f59e0b", dim:"#fff8e1" },
+                { s:"skipped",   emoji:"✗", color:"#ef5350", dim:"#fce4ec" },
+              ].map(opt => {
+                const active = exercise.log?.status === opt.s;
+                const any = !!exercise.log?.status;
+                return (
+                  <button key={opt.s} title={opt.s}
+                    onClick={() => {
+                      const ns = active ? null : opt.s;
+                      onChange({...exercise, log:{...exercise.log, status:ns, done:ns==="completed"}});
+                      setShowLog(true);
+                    }}
+                    style={{width:28,height:28,borderRadius:"50%",
+                      border:active?`2.5px solid ${opt.color}`:"2px solid #e0e0e0",
+                      background:active?opt.color:any?opt.dim:"#f5f5f5",
+                      color:active?"#fff":any?opt.color:"#bbb",
+                      fontSize:13,fontWeight:900,cursor:"pointer",
+                      display:"flex",alignItems:"center",justifyContent:"center",
+                      transition:"all .15s",opacity:any&&!active?0.35:1,lineHeight:1}}>
+                    {opt.emoji}
+                  </button>
+                );
+              })}
+            </div>
           )}
           {isClient && (
             <button onClick={()=>setShowLog(v=>!v)}
@@ -398,30 +421,40 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
       </div>
 
       {/* Client log */}
-      {isClient && showLog && (
-        <div style={{padding:"0 16px 14px",borderTop:"1px solid #f5f5f5"}}>
-          <div style={{fontSize:10,fontWeight:800,letterSpacing:".07em",textTransform:"uppercase",color:"#aaa",margin:"12px 0 10px"}}>Your Log</div>
+      {isClient && (exercise.log?.status || showLog) && (
+        <div style={{padding:"0 16px 14px",borderTop:"1px solid #f5f5f5",
+          background:exercise.log?.status==="completed"?"#f8fdf8":exercise.log?.status==="partial"?"#fffbeb":exercise.log?.status==="skipped"?"#fff5f5":"#fff"}}>
+          {exercise.log?.status && (
+            <div style={{fontSize:11,fontWeight:800,letterSpacing:".06em",textTransform:"uppercase",
+              color:exercise.log.status==="completed"?"#2e7d32":exercise.log.status==="partial"?"#b45309":"#c62828",
+              margin:"10px 0 8px"}}>
+              {exercise.log.status==="completed"?"✓ Completed":exercise.log.status==="partial"?"~ Partial — didn't complete":"✗ Skipped"}
+            </div>
+          )}
+          {!exercise.log?.status && <div style={{fontSize:10,fontWeight:800,letterSpacing:".07em",textTransform:"uppercase",color:"#aaa",margin:"12px 0 10px"}}>Your Log</div>}
           <div style={{display:"flex",flexWrap:"wrap",gap:10,marginBottom:10}}>
-            {(isContraction||isHold||isTable||exercise.templateKey==="max-effort") && (
+            {exercise.log?.status !== "skipped" && (isContraction||isHold||isTable||exercise.templateKey==="max-effort") && (
               <Field label="Actual hold time" half>
                 <input value={exercise.log?.actualTime||""} onChange={e=>updLog("actualTime",e.target.value)}
                   style={inpGreen} placeholder="e.g. 2:15" />
               </Field>
             )}
-            {isContraction && (
+            {exercise.log?.status !== "skipped" && isContraction && (
               <Field label="First contraction at" half>
                 <input value={exercise.log?.actualContraction||""} onChange={e=>updLog("actualContraction",e.target.value)}
                   style={inpGreen} placeholder="e.g. 1:45" />
               </Field>
             )}
-            <Field label="How did you feel?">
+            <Field label={exercise.log?.status==="skipped"?"Why did you skip?":"How did you feel?"}>
               <input value={exercise.log?.feeling||""} onChange={e=>updLog("feeling",e.target.value)}
-                style={inpGreen} placeholder="Relaxed / tense / anxious / strong..." />
+                style={inpGreen} placeholder={exercise.log?.status==="skipped"?"Fatigue, injury, time...":"Relaxed / tense / anxious / strong..."} />
             </Field>
-            <Field label="Observations / limiting factor">
-              <input value={exercise.log?.limitingFactor||""} onChange={e=>updLog("limitingFactor",e.target.value)}
-                style={inpGreen} placeholder="What stopped you or made it hard?" />
-            </Field>
+            {exercise.log?.status !== "skipped" && (
+              <Field label="Observations / limiting factor">
+                <input value={exercise.log?.limitingFactor||""} onChange={e=>updLog("limitingFactor",e.target.value)}
+                  style={inpGreen} placeholder="What stopped you or made it hard?" />
+              </Field>
+            )}
           </div>
         </div>
       )}
@@ -444,7 +477,7 @@ export default function StaticBuilder({ initialData, onSave, isClient }) {
   function removeExercise(id) { setExercises(prev=>prev.filter(e=>e.id!==id)); }
   function addExercise(ex) { setExercises(prev=>[...prev, ex]); }
 
-  const doneCount  = exercises.filter(e=>e.log?.done).length;
+  const doneCount  = exercises.filter(e=>e.log?.status==="completed").length;
   const totalCount = exercises.length;
   const progress   = totalCount>0?Math.round((doneCount/totalCount)*100):0;
 

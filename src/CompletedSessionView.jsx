@@ -247,22 +247,29 @@ export default function CompletedSessionView({ method, coachPlan, clientLog, onR
             {exercises.map((ex, i) => {
               const clientEx = clientExercises.find(e=>e.id===ex.id) || clientExercises[i] || ex;
               const log = clientEx.log || {};
+              const logStatus = log.status || (log.done ? "completed" : null);
+              const ssMap = {
+                completed:{label:"✓ Completed",bg:"#e8f5e9",color:"#2e7d32",border:"#a5d6a7",logBg:"#f8fdf8"},
+                partial:  {label:"~ Partial",  bg:"#fffbeb",color:"#b45309",border:"#fcd34d",logBg:"#fffbeb"},
+                skipped:  {label:"✗ Skipped",  bg:"#fff5f5",color:"#c62828",border:"#fca5a5",logBg:"#fff5f5"},
+              };
+              const ss = ssMap[logStatus] || {label:"Not logged",bg:"#f5f4f0",color:"#aaa",border:"#ddd",logBg:"#f8f8f6"};
               return (
-                <div key={ex.id||i} style={{background:"#fff",borderRadius:12,border:`1.5px solid ${log.done?"#a5d6a7":"#ebebeb"}`,marginBottom:10,overflow:"hidden"}}>
+                <div key={ex.id||i} style={{background:"#fff",borderRadius:12,border:`1.5px solid ${logStatus?ss.border:"#ebebeb"}`,marginBottom:10,overflow:"hidden"}}>
                   <div style={{padding:"10px 14px",borderBottom:"1px solid #f5f5f5",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-                    <span style={{fontWeight:700,fontSize:14,flex:1}}>{ex.name}</span>
+                    <span style={{fontWeight:700,fontSize:14,flex:1}}>{ex.label||ex.name}</span>
                     {ex.targetTime && <span style={{fontSize:12,color:"#888"}}>Target: {ex.targetTime}</span>}
-                    <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,background:log.done?"#e8f5e9":"#f5f4f0",color:log.done?"#2e7d32":"#aaa"}}>{log.done?"✓ Done":"Not done"}</span>
+                    <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,background:ss.bg,color:ss.color,border:`1px solid ${ss.border}`}}>{ss.label}</span>
                   </div>
                   {ex.description && <div style={{padding:"8px 14px",background:"#fffbe6",fontSize:13,color:"#5a4800",lineHeight:1.6}}>{ex.description}</div>}
-                  {log.done && (
-                    <div style={{padding:"8px 14px",background:"#f8fdf8"}}>
+                  {logStatus && (log.actualTime||log.actualContraction||log.feeling||log.limitingFactor) && (
+                    <div style={{padding:"8px 14px",background:ss.logBg}}>
                       <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:4}}>
                         {log.actualTime && <span style={{fontSize:13}}><span style={{color:"#aaa",fontSize:11}}>Time: </span><strong>{log.actualTime}</strong></span>}
                         {log.actualContraction && <span style={{fontSize:13}}><span style={{color:"#aaa",fontSize:11}}>First contraction: </span><strong>{log.actualContraction}</strong></span>}
                       </div>
-                      {log.feeling && <div style={{fontSize:12,color:"#555",marginBottom:2}}><span style={{color:"#aaa"}}>Feeling: </span>{log.feeling}</div>}
-                      {log.observations && <div style={{fontSize:12,color:"#555"}}>{log.observations}</div>}
+                      {log.feeling && <div style={{fontSize:12,color:"#555",marginBottom:2}}><span style={{color:"#aaa"}}>{logStatus==="skipped"?"Reason: ":"Feeling: "}</span>{log.feeling}</div>}
+                      {log.limitingFactor && <div style={{fontSize:12,color:"#555"}}><span style={{color:"#aaa"}}>Limiting factor: </span>{log.limitingFactor}</div>}
                     </div>
                   )}
                 </div>
