@@ -205,6 +205,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
 
   // Static sessions use the dedicated builder
   if (isStatic) {
+    const isCompleted_static = !isClient && session.feedback?.status==="completed" && session.feedback?.clientGymData;
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -212,6 +213,17 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
           <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?"Athlete View":"Coach View"}</span>
         </div>
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
+        {isCompleted_static ? (
+          <CompletedSessionView
+            method="static"
+            coachPlan={session.plan?.gymData}
+            clientLog={session.feedback?.clientGymData}
+            coachComment={fb.coachComment||""}
+            onReply={v=>setFb(p=>({...p,coachComment:v}))}
+            saving={saving}
+            onSave={async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
+          />
+        ) : (
         <StaticBuilder
           isClient={isClient}
           initialData={(() => {
@@ -247,11 +259,13 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             onClose();
           }}
         />
+        )}
       </Modal>
     );
   }
 
   if (isMobility) {
+    const isCompleted_mobility = !isClient && session.feedback?.status==="completed" && session.feedback?.clientGymData;
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -260,6 +274,17 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
           {!isClient&&onEdit&&<button onClick={()=>{onClose();onEdit&&onEdit(session);}} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>}
         </div>
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
+        {isCompleted_mobility ? (
+          <CompletedSessionView
+            method="mobility"
+            coachPlan={session.plan?.gymData}
+            clientLog={session.feedback?.clientGymData}
+            coachComment={fb.coachComment||""}
+            onReply={v=>setFb(p=>({...p,coachComment:v}))}
+            saving={saving}
+            onSave={async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
+          />
+        ) : (
         <MobilityBuilder
           isClient={isClient}
           initialData={(() => {
@@ -288,11 +313,13 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             setSaving(false); onClose();
           }}
         />
+        )}
       </Modal>
     );
   }
 
   if (isDryEq) {
+    const isCompleted_dry_eq = !isClient && session.feedback?.status==="completed" && session.feedback?.clientGymData;
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -301,6 +328,17 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
           {!isClient&&onEdit&&<button onClick={()=>{onClose();onEdit&&onEdit(session);}} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>}
         </div>
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
+        {isCompleted_dry_eq ? (
+          <CompletedSessionView
+            method="dry-eq"
+            coachPlan={session.plan?.gymData}
+            clientLog={session.feedback?.clientGymData}
+            coachComment={fb.coachComment||""}
+            onReply={v=>setFb(p=>({...p,coachComment:v}))}
+            saving={saving}
+            onSave={async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
+          />
+        ) : (
         <DryEqBuilder
           isClient={isClient}
           initialData={(() => {
@@ -326,6 +364,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             setSaving(false); onClose();
           }}
         />
+        )}
       </Modal>
     );
   }
@@ -399,6 +438,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   }
 
   if (isPool2) {
+    const isCompleted_pool_co2 = !isClient && session.feedback?.status==="completed" && session.feedback?.clientGymData;
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -407,6 +447,17 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
           {!isClient&&onEdit&&<button onClick={()=>{onClose();onEdit&&onEdit(session);}} style={{marginLeft:"auto",background:"transparent",color:"#1a1a1a",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>}
         </div>
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
+        {isCompleted_pool_co2 ? (
+          <CompletedSessionView
+            method="pool-co2"
+            coachPlan={session.plan?.gymData}
+            clientLog={session.feedback?.clientGymData}
+            coachComment={fb.coachComment||""}
+            onReply={v=>setFb(p=>({...p,coachComment:v}))}
+            saving={saving}
+            onSave={async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
+          />
+        ) : (
         <PoolBuilder
           isClient={isClient}
           initialData={(() => {
@@ -427,11 +478,13 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             setSaving(false); onClose();
           }}
         />
+        )}
       </Modal>
     );
   }
 
   if (isPool) {
+    const isCompleted_pool_technique = !isClient && session.feedback?.status==="completed" && session.feedback?.clientGymData;
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -440,6 +493,17 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
           {!isClient&&onEdit&&<button onClick={()=>{onClose();onEdit&&onEdit(session);}} style={{marginLeft:"auto",background:"transparent",color:"#1a1a1a",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>✏️ Edit</button>}
         </div>
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
+        {isCompleted_pool_technique ? (
+          <CompletedSessionView
+            method="pool-technique"
+            coachPlan={session.plan?.gymData}
+            clientLog={session.feedback?.clientGymData}
+            coachComment={fb.coachComment||""}
+            onReply={v=>setFb(p=>({...p,coachComment:v}))}
+            saving={saving}
+            onSave={async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
+          />
+        ) : (
         <PoolTechniqueBuilder
           isClient={isClient}
           initialData={(() => {
@@ -460,12 +524,14 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             setSaving(false); onClose();
           }}
         />
+        )}
       </Modal>
     );
   }
 
   // Gym strength sessions use the dedicated builder
   if (isGym) {
+    const isCompleted_gym_strength = !isClient && session.feedback?.status==="completed" && session.feedback?.clientGymData;
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -473,6 +539,17 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
           <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?"Athlete View":"Coach View"}</span>
         </div>
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
+        {isCompleted_gym_strength ? (
+          <CompletedSessionView
+            method="gym-strength"
+            coachPlan={session.plan?.gymData}
+            clientLog={session.feedback?.clientGymData}
+            coachComment={fb.coachComment||""}
+            onReply={v=>setFb(p=>({...p,coachComment:v}))}
+            saving={saving}
+            onSave={async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
+          />
+        ) : (
         <GymStrengthBuilder
           isClient={isClient}
           initialData={(() => {
@@ -508,6 +585,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             onClose();
           }}
         />
+        )}
       </Modal>
     );
   }
