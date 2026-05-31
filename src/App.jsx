@@ -28,7 +28,7 @@ function mondayOf(date) {
   d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day)); d.setHours(0,0,0,0); return d;
 }
 function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
-function toISO(d) { return d.toISOString().slice(0,10); }
+function toISO(d) { const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`; }
 function fmtShort(d) { return d.toLocaleDateString("en-US", { month:"short", day:"numeric" }); }
 function fmtFull(iso) {
   if (!iso) return "";
@@ -1278,7 +1278,7 @@ function generateWeekPDF(weekDates, sessions, clientName, coachName) {
   </div>`;
 
   weekDates.forEach((d, di) => {
-    const iso = d.toISOString().split("T")[0];
+    const iso = toISO(d);
     const daySessions = sessions.filter(s => s.date === iso);
     const dayLabel = DAYS[di] + " " + d.toLocaleDateString("en-US",{month:"short",day:"numeric"});
 
@@ -1529,6 +1529,13 @@ export default function ApneaCoach() {
     return ()=>subscription.unsubscribe();
   },[]);
 
+  // For athletes: ensure activeClient is always set when clients are loaded
+  useEffect(()=>{
+    if (profile?.role==="client" && clients.length>0 && !activeClient) {
+      setActiveClient(clients[0]);
+    }
+  },[profile, clients, activeClient]);
+
   async function loadProfile(u) {
     const {data} = await supabase.from("profiles").select("*").eq("id",u.id).single();
     setProfile(data);
@@ -1723,7 +1730,10 @@ export default function ApneaCoach() {
       feeling:fb.feeling||null, limiting_factor:fb.limitingFactor||null,
       client_notes:clientNotesValue, coach_comment:fb.coachComment||null,
     },{onConflict:"session_id"});
-    if (!error) { setSessions(prev=>prev.map(s=>s.id===sessionId?{...s,feedback:{...fb}}:s)); setDayModal(null); flash("Feedback saved!"); }
+    if (!error) {
+      setSessions(prev=>prev.map(s=>s.id===sessionId?{...s,feedback:{...fb, clientGymData: fb.gymData || s.feedback?.clientGymData, gymData: undefined}}:s));
+      setDayModal(null); flash("Feedback saved!");
+    }
   }
 
   // ── Edit session ──
@@ -2098,13 +2108,12 @@ export default function ApneaCoach() {
         )}
 
         {/* ATHLETE DASHBOARD */}
-        {view==="dashboard"&&profile?.role==="client"&&(clients.length>0||activeClient)&&(
+        {view==="dashboard"&&profile?.role==="client"&&(
           <div>
             {/* Header */}
-            {(()=>{ if(!activeClient && clients[0]) setActiveClient(clients[0]); return null; })()}
             {(()=>{
               const client = activeClient || clients[0];
-              if (!client) return null;
+              if (!client) return <div style={{textAlign:"center",color:"#bbb",padding:60,fontSize:15}}>Loading your dashboard…</div>;
               return (
                 <div style={{marginBottom:28,display:"flex",alignItems:"center",gap:16}}>
                   <label style={{cursor:"pointer",flexShrink:0}}>
