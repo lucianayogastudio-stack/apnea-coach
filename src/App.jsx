@@ -211,7 +211,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
 
   // Static sessions use the dedicated builder
   if (isStatic) {
-    const isCompleted_static = session.feedback?.status==="completed" && session.feedback?.clientGymData;
+    const isCompleted_static = session.feedback?.status==="completed";
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -281,7 +281,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   }
 
   if (isMobility) {
-    const isCompleted_mobility = session.feedback?.status==="completed" && session.feedback?.clientGymData;
+    const isCompleted_mobility = session.feedback?.status==="completed";
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -344,7 +344,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   }
 
   if (isDryEq) {
-    const isCompleted_dry_eq = session.feedback?.status==="completed" && session.feedback?.clientGymData;
+    const isCompleted_dry_eq = session.feedback?.status==="completed";
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -407,7 +407,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
     const isCompleted = session.feedback?.status === "completed";
     const clientLog = session.feedback?.clientGymData || null;
     // Show completed view if status=completed (coach always, athlete always)
-    const showCompletedView = isCompleted && clientLog;
+    const showCompletedView = isCompleted;
 
     return (
       <Modal onClose={onClose} wide>
@@ -469,7 +469,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   }
 
   if (isPool2) {
-    const isCompleted_pool_co2 = session.feedback?.status==="completed" && session.feedback?.clientGymData;
+    const isCompleted_pool_co2 = session.feedback?.status==="completed";
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -524,7 +524,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   }
 
   if (isPool) {
-    const isCompleted_pool_technique = session.feedback?.status==="completed" && session.feedback?.clientGymData;
+    const isCompleted_pool_technique = session.feedback?.status==="completed";
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -580,7 +580,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
 
   // Gym strength sessions use the dedicated builder
   if (isGym) {
-    const isCompleted_gym_strength = session.feedback?.status==="completed" && session.feedback?.clientGymData;
+    const isCompleted_gym_strength = session.feedback?.status==="completed";
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
