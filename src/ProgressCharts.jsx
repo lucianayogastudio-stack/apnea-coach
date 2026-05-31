@@ -279,15 +279,70 @@ export default function ProgressCharts({ sessions, clientName }) {
     ? Math.max(...longestDynOverTime.map(d => d.y))
     : null;
 
+  // ── Parse static sessions ──
+  // Convert "M:SS" or "MM:SS" time strings to seconds
+  function timeToSeconds(t) {
+    if (!t) return null;
+    const s = String(t).trim();
+    // Numeric already (seconds)
+    if (/^\d+(\.\d+)?$/.test(s)) return Math.round(Number(s));
+    // M:SS or MM:SS
+    const parts = s.split(":");
+    if (parts.length === 2) {
+      const m = parseInt(parts[0], 10), sec = parseFloat(parts[1]);
+      if (!isNaN(m) && !isNaN(sec)) return m * 60 + Math.round(sec);
+    }
+    return null;
+  }
+  function fmtSeconds(secs) {
+    if (!secs) return "—";
+    const m = Math.floor(secs / 60), s = secs % 60;
+    return `${m}:${String(s).padStart(2, "0")}`;
+  }
+
+  const staticSessions = sessions
+    .filter(s => s.method === "static" && s.plan?.gymData)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  // Best hold per session (max actualTime from logged exercises)
+  const staticOverTime = staticSessions.map(s => {
+    const exercises = s.plan.gymData.exercises || [];
+    const clientData = s.feedback?.clientGymData;
+    const loggedExercises = clientData?.exercises || [];
+
+    let bestSecs = null;
+    exercises.forEach(ex => {
+      const logged = loggedExercises.find(l => l.id === ex.id) || ex;
+      const t = timeToSeconds(logged.log?.actualTime || ex.targetTime);
+      if (t && (!bestSecs || t > bestSecs)) bestSecs = t;
+    });
+    return bestSecs ? { x: s.date, y: bestSecs } : null;
+  }).filter(Boolean);
+
+  // Running STA PB
+  let runningStaticPB = 0;
+  const staticPBOverTime = staticOverTime.map(d => {
+    if (d.y > runningStaticPB) runningStaticPB = d.y;
+    return { x: d.x, y: runningStaticPB };
+  });
+
+  // CO2 tolerance: avg rest time trend (shorter rest = better CO2 tolerance)
+  // Not enough data usually; skip for now
+
+  const currentStaticPB = staticPBOverTime.length > 0 ? staticPBOverTime[staticPBOverTime.length - 1].y : null;
+  const latestStatic = staticOverTime.length > 0 ? staticOverTime[staticOverTime.length - 1].y : null;
+  const totalStaticSessions = staticSessions.length;
+
   const tabs = [
-    { key:"depth", label:"🌊 Depth", show: depthSessions.length > 0 },
-    { key:"pool",  label:"💧 Pool",  show: poolSessions.length > 0 },
+    { key:"depth",  label:"🌊 Depth",  show: depthSessions.length > 0 },
+    { key:"pool",   label:"💧 Pool",   show: poolSessions.length > 0 },
+    { key:"static", label:"🫁 Static", show: staticSessions.length > 0 },
   ].filter(t => t.show);
 
   if (tabs.length === 0) {
     return (
       <div style={{ background:"#fafaf8", borderRadius:12, border:"1.5px dashed #e0e0e0", padding:"32px", textAlign:"center", color:"#bbb", fontSize:14 }}>
-        No depth or pool training data yet. Charts will appear here once sessions are logged.
+        No training data yet. Charts will appear here once sessions are logged.
       </div>
     );
   }
@@ -296,7 +351,7 @@ export default function ProgressCharts({ sessions, clientName }) {
     <div style={{ fontFamily:"'DM Sans','Helvetica Neue',sans-serif" }}>
       {/* Tab switcher */}
       {tabs.length > 1 && (
-        <div style={{ display:"flex", gap:8, marginBottom:18 }}>
+        <div style={{ display:"flex", gap:8, marginBottom:18, flexWrap:"wrap" }}>
           {tabs.map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)}
               style={{ padding:"8px 18px", borderRadius:9, border:"none", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit", background: activeTab === t.key ? "#1a1a1a" : "#f0f0ec", color: activeTab === t.key ? "#fff" : "#666", transition:"all .15s" }}>
@@ -390,6 +445,48 @@ export default function ProgressCharts({ sessions, clientName }) {
               height={180}
               showDots={true}
               referenceLines={longestDyn ? [{ value: longestDyn, color:"#ef5350", label:"Best " + longestDyn + "m" }] : null}
+            />
+          </ChartCard>
+        </div>
+      )}
+
+      {/* STATIC CHARTS */}
+      {activeTab === "static" && (
+        <div>
+          <StatRow stats={[
+            { label:"Static Sessions", value: totalStaticSessions, color:"#6b21a8" },
+            { label:"Current STA PB",  value: currentStaticPB ? fmtSeconds(currentStaticPB) : "—", color:"#c0392b" },
+            { label:"Latest Session",  value: latestStatic ? fmtSeconds(latestStatic) : "—", color:"#555" },
+          ]} />
+
+          <ChartCard
+            title="Best Hold Per Session"
+            subtitle="Longest breath-hold recorded each session"
+            isEmpty={staticOverTime.length < 2}
+            emptyMsg="Need at least 2 logged static sessions to show this chart">
+            <LineChart
+              data={staticOverTime}
+              color="#9333ea"
+              yLabel="Time"
+              height={200}
+              showDots={true}
+              formatY={v => fmtSeconds(Math.round(v))}
+              referenceLines={currentStaticPB ? [{ value: currentStaticPB, color:"#ef5350", label:"PB " + fmtSeconds(currentStaticPB) }] : null}
+            />
+          </ChartCard>
+
+          <ChartCard
+            title="STA Personal Best Progression"
+            subtitle="Running best breath-hold over time"
+            isEmpty={staticPBOverTime.length < 2}
+            emptyMsg="Need at least 2 logged static sessions to show this chart">
+            <LineChart
+              data={staticPBOverTime}
+              color="#ef5350"
+              yLabel="Time"
+              height={180}
+              showDots={false}
+              formatY={v => fmtSeconds(Math.round(v))}
             />
           </ChartCard>
         </div>

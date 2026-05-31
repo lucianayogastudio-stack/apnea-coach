@@ -211,24 +211,34 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
 
   // Static sessions use the dedicated builder
   if (isStatic) {
-    const isCompleted_static = !isClient && session.feedback?.status==="completed" && session.feedback?.clientGymData;
+    const isCompleted_static = session.feedback?.status==="completed" && session.feedback?.clientGymData;
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
           <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`}}>{m.emoji} {m.label}</span>
-          <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?"Athlete View":"Coach View"}</span>
+          <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient ? (isCompleted_static?"Completed":"Athlete View") : (isCompleted_static?"Completed Session":"Coach View")}</span>
+          {!isClient && isCompleted_static && fb.status && <button onClick={()=>setFb(p=>({...p,status:null}))} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #e0e0e0",color:"#888",padding:"5px 10px",borderRadius:7,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>↩ Reopen</button>}
+          {!isClient && !isCompleted_static && onEdit && <button onClick={()=>{onClose();onEdit(session);}} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>}
         </div>
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
         {isCompleted_static ? (
-          <CompletedSessionView
-            method="static"
-            coachPlan={session.plan?.gymData}
-            clientLog={session.feedback?.clientGymData}
-            coachComment={fb.coachComment||""}
-            onReply={v=>setFb(p=>({...p,coachComment:v}))}
-            saving={saving}
-            onSave={async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
-          />
+          <>
+            <CompletedSessionView
+              method="static"
+              coachPlan={session.plan?.gymData}
+              clientLog={session.feedback?.clientGymData}
+              coachComment={isClient ? undefined : fb.coachComment||""}
+              onReply={isClient ? undefined : v=>setFb(p=>({...p,coachComment:v}))}
+              saving={saving}
+              onSave={isClient ? undefined : async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
+            />
+            {isClient && session.feedback?.coachComment && (
+              <div style={{marginTop:16,background:"#e8f5e9",border:"1px solid #a5d6a7",borderRadius:10,padding:"14px 16px"}}>
+                <div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#2e7d32",marginBottom:6}}>💬 Coach's Feedback</div>
+                <div style={{fontSize:14,color:"#1b5e20",lineHeight:1.65}}>{session.feedback.coachComment}</div>
+              </div>
+            )}
+          </>
         ) : (
         <StaticBuilder
           isClient={isClient}
@@ -271,25 +281,34 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   }
 
   if (isMobility) {
-    const isCompleted_mobility = !isClient && session.feedback?.status==="completed" && session.feedback?.clientGymData;
+    const isCompleted_mobility = session.feedback?.status==="completed" && session.feedback?.clientGymData;
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
           <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`}}>{m.emoji} {m.label}</span>
-          <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?"Athlete View":"Coach View"}</span>
-          {!isClient&&onEdit&&<button onClick={()=>{onClose();onEdit&&onEdit(session);}} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>}
+          <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?(isCompleted_mobility?"Completed":"Athlete View"):(isCompleted_mobility?"Completed Session":"Coach View")}</span>
+          {!isClient && isCompleted_mobility && fb.status && <button onClick={()=>setFb(p=>({...p,status:null}))} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #e0e0e0",color:"#888",padding:"5px 10px",borderRadius:7,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>↩ Reopen</button>}
+          {!isClient && !isCompleted_mobility && onEdit&&<button onClick={()=>{onClose();onEdit&&onEdit(session);}} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>}
         </div>
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
         {isCompleted_mobility ? (
-          <CompletedSessionView
-            method="mobility"
-            coachPlan={session.plan?.gymData}
-            clientLog={session.feedback?.clientGymData}
-            coachComment={fb.coachComment||""}
-            onReply={v=>setFb(p=>({...p,coachComment:v}))}
-            saving={saving}
-            onSave={async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
-          />
+          <>
+            <CompletedSessionView
+              method="mobility"
+              coachPlan={session.plan?.gymData}
+              clientLog={session.feedback?.clientGymData}
+              coachComment={isClient ? undefined : fb.coachComment||""}
+              onReply={isClient ? undefined : v=>setFb(p=>({...p,coachComment:v}))}
+              saving={saving}
+              onSave={isClient ? undefined : async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
+            />
+            {isClient && session.feedback?.coachComment && (
+              <div style={{marginTop:16,background:"#e8f5e9",border:"1px solid #a5d6a7",borderRadius:10,padding:"14px 16px"}}>
+                <div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#2e7d32",marginBottom:6}}>💬 Coach's Feedback</div>
+                <div style={{fontSize:14,color:"#1b5e20",lineHeight:1.65}}>{session.feedback.coachComment}</div>
+              </div>
+            )}
+          </>
         ) : (
         <MobilityBuilder
           isClient={isClient}
@@ -325,25 +344,34 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   }
 
   if (isDryEq) {
-    const isCompleted_dry_eq = !isClient && session.feedback?.status==="completed" && session.feedback?.clientGymData;
+    const isCompleted_dry_eq = session.feedback?.status==="completed" && session.feedback?.clientGymData;
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
           <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`}}>{m.emoji} {m.label}</span>
-          <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?"Athlete View":"Coach View"}</span>
-          {!isClient&&onEdit&&<button onClick={()=>{onClose();onEdit&&onEdit(session);}} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>}
+          <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?(isCompleted_dry_eq?"Completed":"Athlete View"):(isCompleted_dry_eq?"Completed Session":"Coach View")}</span>
+          {!isClient && isCompleted_dry_eq && fb.status && <button onClick={()=>setFb(p=>({...p,status:null}))} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #e0e0e0",color:"#888",padding:"5px 10px",borderRadius:7,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>↩ Reopen</button>}
+          {!isClient && !isCompleted_dry_eq && onEdit&&<button onClick={()=>{onClose();onEdit&&onEdit(session);}} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>}
         </div>
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
         {isCompleted_dry_eq ? (
-          <CompletedSessionView
-            method="dry-eq"
-            coachPlan={session.plan?.gymData}
-            clientLog={session.feedback?.clientGymData}
-            coachComment={fb.coachComment||""}
-            onReply={v=>setFb(p=>({...p,coachComment:v}))}
-            saving={saving}
-            onSave={async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
-          />
+          <>
+            <CompletedSessionView
+              method="dry-eq"
+              coachPlan={session.plan?.gymData}
+              clientLog={session.feedback?.clientGymData}
+              coachComment={isClient ? undefined : fb.coachComment||""}
+              onReply={isClient ? undefined : v=>setFb(p=>({...p,coachComment:v}))}
+              saving={saving}
+              onSave={isClient ? undefined : async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
+            />
+            {isClient && session.feedback?.coachComment && (
+              <div style={{marginTop:16,background:"#e8f5e9",border:"1px solid #a5d6a7",borderRadius:10,padding:"14px 16px"}}>
+                <div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#2e7d32",marginBottom:6}}>💬 Coach's Feedback</div>
+                <div style={{fontSize:14,color:"#1b5e20",lineHeight:1.65}}>{session.feedback.coachComment}</div>
+              </div>
+            )}
+          </>
         ) : (
         <DryEqBuilder
           isClient={isClient}
@@ -441,25 +469,34 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   }
 
   if (isPool2) {
-    const isCompleted_pool_co2 = !isClient && session.feedback?.status==="completed" && session.feedback?.clientGymData;
+    const isCompleted_pool_co2 = session.feedback?.status==="completed" && session.feedback?.clientGymData;
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
           <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`}}>{m.emoji} {m.label}</span>
-          <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?"Athlete View":"Coach View"}</span>
-          {!isClient&&onEdit&&<button onClick={()=>{onClose();onEdit&&onEdit(session);}} style={{marginLeft:"auto",background:"transparent",color:"#1a1a1a",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>}
+          <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?(isCompleted_pool_co2?"Completed":"Athlete View"):(isCompleted_pool_co2?"Completed Session":"Coach View")}</span>
+          {!isClient && isCompleted_pool_co2 && fb.status && <button onClick={()=>setFb(p=>({...p,status:null}))} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #e0e0e0",color:"#888",padding:"5px 10px",borderRadius:7,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>↩ Reopen</button>}
+          {!isClient && !isCompleted_pool_co2 && onEdit&&<button onClick={()=>{onClose();onEdit&&onEdit(session);}} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>}
         </div>
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
         {isCompleted_pool_co2 ? (
-          <CompletedSessionView
-            method="pool-co2"
-            coachPlan={session.plan?.gymData}
-            clientLog={session.feedback?.clientGymData}
-            coachComment={fb.coachComment||""}
-            onReply={v=>setFb(p=>({...p,coachComment:v}))}
-            saving={saving}
-            onSave={async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
-          />
+          <>
+            <CompletedSessionView
+              method="pool-co2"
+              coachPlan={session.plan?.gymData}
+              clientLog={session.feedback?.clientGymData}
+              coachComment={isClient ? undefined : fb.coachComment||""}
+              onReply={isClient ? undefined : v=>setFb(p=>({...p,coachComment:v}))}
+              saving={saving}
+              onSave={isClient ? undefined : async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
+            />
+            {isClient && session.feedback?.coachComment && (
+              <div style={{marginTop:16,background:"#e8f5e9",border:"1px solid #a5d6a7",borderRadius:10,padding:"14px 16px"}}>
+                <div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#2e7d32",marginBottom:6}}>💬 Coach's Feedback</div>
+                <div style={{fontSize:14,color:"#1b5e20",lineHeight:1.65}}>{session.feedback.coachComment}</div>
+              </div>
+            )}
+          </>
         ) : (
         <PoolBuilder
           isClient={isClient}
@@ -487,25 +524,34 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   }
 
   if (isPool) {
-    const isCompleted_pool_technique = !isClient && session.feedback?.status==="completed" && session.feedback?.clientGymData;
+    const isCompleted_pool_technique = session.feedback?.status==="completed" && session.feedback?.clientGymData;
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
           <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`}}>{m.emoji} {m.label}</span>
-          <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?"Athlete View":"Coach View"}</span>
-          {!isClient&&onEdit&&<button onClick={()=>{onClose();onEdit&&onEdit(session);}} style={{marginLeft:"auto",background:"transparent",color:"#1a1a1a",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>✏️ Edit</button>}
+          <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?(isCompleted_pool_technique?"Completed":"Athlete View"):(isCompleted_pool_technique?"Completed Session":"Coach View")}</span>
+          {!isClient && isCompleted_pool_technique && fb.status && <button onClick={()=>setFb(p=>({...p,status:null}))} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #e0e0e0",color:"#888",padding:"5px 10px",borderRadius:7,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>↩ Reopen</button>}
+          {!isClient && !isCompleted_pool_technique && onEdit&&<button onClick={()=>{onClose();onEdit&&onEdit(session);}} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>✏️ Edit</button>}
         </div>
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
         {isCompleted_pool_technique ? (
-          <CompletedSessionView
-            method="pool-technique"
-            coachPlan={session.plan?.gymData}
-            clientLog={session.feedback?.clientGymData}
-            coachComment={fb.coachComment||""}
-            onReply={v=>setFb(p=>({...p,coachComment:v}))}
-            saving={saving}
-            onSave={async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
-          />
+          <>
+            <CompletedSessionView
+              method="pool-technique"
+              coachPlan={session.plan?.gymData}
+              clientLog={session.feedback?.clientGymData}
+              coachComment={isClient ? undefined : fb.coachComment||""}
+              onReply={isClient ? undefined : v=>setFb(p=>({...p,coachComment:v}))}
+              saving={saving}
+              onSave={isClient ? undefined : async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
+            />
+            {isClient && session.feedback?.coachComment && (
+              <div style={{marginTop:16,background:"#e8f5e9",border:"1px solid #a5d6a7",borderRadius:10,padding:"14px 16px"}}>
+                <div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#2e7d32",marginBottom:6}}>💬 Coach's Feedback</div>
+                <div style={{fontSize:14,color:"#1b5e20",lineHeight:1.65}}>{session.feedback.coachComment}</div>
+              </div>
+            )}
+          </>
         ) : (
         <PoolTechniqueBuilder
           isClient={isClient}
@@ -535,24 +581,25 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   // Gym strength sessions use the dedicated builder
   if (isGym) {
     const isCompleted_gym_strength = session.feedback?.status==="completed" && session.feedback?.clientGymData;
-    const athleteCompleted = false; // merged into isCompleted_gym_strength
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
           <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`}}>{m.emoji} {m.label}</span>
-          <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?"Athlete View":"Coach View"}</span>
+          <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?(isCompleted_gym_strength?"Completed":"Athlete View"):(isCompleted_gym_strength?"Completed Session":"Coach View")}</span>
+          {!isClient && isCompleted_gym_strength && fb.status && <button onClick={()=>setFb(p=>({...p,status:null}))} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #e0e0e0",color:"#888",padding:"5px 10px",borderRadius:7,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>↩ Reopen</button>}
+          {!isClient && !isCompleted_gym_strength && onEdit && <button onClick={()=>{onClose();onEdit(session);}} style={{marginLeft:"auto",background:"transparent",border:"1.5px solid #ddd",color:"#555",padding:"5px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>}
         </div>
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
         {isCompleted_gym_strength ? (
           <>
             <CompletedSessionView
               method="gym-strength"
-            coachPlan={session.plan?.gymData}
-            clientLog={session.feedback?.clientGymData}
-            coachComment={fb.coachComment||""}
-            onReply={v=>setFb(p=>({...p,coachComment:v}))}
-            saving={saving}
-            onSave={async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
+              coachPlan={session.plan?.gymData}
+              clientLog={session.feedback?.clientGymData}
+              coachComment={isClient ? undefined : fb.coachComment||""}
+              onReply={isClient ? undefined : v=>setFb(p=>({...p,coachComment:v}))}
+              saving={saving}
+              onSave={isClient ? undefined : async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
             />
             {/* Show coach reply to athlete */}
             {isClient && session.feedback?.coachComment && (
@@ -1436,12 +1483,11 @@ function WeekGrid({ weekDates, clientId, sessions, onClickSession, onClickAdd, o
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
                       <span style={{fontSize:16}}>{m.emoji}</span>
                       <div style={{display:"flex",alignItems:"center",gap:4}}>
-                        {sc&&<div style={{width:8,height:8,borderRadius:"50%",background:sc}}/>}
-                        {!isClient&&!isCompleted&&(
-                          <button title="Copy session" onClick={e=>{e.stopPropagation();onCopySession&&onCopySession(s);}}
-                            style={{background:"none",border:"none",fontSize:11,color:"#ccc",cursor:"pointer",padding:0,lineHeight:1}}>⧉</button>
+                        {isClient && s.feedback?.coachComment && s.feedback?.status==="completed" && (
+                          <div title="Coach left feedback" style={{width:7,height:7,borderRadius:"50%",background:"#2e7d32",flexShrink:0}}/>
                         )}
-                        {!isClient&&isCompleted&&(
+                        {sc&&<div style={{width:8,height:8,borderRadius:"50%",background:sc}}/>}
+                        {!isClient&&(
                           <button title="Copy session" onClick={e=>{e.stopPropagation();onCopySession&&onCopySession(s);}}
                             style={{background:"none",border:"none",fontSize:11,color:"#ccc",cursor:"pointer",padding:0,lineHeight:1}}>⧉</button>
                         )}
