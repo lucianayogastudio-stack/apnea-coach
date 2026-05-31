@@ -374,7 +374,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
     const isCompleted = session.feedback?.status === "completed";
     const clientLog = session.feedback?.clientGymData || null;
     // Coach sees completed view if athlete has logged; client sees editable view always
-    const showCompletedView = !isClient && isCompleted && clientLog;
+    const showCompletedView = (!isClient && isCompleted && clientLog) || (isClient && isCompleted && clientLog);
 
     return (
       <Modal onClose={onClose} wide>
@@ -394,7 +394,13 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
         {showCompletedView ? (
           <>
             <CompletedSessionView method="depth" coachPlan={session.plan?.gymData} clientLog={clientLog} onReply={v=>setFb(p=>({...p,coachComment:v}))} coachComment={fb.coachComment||""} saving={saving} onSave={async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}} />
-            {/* Coach reply */}
+            {/* Show coach reply to athlete */}
+            {isClient && session.feedback?.coachComment && (
+              <div style={{marginTop:16,background:"#e8f5e9",border:"1px solid #a5d6a7",borderRadius:10,padding:"14px 16px"}}>
+                <div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#2e7d32",marginBottom:6}}>💬 Coach's Feedback</div>
+                <div style={{fontSize:14,color:"#1b5e20",lineHeight:1.65}}>{session.feedback.coachComment}</div>
+              </div>
+            )}
 
           </>
         ) : (
@@ -524,6 +530,8 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   // Gym strength sessions use the dedicated builder
   if (isGym) {
     const isCompleted_gym_strength = !isClient && session.feedback?.status==="completed" && session.feedback?.clientGymData;
+    // Athlete sees read-only view if session is completed
+    const athleteCompleted = isClient && session.feedback?.status==="completed" && session.feedback?.clientGymData;
     return (
       <Modal onClose={onClose} wide>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -531,16 +539,25 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
           <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?"Athlete View":"Coach View"}</span>
         </div>
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:18}}>{fmtFull(session.date)}</div>
-        {isCompleted_gym_strength ? (
-          <CompletedSessionView
-            method="gym-strength"
+        {isCompleted_gym_strength || athleteCompleted ? (
+          <>
+            <CompletedSessionView
+              method="gym-strength"
             coachPlan={session.plan?.gymData}
             clientLog={session.feedback?.clientGymData}
             coachComment={fb.coachComment||""}
             onReply={v=>setFb(p=>({...p,coachComment:v}))}
             saving={saving}
             onSave={async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}}
-          />
+            />
+            {/* Show coach reply to athlete */}
+            {isClient && session.feedback?.coachComment && (
+              <div style={{marginTop:16,background:"#e8f5e9",border:"1px solid #a5d6a7",borderRadius:10,padding:"14px 16px"}}>
+                <div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#2e7d32",marginBottom:6}}>💬 Coach's Feedback</div>
+                <div style={{fontSize:14,color:"#1b5e20",lineHeight:1.65}}>{session.feedback.coachComment}</div>
+              </div>
+            )}
+          </>
         ) : (
         <GymStrengthBuilder
           isClient={isClient}
