@@ -160,8 +160,14 @@ export default function CompletedSessionView({ method, coachPlan, clientLog, onR
                       <span style={{flex:1,fontSize:13,fontWeight:600,color:block.type==="maxeffort"?"#b94a00":"#1a1a1a"}}>{blockDesc}</span>
                       <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:20,background:ss.bg,color:ss.color,border:`1px solid ${ss.border}`}}>{ss.label}</span>
                     </div>
-                    {logStatus && (log.achievedMeters || log.feeling || log.observations) && (
+                    {logStatus && (log.achievedMeters || log.feeling || log.observations || log.athleteVideoUrl) && (
                       <div style={{padding:"8px 14px",background: logStatus==="completed"?"#f8fdf8":logStatus==="partial"?"#fffbeb":"#fff5f5"}}>
+                        {log.athleteVideoUrl && (
+                          <div style={{marginBottom:8}}>
+                            <div style={{fontSize:10,fontWeight:800,color:"#2e7d32",letterSpacing:".06em",textTransform:"uppercase",marginBottom:5}}>📹 Athlete Video</div>
+                            <video src={log.athleteVideoUrl} controls style={{width:"100%",borderRadius:8,maxHeight:280}} />
+                          </div>
+                        )}
                         {log.achievedMeters && <div style={{fontSize:13,fontWeight:700,color:"#b94a00",marginBottom:4}}>🔥 {log.achievedMeters}m achieved</div>}
                         {log.feeling && <div style={{fontSize:12,color:"#555",marginBottom:2}}><span style={{color:"#aaa"}}>Feeling: </span>{log.feeling}</div>}
                         {log.observations && <div style={{fontSize:12,color:"#555"}}>{log.observations}</div>}

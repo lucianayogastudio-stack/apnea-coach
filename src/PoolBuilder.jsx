@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { supabase } from "./supabase";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DISCIPLINES = [
@@ -101,10 +102,13 @@ function EquipmentPicker({ selected, onChange, isClient, mini }) {
 
 // ── Block Card ────────────────────────────────────────────────────────────────
 function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
-  const [showLog,    setShowLog]    = useState(false);
-  const [showVideo,  setShowVideo]  = useState(false);
-  const [editVideo,  setEditVideo]  = useState(false);
-  const [videoInput, setVideoInput] = useState(block.videoUrl || "");
+  const [showLog,       setShowLog]       = useState(false);
+  const [showVideo,     setShowVideo]     = useState(false);
+  const [editVideo,     setEditVideo]     = useState(false);
+  const [videoInput,    setVideoInput]    = useState(block.videoUrl || "");
+  const [uploadingVid,  setUploadingVid]  = useState(false);
+  const [uploadError,   setUploadError]   = useState(null);
+  const videoFileRef = useRef(null);
 
   const disc = DISCIPLINES.find(d => d.key === block.discipline) || DISCIPLINES[0];
   const videoInfo = getVideoEmbed(block.videoUrl);
@@ -115,6 +119,34 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
   function updInterval(id, f, v) { onChange({ ...block, intervalSets: block.intervalSets.map(s => s.id === id ? { ...s, [f]: v } : s) }); }
   function addInterval() { onChange({ ...block, intervalSets: [...block.intervalSets, { id:uid(), reps:"", interval:"", rest:"" }] }); }
   function removeInterval(id) { if (block.intervalSets.length > 1) onChange({ ...block, intervalSets: block.intervalSets.filter(s => s.id !== id) }); }
+
+  async function handleVideoUpload(file) {
+    if (!file) return;
+    setUploadingVid(true);
+    setUploadError(null);
+    try {
+      // Compress video using canvas frame extraction isn't possible — 
+      // we'll upload directly but limit to 50MB and use a unique path
+      const maxMB = 50;
+      if (file.size > maxMB * 1024 * 1024) {
+        setUploadError(`Video too large (max ${maxMB}MB). Please trim it first.`);
+        setUploadingVid(false);
+        return;
+      }
+      const ext = file.name.split(".").pop() || "mp4";
+      const path = `pool-videos/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("session-videos")
+        .upload(path, file, { contentType: file.type, upsert: false });
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from("session-videos").getPublicUrl(path);
+      onChange({ ...block, log: { ...block.log, athleteVideoUrl: data.publicUrl, status: block.log?.status || null, done: block.log?.done || false } });
+      setShowVideo(true);
+    } catch(e) {
+      setUploadError("Upload failed — " + (e.message || "please try again"));
+    }
+    setUploadingVid(false);
+  }
 
   // Calculate total meters for display
   const calcMeters = () => {
@@ -198,8 +230,7 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
                   <button key={opt.status} title={opt.title}
                     onClick={() => {
                       const newStatus = active ? null : opt.status;
-                      updLog("status", newStatus);
-                      updLog("done", newStatus === "completed");
+                      onChange({ ...block, log: { ...block.log, status: newStatus, done: newStatus === "completed" } });
                       setShowLog(true);
                     }}
                     style={{
@@ -224,8 +255,27 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
               {showLog ? "Hide" : "Log"}
             </button>
           )}
-          <button onClick={() => { if (isClient && videoInfo) { setShowVideo(v => !v); } else if (!isClient) { setEditVideo(v => !v); } }}
-            style={{ padding:"4px 9px", borderRadius:6, border:"1.5px solid " + (block.videoUrl ? "#f4a96a" : "#e0e0e0"), background: (showVideo || editVideo) ? "#fff0e0" : "transparent", fontSize:11, color: block.videoUrl ? "#b85c00" : "#888", cursor:"pointer", fontFamily:"inherit" }}>Video</button>
+          {/* Video button — coach: paste link; athlete: upload video */}
+          {isClient ? (
+            <>
+              <input ref={videoFileRef} type="file" accept="video/*" style={{display:"none"}}
+                onChange={e => handleVideoUpload(e.target.files[0])} />
+              {block.log?.athleteVideoUrl ? (
+                <button onClick={() => setShowVideo(v => !v)}
+                  style={{ padding:"4px 9px", borderRadius:6, border:"1.5px solid #a5d6a7", background: showVideo ? "#e8f5e9" : "transparent", fontSize:11, color:"#2e7d32", fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>
+                  {showVideo ? "Hide Video" : "📹 Video"}
+                </button>
+              ) : (
+                <button onClick={() => videoFileRef.current?.click()} disabled={uploadingVid}
+                  style={{ padding:"4px 9px", borderRadius:6, border:"1.5px solid #e0e0e0", background:"transparent", fontSize:11, color: uploadingVid ? "#aaa" : "#888", cursor:"pointer", fontFamily:"inherit" }}>
+                  {uploadingVid ? "Uploading…" : "📹 Upload"}
+                </button>
+              )}
+            </>
+          ) : (
+            <button onClick={() => setEditVideo(v => !v)}
+              style={{ padding:"4px 9px", borderRadius:6, border:"1.5px solid " + (block.videoUrl ? "#f4a96a" : "#e0e0e0"), background: editVideo ? "#fff0e0" : "transparent", fontSize:11, color: block.videoUrl ? "#b85c00" : "#888", cursor:"pointer", fontFamily:"inherit" }}>Video</button>
+          )}
           {!isClient && (
             <button onClick={onRemove} style={{ padding:"4px 9px", borderRadius:6, border:"1.5px solid #e8c5c5", fontSize:11, cursor:"pointer", color:"#c0392b", fontFamily:"inherit" }}>x</button>
           )}
@@ -402,7 +452,7 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
         </div>
       </div>
 
-      {/* Video edit */}
+      {/* Video edit — coach pastes link */}
       {!isClient && editVideo && (
         <div style={{ padding:"8px 14px", borderTop:"1px solid #f5f5f5", background:"#fffaf5" }}>
           <div style={{ display:"flex", gap:7 }}>
@@ -412,12 +462,18 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
             <button onClick={() => { upd("videoUrl", videoInput); setEditVideo(false); }}
               style={{ background:"#f4803a", color:"#fff", border:"none", borderRadius:6, padding:"6px 12px", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>Save</button>
             {block.videoUrl && <button onClick={() => { setVideoInput(""); upd("videoUrl", ""); setEditVideo(false); }}
-              style={{ background:"transparent",color:"#1a1a1a", border:"1.5px solid #e8c5c5", borderRadius:6, padding:"6px 9px", fontSize:12, cursor:"pointer", color:"#c0392b", fontFamily:"inherit" }}>Remove</button>}
+              style={{ background:"transparent", border:"1.5px solid #e8c5c5", borderRadius:6, padding:"6px 9px", fontSize:12, cursor:"pointer", color:"#c0392b", fontFamily:"inherit" }}>Remove</button>}
           </div>
+          {/* Also show athlete video if present */}
+          {block.log?.athleteVideoUrl && (
+            <div style={{ marginTop:8, padding:"8px 10px", background:"#e8f5e9", borderRadius:8, fontSize:12, color:"#2e7d32", fontWeight:600 }}>
+              📹 Athlete uploaded a video — visible in completed session view
+            </div>
+          )}
         </div>
       )}
 
-      {/* Video view */}
+      {/* Coach video link — athlete watches */}
       {isClient && block.videoUrl && showVideo && (
         <div style={{ padding:"8px 14px", borderTop:"1px solid #f5f5f5" }}>
           {videoInfo && (videoInfo.type === "youtube" || videoInfo.type === "vimeo") && (
@@ -430,6 +486,23 @@ function BlockCard({ block, index, onChange, onRemove, isClient, poolLength }) {
       {isClient && block.videoUrl && !showVideo && (
         <div style={{ padding:"5px 14px", borderTop:"1px solid #f5f5f5" }}>
           <button onClick={() => setShowVideo(true)} style={{ background:"#fff5ee", border:"1px solid #f4a96a", borderRadius:6, padding:"4px 10px", fontSize:11, fontWeight:600, color:"#b85c00", cursor:"pointer", fontFamily:"inherit" }}>Watch video</button>
+        </div>
+      )}
+
+      {/* Athlete uploaded video — playback */}
+      {isClient && block.log?.athleteVideoUrl && showVideo && (
+        <div style={{ padding:"8px 14px", borderTop:"1px solid #f5f5f5" }}>
+          <div style={{ fontSize:10, fontWeight:700, color:"#2e7d32", letterSpacing:".06em", textTransform:"uppercase", marginBottom:6 }}>Your uploaded video</div>
+          <video src={block.log.athleteVideoUrl} controls style={{ width:"100%", borderRadius:8, maxHeight:300 }} />
+          <button onClick={() => onChange({ ...block, log: { ...block.log, athleteVideoUrl: null } })}
+            style={{ marginTop:6, background:"transparent", border:"1px solid #fca5a5", borderRadius:6, padding:"3px 8px", fontSize:11, color:"#c62828", cursor:"pointer", fontFamily:"inherit" }}>Remove video</button>
+        </div>
+      )}
+
+      {/* Upload error */}
+      {uploadError && (
+        <div style={{ padding:"6px 14px", borderTop:"1px solid #f5f5f5", background:"#fff5f5", fontSize:12, color:"#c62828" }}>
+          ⚠️ {uploadError}
         </div>
       )}
 
