@@ -1419,7 +1419,12 @@ export default function ApneaCoach() {
     } else {
       const {data:cr} = await supabase.from("clients").select("*").eq("id",p.client_id).single();
       const {data:sr} = await supabase.from("sessions").select("*, feedback(*)").eq("client_id",p.client_id).order("date");
-      if (cr) { setClients([dbToClient(cr)]); setActiveClient(dbToClient(cr)); setView("clientWeek"); }
+      if (cr) { 
+        const clientObj = dbToClient(cr);
+        setClients([clientObj]); 
+        setActiveClient(clientObj); 
+        setView("clientWeek"); 
+      }
       setSessions((sr||[]).map(dbToSession));
     }
   }
@@ -1433,17 +1438,16 @@ export default function ApneaCoach() {
       plan_start_date:form.planStartDate||null, competition_date:form.competitionDate||null, competition_name:form.competitionName||null,
       avatar_url: form.avatarUrl||null,
     }).eq("id", editClientModal.id);
-    if (!error) {
-      const updated = {...editClientModal, ...form, id:editClientModal.id,
-        planType:form.planType, planWeeks:form.planWeeks?Number(form.planWeeks):null,
-        planStartDate:form.planStartDate||null, competitionDate:form.competitionDate||null, competitionName:form.competitionName||null,
-        pb:{CWT:form.pb.CWT, STA:form.pb.STA, DYN:form.pb.DYN},
-        avatarUrl:form.avatarUrl||null};
-      setClients(prev=>prev.map(c=>c.id===editClientModal.id?updated:c));
-      if (activeClient?.id===editClientModal.id) setActiveClient(updated);
-      setEditClientModal(null);
-      flash("Client updated!");
-    }
+    if (error) throw new Error(error.message);
+    const updated = {...editClientModal, ...form, id:editClientModal.id,
+      planType:form.planType, planWeeks:form.planWeeks?Number(form.planWeeks):null,
+      planStartDate:form.planStartDate||null, competitionDate:form.competitionDate||null, competitionName:form.competitionName||null,
+      pb:{CWT:form.pb.CWT, STA:form.pb.STA, DYN:form.pb.DYN},
+      avatarUrl:form.avatarUrl||null};
+    setClients(prev=>prev.map(c=>c.id===editClientModal.id?updated:c));
+    if (activeClient?.id===editClientModal.id) setActiveClient(updated);
+    flash("Client updated!");
+    // Modal's onClose() will close via setEditClientModal(null)
   }
 
   // ── Admin: load all coaches + their clients ──
@@ -1480,23 +1484,19 @@ export default function ApneaCoach() {
       comp_name: form.competitionName || null,
     });
 
-    if (rpcError) { flash("Error: " + rpcError.message); return; }
+    if (rpcError) { flash("Error: " + rpcError.message); throw new Error(rpcError.message); }
 
-    // Supabase RPC returns the JSON directly in `result`
-    // result could be the json object itself or nested
+    // Optimistically update state with returned client row
     const clientRow = result?.client || (typeof result === 'object' && result?.id ? result : null);
-    
     if (clientRow) {
       setClients(prev => [...prev, dbToClient(clientRow)]);
     } else {
-      // Fallback: refetch with small delay to avoid timing issues
       setTimeout(async () => {
-        const { data: updatedClients } = await supabase.from("clients").select("*").eq("coach_id", user.id).order("created_at");
+        const { data: updatedClients } = await supabase.from("clients").select("*, profiles(email)").eq("coach_id", user.id).order("created_at");
         if (updatedClients) setClients(updatedClients.map(dbToClient));
       }, 500);
     }
 
-    // Log activity
     await supabase.from("activity_log").insert({
       event_type: "client_added", coach_email: user.email, coach_id: user.id,
       details: `Added client: ${form.name} (${form.email})`,
@@ -1524,12 +1524,13 @@ export default function ApneaCoach() {
   }
 
   async function deleteClient(id) {
-    // Delete sessions and feedback first, then client
+    // Delete feedback, sessions, profile, then client
     const clientSessions = sessions.filter(s=>s.clientId===id);
     for (const s of clientSessions) {
       await supabase.from("feedback").delete().eq("session_id", s.id);
     }
     await supabase.from("sessions").delete().eq("client_id", id);
+    await supabase.from("profiles").delete().eq("client_id", id);
     await supabase.from("clients").delete().eq("id", id);
     setClients(prev=>prev.filter(c=>c.id!==id));
     setSessions(prev=>prev.filter(s=>s.clientId!==id));
