@@ -1557,6 +1557,7 @@ export default function ApneaCoach() {
   const [pasteModal,     setPasteModal]     = useState(null); // {date, clientId}
   const [adminData,      setAdminData]      = useState(null); // {coaches, allClients}
   const [editClientModal, setEditClientModal] = useState(null); // client being edited
+  const [copyFromModal,  setCopyFromModal]  = useState(null); // clientId to copy from
 
   function flash(msg) { setToast(msg); setTimeout(()=>setToast(""),2400); }
 
@@ -2114,6 +2115,8 @@ export default function ApneaCoach() {
                 <TimelineBadge client={activeClient} />
               </div>
               <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>generateWeekPDF(weekDates, sessions.filter(s=>s.clientId===activeClient.id), activeClient.name, "")}
+                  style={{background:"#f0f0ec",border:"none",borderRadius:8,padding:"8px 13px",fontSize:12,fontWeight:600,color:"#555",cursor:"pointer",fontFamily:"inherit"}}>📄 PDF</button>
                 {[["‹ Prev",()=>setWeekStart(addDays(weekStart,-7))],["Today",()=>setWeekStart(mondayOf(new Date()))],["Next ›",()=>setWeekStart(addDays(weekStart,7))]].map(([l,fn])=>(
                   <button key={l} onClick={fn} style={{background:"transparent",color:"#1a1a1a",border:"1.5px solid #ddd",color:"#444",padding:"8px 13px",borderRadius:8,fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>{l}</button>
                 ))}
@@ -2133,6 +2136,50 @@ export default function ApneaCoach() {
               onCopySession={s=>handleCopySession(s)}
               onPasteDay={(iso,cid)=>handlePasteSession(iso,cid)}
               onClickAdd={(iso,sid,del)=>{ if(del){removeSession(sid);}else{setAssignModal(iso);} }} />
+
+            {/* This week completed summary */}
+            {(()=>{
+              const weekSessions = weekDates.flatMap(d=>sessions.filter(s=>s.clientId===activeClient.id&&s.date===toISO(d)));
+              const completedThisWeek = weekSessions.filter(s=>s.feedback?.status==="completed");
+              const needsReplyThisWeek = completedThisWeek.filter(s=>!s.feedback?.coachComment);
+              if (completedThisWeek.length===0) return null;
+              return (
+                <div style={{marginBottom:16}}>
+                  <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:10}}>
+                    This Week — Completed Sessions {needsReplyThisWeek.length>0&&<span style={{color:"#e65100",marginLeft:8}}>({needsReplyThisWeek.length} need reply)</span>}
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    {completedThisWeek.map(s=>{
+                      const m=gm(s.method);
+                      const hasReply=!!s.feedback?.coachComment;
+                      return(
+                        <div key={s.id} onClick={()=>setDayModal({session:s,role:"coach"})}
+                          style={{background:"#fff",borderRadius:10,border:`1.5px solid ${hasReply?"#a5d6a7":"#ffe082"}`,padding:"12px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,transition:"box-shadow .15s"}}
+                          onMouseEnter={e=>e.currentTarget.style.boxShadow="0 2px 10px rgba(0,0,0,.07)"}
+                          onMouseLeave={e=>e.currentTarget.style.boxShadow="none"}>
+                          <span style={{fontSize:20,flexShrink:0}}>{m.emoji}</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                              <span style={{fontWeight:600,fontSize:13}}>{s.plan?.gymData?.sessionName||m.label}</span>
+                              <span style={{fontSize:11,color:"#aaa"}}>{fmtFull(s.date)}</span>
+                            </div>
+                            {s.method==="depth"&&s.feedback?.actualDepth&&<div style={{fontSize:12,color:"#3a4df4",fontWeight:700,marginTop:2}}>↓ {s.feedback.actualDepth}m reached</div>}
+                            {s.feedback?.clientNotes&&<div style={{fontSize:11,color:"#888",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>"{s.feedback.clientNotes}"</div>}
+                          </div>
+                          <div style={{flexShrink:0,textAlign:"right"}}>
+                            {hasReply
+                              ? <span style={{fontSize:11,fontWeight:700,color:"#2e7d32",background:"#e8f5e9",padding:"3px 8px",borderRadius:20,border:"1px solid #a5d6a7"}}>✓ Replied</span>
+                              : <span style={{fontSize:11,fontWeight:700,color:"#e65100",background:"#fff8e1",padding:"3px 8px",borderRadius:20,border:"1px solid #ffe082"}}>Reply →</span>
+                            }
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:0}}>
               <div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div><div style={{fontWeight:600,fontSize:14}}>Switch to Client View</div><div style={{fontSize:12,color:"#999",marginTop:2}}>See what {activeClient.name.split(" ")[0]} sees</div></div>
@@ -2144,8 +2191,8 @@ export default function ApneaCoach() {
                 <select onChange={e=>{
                   const cid=e.target.value;
                   if(!cid) return;
-                  const clientSessions=sessions.filter(s=>s.clientId===cid).slice(0,5);
-                  if(clientSessions.length>0) handleCopySession(clientSessions[0]);
+                  setCopyFromModal(cid);
+                  e.target.value="";
                 }} style={{width:"100%",padding:"7px 10px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",background:"#fff",color:"#1a1a1a",cursor:"pointer"}}>
                   <option value="">Select client to copy from...</option>
                   {clients.filter(c=>c.id!==activeClient.id).map(c=>(
@@ -2453,7 +2500,64 @@ export default function ApneaCoach() {
           </div>
         </div>
       )}
+      {copyFromModal&&(
+        <CopyFromModal
+          sessions={sessions.filter(s=>s.clientId===copyFromModal).sort((a,b)=>b.date.localeCompare(a.date))}
+          clientName={clients.find(c=>c.id===copyFromModal)?.name||""}
+          onClose={()=>setCopyFromModal(null)}
+          onCopy={s=>{ handleCopySession(s); setCopyFromModal(null); flash("Session copied! Click Paste on any day."); }}
+        />
+      )}
       {toast&&<div style={{position:"fixed",bottom:24,right:24,background:"#1a1a1a",color:"#fff",padding:"12px 20px",borderRadius:10,fontSize:13,fontWeight:500,zIndex:999,animation:"fi .2s"}}>✓ {toast}<style>{`@keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style></div>}
+    </div>
+  );
+}
+
+// ── Copy From Client Modal ────────────────────────────────────────────────────
+function CopyFromModal({ sessions, clientName, onClose, onCopy }) {
+  const [filter, setFilter] = useState("");
+  const filtered = sessions.filter(s=>{
+    if (!filter) return true;
+    const name = s.plan?.gymData?.sessionName || s.plan?.mainSet || s.method;
+    return name?.toLowerCase().includes(filter.toLowerCase()) || s.method.toLowerCase().includes(filter.toLowerCase());
+  });
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{background:"#fff",borderRadius:16,padding:"24px",maxWidth:540,width:"100%",maxHeight:"80vh",display:"flex",flexDirection:"column",boxShadow:"0 20px 60px rgba(0,0,0,.2)"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+          <div>
+            <div style={{fontWeight:700,fontSize:17}}>Copy from {clientName}</div>
+            <div style={{fontSize:12,color:"#aaa",marginTop:2}}>{sessions.length} sessions — pick one to copy</div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,color:"#aaa",cursor:"pointer",lineHeight:1}}>×</button>
+        </div>
+        <input
+          placeholder="Search sessions…"
+          value={filter} onChange={e=>setFilter(e.target.value)}
+          style={{width:"100%",padding:"9px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:13,fontFamily:"inherit",outline:"none",marginBottom:12,boxSizing:"border-box"}}
+        />
+        <div style={{overflowY:"auto",flex:1,display:"flex",flexDirection:"column",gap:8}}>
+          {filtered.length===0&&<div style={{textAlign:"center",color:"#bbb",padding:32,fontSize:14}}>No sessions found</div>}
+          {filtered.map(s=>{
+            const m=gm(s.method);
+            const name=s.plan?.gymData?.sessionName||s.plan?.gymData?.name||null;
+            const sub=s.plan?.mainSet||(s.method==="depth"&&s.plan?.gymData?.dives?`${s.plan.gymData.dives.length} dives`:null)||(s.plan?.gymData?.sections?`${s.plan.gymData.sections?.reduce((a,sec)=>a+(sec.blocks?.reduce((b,bl)=>b+(bl.exercises?.length||0),0)||0),0)} exercises`:null);
+            return (
+              <div key={s.id} onClick={()=>onCopy(s)}
+                style={{background:"#fafaf8",borderRadius:10,border:"1.5px solid #ebebeb",borderLeft:`3px solid ${m.dot}`,padding:"12px 14px",cursor:"pointer",transition:"all .12s"}}
+                onMouseEnter={e=>{e.currentTarget.style.background="#f0f0ec";e.currentTarget.style.borderColor=m.dot;}}
+                onMouseLeave={e=>{e.currentTarget.style.background="#fafaf8";e.currentTarget.style.borderColor="#ebebeb";}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                  <span style={{fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`,padding:"2px 8px",borderRadius:20}}>{m.emoji} {m.label}</span>
+                  <span style={{fontSize:11,color:"#bbb"}}>{fmtFull(s.date)}</span>
+                </div>
+                {name&&<div style={{fontSize:13,fontWeight:600,color:"#1a1a1a"}}>{name}</div>}
+                {sub&&<div style={{fontSize:12,color:"#888",marginTop:2,lineHeight:1.5}}>{sub}</div>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
