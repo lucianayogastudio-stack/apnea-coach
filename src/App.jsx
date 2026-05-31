@@ -1535,6 +1535,7 @@ function WeekGrid({ weekDates, clientId, sessions, onClickSession, onClickAdd, o
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 const ADMIN_EMAIL = "lucianafreediver@gmail.com"; // only this user can create coaches
+const DEFAULT_WELCOME = "Hi {{athlete_name}}, welcome to your training hub! I will plan your sessions here each week. You'll see your workouts on the calendar above — tap any session to open it, log your results, and leave notes for me. Your progress charts will build up over time. Any questions, I'm just a message away. Let's go!\n\n— {{coach_name}}";
 
 export default function ApneaCoach() {
   const [user,     setUser]     = useState(null);
@@ -1562,6 +1563,9 @@ export default function ApneaCoach() {
   const [lastSeenAt, setLastSeenAt] = useState(() => {
     try { return localStorage.getItem("apnea_lastSeen") || new Date(0).toISOString(); } catch { return new Date(0).toISOString(); }
   });
+  const [welcomeMessage, setWelcomeMessage] = useState(""); // coach's global welcome message
+  const [editingWelcome, setEditingWelcome] = useState(false);
+  const [savingWelcome, setSavingWelcome] = useState(false);
 
   function markAllSeen() {
     const now = new Date().toISOString();
@@ -1600,6 +1604,7 @@ export default function ApneaCoach() {
   async function loadProfile(u) {
     const {data} = await supabase.from("profiles").select("*").eq("id",u.id).single();
     setProfile(data);
+    if (data?.welcome_message) setWelcomeMessage(data.welcome_message);
     await loadAll(data, u);
     if (u.email === ADMIN_EMAIL) await loadAdminData();
     else if (data?.role === "coach") {
@@ -1644,6 +1649,22 @@ export default function ApneaCoach() {
       }
       setSessions((sr||[]).map(dbToSession));
     }
+  }
+
+  // ── Welcome message ──
+  function resolveWelcome(athleteName) {
+    const coachName = (profile?.email||"").split("@")[0].replace(/[._]/g," ").replace(/\b\w/g,c=>c.toUpperCase());
+    const msg = welcomeMessage || DEFAULT_WELCOME;
+    return msg.replace(/\{\{athlete_name\}\}/g, athleteName?.split(" ")[0]||"").replace(/\{\{coach_name\}\}/g, coachName);
+  }
+
+  async function saveWelcomeMessage(msg) {
+    setSavingWelcome(true);
+    await supabase.from("profiles").update({welcome_message: msg||null}).eq("id", user.id);
+    setWelcomeMessage(msg);
+    setSavingWelcome(false);
+    setEditingWelcome(false);
+    flash("Welcome message saved!");
   }
 
   // ── Coach notes ──
@@ -2033,10 +2054,59 @@ export default function ApneaCoach() {
                 </div>
               </div>
             )}
+
+            {/* Welcome message editor */}
+            <div style={{marginTop:32}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>💬 Welcome message to athletes</div>
+                  <div style={{fontSize:11,color:"#aaa",marginTop:2}}>Shown at the bottom of every athlete's week view</div>
+                </div>
+                {!editingWelcome && (
+                  <button onClick={()=>setEditingWelcome(true)}
+                    style={{background:"transparent",border:"1.5px solid #ddd",color:"#555",padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+                    ✏️ Edit
+                  </button>
+                )}
+              </div>
+              {!editingWelcome ? (
+                <div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",borderLeft:"3px solid #3a8ef4",padding:"16px 18px"}}>
+                  <div style={{fontSize:13,color:"#555",lineHeight:1.75,whiteSpace:"pre-wrap"}}>
+                    {(welcomeMessage||DEFAULT_WELCOME)
+                      .replace(/\{\{athlete_name\}\}/g,"[athlete name]")
+                      .replace(/\{\{coach_name\}\}/g, (profile?.email||"").split("@")[0].replace(/[._]/g," ").replace(/\b\w/g,c=>c.toUpperCase()))}
+                  </div>
+                </div>
+              ) : (
+                <div style={{background:"#fff",borderRadius:12,border:"1.5px solid #3a8ef4",padding:"16px 18px"}}>
+                  <div style={{background:"#f0f7ff",borderRadius:8,padding:"8px 12px",marginBottom:10,fontSize:12,color:"#005fa3"}}>
+                    <strong>Placeholders:</strong> use <code style={{background:"#dbeafe",padding:"1px 5px",borderRadius:4}}>{"{{athlete_name}}"}</code> and <code style={{background:"#dbeafe",padding:"1px 5px",borderRadius:4}}>{"{{coach_name}}"}</code> — they get replaced automatically for each athlete.
+                  </div>
+                  <textarea
+                    value={welcomeMessage||DEFAULT_WELCOME}
+                    onChange={e=>setWelcomeMessage(e.target.value)}
+                    rows={7}
+                    style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:13,fontFamily:"inherit",outline:"none",resize:"vertical",color:"#1a1a1a",lineHeight:1.7,boxSizing:"border-box"}}
+                  />
+                  <div style={{display:"flex",gap:8,marginTop:10}}>
+                    <button onClick={()=>saveWelcomeMessage(welcomeMessage)} disabled={savingWelcome}
+                      style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"8px 18px",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:savingWelcome?0.6:1}}>
+                      {savingWelcome?"Saving…":"Save message"}
+                    </button>
+                    <button onClick={()=>{setWelcomeMessage(DEFAULT_WELCOME);}}
+                      style={{background:"transparent",color:"#888",border:"1.5px solid #e0e0e0",padding:"8px 14px",borderRadius:8,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                      Reset to default
+                    </button>
+                    <button onClick={()=>{setEditingWelcome(false); setWelcomeMessage(welcomeMessage);}}
+                      style={{background:"transparent",color:"#aaa",border:"none",padding:"8px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
-
-        {/* ADMIN VIEW */}
         {view==="adminView"&&isAdmin&&(
           <div>
             <div style={{marginBottom:24}}>
@@ -2559,6 +2629,29 @@ export default function ApneaCoach() {
                 <ProgressCharts sessions={sessions.filter(s=>s.clientId===activeClient.id)} clientName={activeClient.name} />
               </div>
             )}
+
+            {/* Welcome message from coach — always visible at bottom */}
+            {(()=>{
+              const msg = resolveWelcome(activeClient.name);
+              const lines = msg.split("\n").filter(l=>l.trim());
+              const bodyLines = lines.slice(0,-1);
+              const signatureLine = lines[lines.length-1];
+              return (
+                <div style={{background:"#fff",borderRadius:14,border:"1px solid #ebebeb",borderLeft:"3px solid #3a8ef4",padding:"18px 22px",marginTop:8,marginBottom:8}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+                    <div style={{width:36,height:36,borderRadius:"50%",background:"#e8f0ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>🤿</div>
+                    <div>
+                      <div style={{fontWeight:600,fontSize:15,color:"#1a1a1a"}}>{lines[0]}</div>
+                      <div style={{fontSize:11,color:"#aaa",marginTop:1}}>From your coach</div>
+                    </div>
+                  </div>
+                  <div style={{fontSize:13,color:"#555",lineHeight:1.75}}>
+                    {bodyLines.slice(1).map((l,i)=><p key={i} style={{margin:"0 0 6px"}}>{l}</p>)}
+                  </div>
+                  {signatureLine && <div style={{fontSize:13,fontWeight:500,color:"#1a1a1a",marginTop:10,fontStyle:"italic"}}>{signatureLine}</div>}
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
