@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase";
-import GymStrengthBuilder, { CompletedGymSessionView } from "./GymStrengthBuilder";
+import GymStrengthBuilder from "./GymStrengthBuilder";
 import StaticBuilder from "./StaticBuilder";
 import PoolTechniqueBuilder from "./PoolTechniqueBuilder";
 import PoolBuilder from "./PoolBuilder";
-import DepthBuilder, { CompletedDepthSessionView } from "./DepthBuilder";
+import DepthBuilder from "./DepthBuilder";
 import DryEqBuilder from "./DryEqBuilder";
 import ProgressCharts from "./ProgressCharts";
 import MobilityBuilder from "./MobilityBuilder";
@@ -392,18 +392,9 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
 
         {showCompletedView ? (
           <>
-            <CompletedDepthSessionView coachPlan={session.plan?.gymData} clientLog={clientLog} />
+            <CompletedSessionView method="depth" coachPlan={session.plan?.gymData} clientLog={clientLog} onReply={v=>setFb(p=>({...p,coachComment:v}))} coachComment={fb.coachComment||""} saving={saving} onSave={async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}} />
             {/* Coach reply */}
-            <div style={{marginTop:16,borderTop:"1.5px solid #f0f0f0",paddingTop:16}}>
-              <div style={{fontSize:12,fontWeight:600,color:"#555",marginBottom:6}}>Reply to athlete</div>
-              <textarea value={fb.coachComment||""} onChange={e=>setFb(p=>({...p,coachComment:e.target.value}))}
-                placeholder="Leave feedback, encouragement or adjustments for next session..."
-                style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",resize:"vertical",minHeight:80,color:"#1a1a1a",background:"#fff",marginBottom:10}}/>
-              <button onClick={async()=>{setSaving(true);await onSave({...fb});setSaving(false);onClose();}} disabled={saving}
-                style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"10px 20px",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:saving?0.6:1}}>
-                {saving?"Saving...":"Save Reply"}
-              </button>
-            </div>
+
           </>
         ) : (
           <DepthBuilder

@@ -262,6 +262,82 @@ export default function CompletedSessionView({ method, coachPlan, clientLog, onR
     );
   }
 
+  // ── DEPTH ─────────────────────────────────────────────────────────────────
+  if (method === "depth") {
+    const DISC_COLORS = {
+      CWT:{bg:"#e8f0ff",color:"#1a2fa3",border:"#6a7ef4"},
+      CWTB:{bg:"#e6f4ff",color:"#005fa3",border:"#6ab0f4"},
+      CNF:{bg:"#edf6e6",color:"#2d7a2d",border:"#7ec87e"},
+      FIM:{bg:"#fffbe6",color:"#7a6200",border:"#e8cc4d"},
+      MONO:{bg:"#fdf0fb",color:"#8b1f7a",border:"#d97ec8"},
+      DRILL:{bg:"#f5f4f0",color:"#555",border:"#ccc"},
+    };
+    const dives = coachPlan?.dives || [];
+    const loggedDives = clientLog?.dives || [];
+    return (
+      <div style={{fontFamily:"'DM Sans','Helvetica Neue',sans-serif"}}>
+        <SessionHeader coachPlan={coachPlan} clientLog={clientLog} energyLabels={energyLabels} />
+        <div style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".07em",textTransform:"uppercase",marginBottom:10}}>Dives</div>
+        {dives.map((dive, i) => {
+          const disc = DISC_COLORS[dive.discipline] || DISC_COLORS.DRILL;
+          const logged = loggedDives.find(l=>l.id===dive.id) || dive;
+          const log = logged.log || {};
+          const statusStyles = {
+            completed:{label:"✓ Completed",bg:"#e8f5e9",color:"#2e7d32",border:"#a5d6a7"},
+            "early-turn":{label:"↩ Early turn",bg:"#fff8e1",color:"#e65100",border:"#ffcc02"},
+            missed:{label:"✗ Missed",bg:"#fff5f5",color:"#c62828",border:"#ef9a9a"},
+          };
+          const ss = statusStyles[log.status] || {label:"Not logged",bg:"#f5f4f0",color:"#aaa",border:"#ddd"};
+          return (
+            <div key={dive.id} style={{background:"#fff",borderRadius:12,border:"1.5px solid #ebebeb",marginBottom:10,overflow:"hidden"}}>
+              <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",borderBottom:"1px solid #f5f5f5"}}>
+                <span style={{fontSize:12,fontWeight:700,color:"#bbb"}}>#{i+1}</span>
+                <span style={{padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:700,background:disc.bg,color:disc.color,border:"1px solid "+disc.border}}>{dive.discipline}</span>
+                <span style={{fontSize:11,color:"#888",background:"#f5f4f0",padding:"2px 8px",borderRadius:6,fontWeight:600}}>{dive.lungVolume}</span>
+                <span style={{fontWeight:700,fontSize:15,color:"#1a2fa3"}}>{dive.openLine?"Open"+(dive.openLineMax?" (max "+dive.openLineMax+"m)":""):dive.targetDepth?dive.targetDepth+"m":"—"}</span>
+                {dive.hang&&<span style={{padding:"2px 8px",borderRadius:6,fontSize:11,fontWeight:700,background:"#fffbe6",color:"#7a6200",border:"1px solid #e8cc4d"}}>⏱ {dive.hang}s hang</span>}
+                <span style={{marginLeft:"auto",padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:700,background:ss.bg,color:ss.color,border:"1px solid "+ss.border}}>{ss.label}</span>
+              </div>
+              {(dive.coachNotes||dive.drillNotes)&&(
+                <div style={{padding:"10px 14px",background:"#fffbe6",borderBottom:"1px solid #f5f5f5"}}>
+                  <div style={{fontSize:10,fontWeight:800,color:"#a07a00",letterSpacing:".06em",textTransform:"uppercase",marginBottom:4}}>📋 Coach Instructions</div>
+                  <div style={{fontSize:13,color:"#5a4800",lineHeight:1.7}}>{dive.coachNotes||dive.drillNotes}</div>
+                </div>
+              )}
+              {log.status&&(
+                <div style={{padding:"10px 14px",background:"#f8fdf8"}}>
+                  <div style={{fontSize:10,fontWeight:800,color:"#2e7d32",letterSpacing:".06em",textTransform:"uppercase",marginBottom:6}}>🌊 Athlete Execution</div>
+                  <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:13}}>
+                    {log.actualDepth&&<span><span style={{color:"#aaa",fontSize:11}}>Depth: </span><strong>{log.actualDepth}m</strong></span>}
+                    {log.turnDepth&&<span><span style={{color:"#aaa",fontSize:11}}>Turned at: </span><strong>{log.turnDepth}m</strong></span>}
+                    {log.diveTime&&<span><span style={{color:"#aaa",fontSize:11}}>Time: </span><strong>{log.diveTime}</strong></span>}
+                  </div>
+                  {log.reason&&<div style={{fontSize:13,color:"#555",marginTop:6,lineHeight:1.6}}>{log.reason}</div>}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {clientLog?.incident&&typeof clientLog.incident==="object"&&clientLog.incident.types?.length>0&&(
+          <div style={{background:"#fff5f5",border:"2px solid #ef5350",borderRadius:10,padding:"14px 16px",marginBottom:14}}>
+            <div style={{fontSize:12,fontWeight:800,color:"#c62828",letterSpacing:".06em",textTransform:"uppercase",marginBottom:8}}>🚨 Incident Report</div>
+            {[{key:"lung_squeeze",label:"Lung Squeeze"},{key:"trachea_squeeze",label:"Trachea Squeeze"},{key:"samba",label:"Samba / LMC"},{key:"uw_blackout",label:"Underwater Blackout"},{key:"surface_blackout",label:"Surface Blackout"}]
+              .filter(i=>clientLog.incident.types.includes(i.key)).map(i=>(
+              <div key={i.key} style={{marginBottom:4}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#c62828"}}>• {i.label}</div>
+                {i.key==="uw_blackout"&&clientLog.incident.details?.uw_depth&&<div style={{fontSize:12,color:"#555",marginLeft:14}}>Depth: {clientLog.incident.details.uw_depth}m · Unconscious: {clientLog.incident.details.uw_seconds||"?"}s</div>}
+                {i.key==="surface_blackout"&&clientLog.incident.details?.surface_seconds&&<div style={{fontSize:12,color:"#555",marginLeft:14}}>Unconscious: {clientLog.incident.details.surface_seconds}s</div>}
+              </div>
+            ))}
+            {clientLog.incident.notes&&<div style={{fontSize:13,color:"#555",marginTop:8,paddingTop:8,borderTop:"1px solid #ef9a9a",lineHeight:1.6}}>{clientLog.incident.notes}</div>}
+          </div>
+        )}
+        <AthleteNotes clientLog={clientLog} energyLabels={energyLabels} />
+        <CoachReply coachComment={coachComment} onReply={onReply} saving={saving} onSave={onSave} />
+      </div>
+    );
+  }
+
   return null;
 }
 
