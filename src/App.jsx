@@ -162,9 +162,9 @@ function LoginScreen() {
 // ── Shared UI ─────────────────────────────────────────────────────────────────
 function Modal({ children, onClose, wide }) {
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflowY:"auto"}}
+    <div className="modal-overlay" style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflowY:"auto"}}
       onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={{background:"#fff",borderRadius:16,padding:32,width:"100%",maxWidth:wide?700:480,maxHeight:"92vh",overflowY:"auto",position:"relative",boxShadow:"0 24px 64px rgba(0,0,0,.18)"}}>
+      <div className="modal-box" style={{background:"#fff",borderRadius:16,padding:32,width:"100%",maxWidth:wide?700:480,maxHeight:"92vh",overflowY:"auto",position:"relative",boxShadow:"0 24px 64px rgba(0,0,0,.18)"}}>
         <button onClick={onClose} style={{position:"absolute",top:16,right:18,background:"none",border:"none",fontSize:22,color:"#bbb",cursor:"pointer",lineHeight:1}}>×</button>
         {children}
       </div>
@@ -1456,7 +1456,7 @@ function WeekGrid({ weekDates, clientId, sessions, onClickSession, onClickAdd, o
   const [draggingId,  setDraggingId]  = useState(null);
 
   return (
-    <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:10,marginBottom:24}}>
+    <div className="week-grid" style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:10,marginBottom:24}}>
       {weekDates.map((d,di)=>{
         const iso=toISO(d), isToday=iso===toISO(new Date());
         const daySessions=sessions.filter(s=>s.clientId===clientId&&s.date===iso);
@@ -1995,8 +1995,8 @@ export default function ApneaCoach() {
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');*{box-sizing:border-box;margin:0;padding:0}`}</style>
 
       {/* Header */}
-      <div style={{background:"#fff",borderBottom:"1px solid #ebebeb",padding:"0 24px"}}>
-        <div style={{maxWidth:1040,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
+      <div className="nav-bar" style={{background:"#fff",borderBottom:"1px solid #ebebeb",padding:"0 24px"}}>
+        <div className="nav-inner" style={{maxWidth:1040,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
           <div style={{display:"flex",alignItems:"center",gap:20}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <span style={{fontSize:20}}>🤿</span>
@@ -2012,17 +2012,18 @@ export default function ApneaCoach() {
                 ).length : 0;
 
                 return [
-                  {key:"dashboard", label: profile?.role==="client" ? "📊 Dashboard" : "📋 Dashboard", badge: isCoach && newCompletions > 0 ? newCompletions : 0},
-                  ...(isAdmin?[{key:"adminView",label:"👑 Admin",badge:0}]:[]),
-                  ...(isCoach&&activeClient?[{key:"coachWeek",label:`📅 ${activeClient.name.split(" ")[0]}'s Week`,badge:0},{key:"clientWeek",label:"🏊 Client View",badge:0}]:[]),
-                  ...(profile?.role==="client"?[{key:"clientWeek",label:"📅 My Week",badge:0}]:[])
+                  {key:"dashboard", emoji:"📋", label: profile?.role==="client" ? "Dashboard" : "Dashboard", badge: isCoach && newCompletions > 0 ? newCompletions : 0},
+                  ...(isAdmin?[{key:"adminView", emoji:"👑", label:"Admin", badge:0}]:[]),
+                  ...(isCoach&&activeClient?[{key:"coachWeek", emoji:"📅", label:`${activeClient.name.split(" ")[0]}'s Week`, badge:0},{key:"clientWeek", emoji:"🏊", label:"Client View", badge:0}]:[]),
+                  ...(profile?.role==="client"?[{key:"clientWeek", emoji:"📅", label:"My Week", badge:0}]:[])
                 ].map(t=>(
                   <button key={t.key} onClick={()=>{
                     if(profile?.role==="client"&&!activeClient&&clients[0]) setActiveClient(clients[0]);
                     setView(t.key);
                     if(t.key==="dashboard"&&isCoach) markAllSeen();
-                  }} style={{padding:"8px 15px",borderRadius:8,border:"none",fontSize:13,cursor:"pointer",fontFamily:"inherit",transition:"all .15s",background:view===t.key?"#f0f0ec":"transparent",color:view===t.key?"#1a1a1a":"#888",fontWeight:view===t.key?600:500,position:"relative"}}>
-                    {t.label}
+                  }} style={{padding:"8px 12px",borderRadius:8,border:"none",fontSize:13,cursor:"pointer",fontFamily:"inherit",transition:"all .15s",background:view===t.key?"#f0f0ec":"transparent",color:view===t.key?"#1a1a1a":"#888",fontWeight:view===t.key?600:500,position:"relative",display:"flex",alignItems:"center",gap:5}}>
+                    <span>{t.emoji}</span>
+                    <span className="nav-label">{t.label}</span>
                     {t.badge > 0 && (
                       <span style={{position:"absolute",top:3,right:3,background:"#ef5350",color:"#fff",borderRadius:"50%",width:16,height:16,fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>
                         {t.badge > 9 ? "9+" : t.badge}
@@ -2033,17 +2034,17 @@ export default function ApneaCoach() {
               })()}
             </div>
           </div>
-          <div style={{display:"flex",gap:10,alignItems:"center"}}>
-            <div style={{fontSize:12,color:"#aaa",fontWeight:500}}>{user.email}</div>
-            {isCoach&&activeClient&&view!=="dashboard"&&<button onClick={()=>{setActiveClient(null);setView("dashboard");}} style={{background:"transparent",color:"#1a1a1a",border:"1.5px solid #ddd",color:"#666",padding:"8px 14px",borderRadius:8,fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>← All Clients</button>}
-            {isCoach&&<button onClick={()=>setAddClientModal(true)} style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"10px 18px",borderRadius:8,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>+ Add Client</button>}
-            {isAdmin&&<button onClick={()=>setAddCoachModal(true)} style={{background:"#3a8ef4",color:"#fff",border:"none",padding:"10px 18px",borderRadius:8,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>+ Add Coach</button>}
-            <button onClick={handleSignOut} style={{background:"transparent",color:"#1a1a1a",border:"1.5px solid #ddd",color:"#666",padding:"8px 14px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Sign Out</button>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <div className="nav-label" style={{fontSize:12,color:"#aaa",fontWeight:500}}>{user.email}</div>
+            {isCoach&&activeClient&&view!=="dashboard"&&<button onClick={()=>{setActiveClient(null);setView("dashboard");}} style={{background:"transparent",border:"1.5px solid #ddd",color:"#666",padding:"8px 12px",borderRadius:8,fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>← <span className="nav-label">All Clients</span></button>}
+            {isCoach&&<button onClick={()=>setAddClientModal(true)} style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"9px 14px",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>+ <span className="nav-label">Add Client</span></button>}
+            {isAdmin&&<button onClick={()=>setAddCoachModal(true)} style={{background:"#3a8ef4",color:"#fff",border:"none",padding:"9px 14px",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>+ <span className="nav-label">Add Coach</span></button>}
+            <button onClick={handleSignOut} style={{background:"transparent",border:"1.5px solid #ddd",color:"#666",padding:"8px 12px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}><span className="nav-label">Sign Out</span><span style={{display:"none"}} className="nav-icon">⎋</span></button>
           </div>
         </div>
       </div>
 
-      <div style={{maxWidth:1040,margin:"0 auto",padding:"28px 24px"}}>
+      <div className="main-content" style={{maxWidth:1040,margin:"0 auto",padding:"28px 24px"}}>
 
         {/* DASHBOARD */}
         {view==="dashboard"&&(isCoach||isAdmin)&&(
