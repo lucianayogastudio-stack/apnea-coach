@@ -239,9 +239,13 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate }) {
       await onSave({ ...fb, gymData: data });
       setSaving(false);
       setIsDirty(false);
-      setIsEditing(false);
-      if (onSaveTemplate) setSaveTemplateModal({ method, gymData: data });
-      else onClose();
+      // Show template save dialog — it handles closing the modal
+      if (onSaveTemplate) {
+        setIsEditing(false);
+        setSaveTemplateModal({ method, gymData: data });
+      } else {
+        onClose();
+      }
     };
   }
 
@@ -2021,7 +2025,12 @@ export default function ApneaCoach() {
     },{onConflict:"session_id"});
     if (!error) {
       setSessions(prev=>prev.map(s=>s.id===sessionId?{...s,feedback:{...fb, clientGymData: fb.gymData || s.feedback?.clientGymData, gymData: undefined}}:s));
-      setDayModal(null); flash("Feedback saved!");
+      // Only close modal and flash here for athlete saves (status set) or non-gymData saves
+      // For coach plan saves (gymData present, no status), coachSave() handles closing after template dialog
+      const isCoachPlanSave = fb.gymData && !fb.status;
+      if (!isCoachPlanSave) {
+        setDayModal(null); flash("Saved!");
+      }
 
       // ── PB detection ──
       const session = sessions.find(s=>s.id===sessionId);
