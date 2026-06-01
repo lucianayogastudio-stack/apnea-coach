@@ -87,32 +87,72 @@ export default function CompletedSessionView({ method, coachPlan, clientLog, onR
     const drills = coachPlan?.drills || [];
     const clientDrills = clientLog?.drills || drills;
     const selfLabels = ["","Didn't feel it 😕","Slight feeling 🤔","Getting it 😐","Felt good 🙂","Clicked! 🎯"];
+    const ssMap = {
+      completed:{label:"✓ Completed",bg:"#e8f5e9",color:"#2e7d32",border:"#a5d6a7",logBg:"#f8fdf8"},
+      partial:  {label:"~ Partial",  bg:"#fffbeb",color:"#b45309",border:"#fcd34d",logBg:"#fffbeb"},
+      skipped:  {label:"✗ Skipped",  bg:"#fff5f5",color:"#c62828",border:"#fca5a5",logBg:"#fff5f5"},
+    };
+
+    const totalDrills = drills.length;
+    const doneDrills = clientDrills.filter(d => d.log?.status==="completed"||(d.log?.done&&!d.log?.status)).length;
+    const partialDrills = clientDrills.filter(d => d.log?.status==="partial").length;
+    const skippedDrills = clientDrills.filter(d => d.log?.status==="skipped").length;
 
     return (
       <div style={{fontFamily:"'DM Sans','Helvetica Neue',sans-serif"}}>
         <SessionHeader coachPlan={coachPlan} clientLog={clientLog} energyLabels={energyLabels} />
 
+        {/* Summary bar */}
+        {totalDrills > 0 && (
+          <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+            {doneDrills > 0 && <span style={{fontSize:12,fontWeight:700,padding:"4px 10px",borderRadius:20,background:"#e8f5e9",color:"#2e7d32",border:"1px solid #a5d6a7"}}>✓ {doneDrills} completed</span>}
+            {partialDrills > 0 && <span style={{fontSize:12,fontWeight:700,padding:"4px 10px",borderRadius:20,background:"#fffbeb",color:"#b45309",border:"1px solid #fcd34d"}}>~ {partialDrills} partial</span>}
+            {skippedDrills > 0 && <span style={{fontSize:12,fontWeight:700,padding:"4px 10px",borderRadius:20,background:"#fff5f5",color:"#c62828",border:"1px solid #fca5a5"}}>✗ {skippedDrills} skipped</span>}
+            {(doneDrills+partialDrills+skippedDrills)===0 && <span style={{fontSize:12,color:"#aaa"}}>No drills logged yet</span>}
+          </div>
+        )}
+
         <div style={{fontSize:11,fontWeight:800,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:10}}>Drills</div>
         {drills.map((drill, i) => {
           const clientDrill = clientDrills.find(d=>d.id===drill.id) || clientDrills[i] || drill;
           const log = clientDrill.log || {};
+          const logStatus = log.status || (log.done ? "completed" : null);
+          const ss = ssMap[logStatus] || {label:"Not logged",bg:"#f5f4f0",color:"#aaa",border:"#ddd",logBg:"#f8f8f6"};
           return (
-            <div key={drill.id||i} style={{background:"#fff",borderRadius:12,border:`1.5px solid ${log.done?"#a5d6a7":"#ebebeb"}`,marginBottom:10,overflow:"hidden"}}>
-              <div style={{padding:"10px 14px",borderBottom:"1px solid #f5f5f5",display:"flex",alignItems:"center",gap:10}}>
-                <span style={{fontWeight:700,fontSize:14,flex:1}}>{drill.name||drill.technique}</span>
-                <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,background:log.done?"#e8f5e9":"#f5f4f0",color:log.done?"#2e7d32":"#aaa",border:`1px solid ${log.done?"#a5d6a7":"#ddd"}`}}>{log.done?"✓ Done":"Not done"}</span>
+            <div key={drill.id||i} style={{background:"#fff",borderRadius:12,border:`1.5px solid ${logStatus?ss.border:"#ebebeb"}`,marginBottom:10,overflow:"hidden"}}>
+              {/* Header */}
+              <div style={{padding:"10px 14px",borderBottom:"1px solid #f5f5f5",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:14,color:"#1a1a1a"}}>{drill.name||drill.technique}</div>
+                  <div style={{display:"flex",gap:8,marginTop:3,flexWrap:"wrap"}}>
+                    {drill.technique && <span style={{fontSize:11,color:"#888"}}>{drill.technique}</span>}
+                    {drill.reps && <span style={{fontSize:11,color:"#888"}}>{drill.reps} reps</span>}
+                    {drill.duration && <span style={{fontSize:11,color:"#888"}}>{drill.duration}</span>}
+                  </div>
+                </div>
+                <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,background:ss.bg,color:ss.color,border:`1px solid ${ss.border}`,flexShrink:0}}>{ss.label}</span>
               </div>
+              {/* Coach instructions */}
               {drill.description && (
                 <div style={{padding:"10px 14px",background:"#fffbe6",borderBottom:"1px solid #f5f5f5"}}>
                   <div style={{fontSize:10,fontWeight:800,color:"#a07a00",letterSpacing:".06em",textTransform:"uppercase",marginBottom:4}}>Coach Instructions</div>
                   <div style={{fontSize:13,color:"#5a4800",lineHeight:1.7}}>{drill.description}</div>
                 </div>
               )}
-              {log.done && (
-                <div style={{padding:"10px 14px",background:"#f8fdf8"}}>
-                  <div style={{fontSize:10,fontWeight:800,color:"#2e7d32",letterSpacing:".06em",textTransform:"uppercase",marginBottom:6}}>Athlete Log</div>
-                  {log.selfAssessment && <div style={{fontSize:13,marginBottom:4}}><span style={{color:"#aaa",fontSize:11}}>Self assessment: </span><strong>{log.selfAssessment}/5 — {selfLabels[log.selfAssessment]}</strong></div>}
-                  {log.notes && <div style={{fontSize:13,color:"#555",lineHeight:1.6}}>{log.notes}</div>}
+              {/* Athlete log */}
+              {logStatus && (
+                <div style={{padding:"10px 14px",background:ss.logBg}}>
+                  <div style={{fontSize:10,fontWeight:800,letterSpacing:".06em",textTransform:"uppercase",marginBottom:6,color:ss.color}}>
+                    {logStatus==="skipped"?"Reason":"Athlete Log"}
+                  </div>
+                  {log.selfAssessment && logStatus!=="skipped" && (
+                    <div style={{fontSize:13,marginBottom:6}}>
+                      <span style={{color:"#aaa",fontSize:11}}>Self assessment: </span>
+                      <strong>{log.selfAssessment}/5 — {selfLabels[log.selfAssessment]}</strong>
+                    </div>
+                  )}
+                  {log.notes && <div style={{fontSize:13,color:"#555",lineHeight:1.65}}>{log.notes}</div>}
+                  {!log.notes && !log.selfAssessment && <div style={{fontSize:12,color:"#ccc",fontStyle:"italic"}}>No notes left</div>}
                 </div>
               )}
             </div>
@@ -191,32 +231,80 @@ export default function CompletedSessionView({ method, coachPlan, clientLog, onR
   if (method === "pool-technique") {
     const exercises = coachPlan?.exercises || [];
     const clientExercises = clientLog?.exercises || exercises;
+    const ssMap = {
+      completed:{label:"✓ Completed",bg:"#e8f5e9",color:"#2e7d32",border:"#a5d6a7",logBg:"#f8fdf8"},
+      partial:  {label:"~ Partial",  bg:"#fffbeb",color:"#b45309",border:"#fcd34d",logBg:"#fffbeb"},
+      skipped:  {label:"✗ Skipped",  bg:"#fff5f5",color:"#c62828",border:"#fca5a5",logBg:"#fff5f5"},
+    };
+
+    const totalEx = exercises.length;
+    const doneEx    = clientExercises.filter(e=>e.log?.status==="completed"||(e.log?.done&&!e.log?.status)).length;
+    const partialEx = clientExercises.filter(e=>e.log?.status==="partial").length;
+    const skippedEx = clientExercises.filter(e=>e.log?.status==="skipped").length;
 
     return (
       <div style={{fontFamily:"'DM Sans','Helvetica Neue',sans-serif"}}>
         <SessionHeader coachPlan={coachPlan} clientLog={clientLog} energyLabels={energyLabels} />
 
+        {/* Summary bar */}
+        {totalEx > 0 && (
+          <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+            {doneEx > 0    && <span style={{fontSize:12,fontWeight:700,padding:"4px 10px",borderRadius:20,background:"#e8f5e9",color:"#2e7d32",border:"1px solid #a5d6a7"}}>✓ {doneEx} completed</span>}
+            {partialEx > 0 && <span style={{fontSize:12,fontWeight:700,padding:"4px 10px",borderRadius:20,background:"#fffbeb",color:"#b45309",border:"1px solid #fcd34d"}}>~ {partialEx} partial</span>}
+            {skippedEx > 0 && <span style={{fontSize:12,fontWeight:700,padding:"4px 10px",borderRadius:20,background:"#fff5f5",color:"#c62828",border:"1px solid #fca5a5"}}>✗ {skippedEx} skipped</span>}
+            {(doneEx+partialEx+skippedEx)===0 && <span style={{fontSize:12,color:"#aaa"}}>No exercises logged yet</span>}
+          </div>
+        )}
+
         <div style={{fontSize:11,fontWeight:800,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:10}}>Exercises</div>
         {exercises.map((ex, i) => {
           const clientEx = clientExercises.find(e=>e.id===ex.id) || clientExercises[i] || ex;
           const log = clientEx.log || {};
+          const logStatus = log.status || (log.done ? "completed" : null);
+          const ss = ssMap[logStatus] || {label:"Not logged",bg:"#f5f4f0",color:"#aaa",border:"#ddd",logBg:"#f8f8f6"};
+
+          // Build exercise label
+          const discLabel = ex.discipline || "";
+          const distLabel = ex.reps && ex.meters ? `${ex.reps}×${ex.meters}m` : ex.meters ? `${ex.meters}m` : "";
+          const lvLabel = ex.lungVolume && ex.lungVolume!=="Full" ? ex.lungVolume : "";
+
           return (
-            <div key={ex.id||i} style={{background:"#fff",borderRadius:12,border:`1.5px solid ${log.done?"#a5d6a7":"#ebebeb"}`,marginBottom:10,overflow:"hidden"}}>
-              <div style={{padding:"10px 14px",borderBottom:"1px solid #f5f5f5",display:"flex",alignItems:"center",gap:10}}>
-                <span style={{fontWeight:700,fontSize:14,flex:1}}>{ex.name}</span>
-                {ex.sets && <span style={{fontSize:12,color:"#888"}}>{ex.sets} sets</span>}
-                {ex.distance && <span style={{fontSize:12,color:"#888"}}>{ex.distance}</span>}
-                <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,background:log.done?"#e8f5e9":"#f5f4f0",color:log.done?"#2e7d32":"#aaa"}}>{log.done?"✓ Done":"Not done"}</span>
+            <div key={ex.id||i} style={{background:"#fff",borderRadius:12,border:`1.5px solid ${logStatus?ss.border:"#ebebeb"}`,marginBottom:10,overflow:"hidden"}}>
+              {/* Header */}
+              <div style={{padding:"10px 14px",borderBottom:"1px solid #f5f5f5",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    {discLabel && <span style={{fontSize:12,fontWeight:700,padding:"2px 8px",borderRadius:6,background:"#e8f0ff",color:"#1a2fa3",border:"1px solid #c0ceff"}}>{discLabel}</span>}
+                    {distLabel && <span style={{fontWeight:700,fontSize:14,color:"#1a1a1a"}}>{distLabel}</span>}
+                    {lvLabel && <span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:"#e8f0ff",color:"#1a2fa3",border:"1.5px solid #6a7ef4"}}>{lvLabel}</span>}
+                  </div>
+                  {ex.name && <div style={{fontSize:12,color:"#888",marginTop:2}}>{ex.name}</div>}
+                </div>
+                <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,background:ss.bg,color:ss.color,border:`1px solid ${ss.border}`,flexShrink:0}}>{ss.label}</span>
               </div>
+              {/* Coach description */}
               {ex.description && (
                 <div style={{padding:"8px 14px",background:"#fffbe6",borderBottom:"1px solid #f5f5f5"}}>
-                  <div style={{fontSize:13,color:"#5a4800",lineHeight:1.6}}>{ex.description}</div>
+                  <div style={{fontSize:10,fontWeight:800,color:"#a07a00",letterSpacing:".06em",textTransform:"uppercase",marginBottom:4}}>Coach Notes</div>
+                  <div style={{fontSize:13,color:"#5a4800",lineHeight:1.65}}>{ex.description}</div>
                 </div>
               )}
-              {log.done && (log.feeling||log.observations) && (
-                <div style={{padding:"8px 14px",background:"#f8fdf8"}}>
-                  {log.feeling && <div style={{fontSize:12,color:"#555",marginBottom:2}}><span style={{color:"#aaa"}}>Feeling: </span>{log.feeling}</div>}
-                  {log.observations && <div style={{fontSize:12,color:"#555"}}>{log.observations}</div>}
+              {/* Athlete log */}
+              {logStatus && (
+                <div style={{padding:"10px 14px",background:ss.logBg}}>
+                  <div style={{fontSize:10,fontWeight:800,letterSpacing:".06em",textTransform:"uppercase",marginBottom:6,color:ss.color}}>
+                    {logStatus==="skipped"?"Reason":"Athlete Log"}
+                  </div>
+                  {log.feeling && (
+                    <div style={{fontSize:13,color:"#555",marginBottom:4}}>
+                      <span style={{color:"#aaa",fontSize:11}}>{logStatus==="skipped"?"Reason: ":"Feeling: "}</span>
+                      {log.feeling}
+                    </div>
+                  )}
+                  {log.observations && logStatus!=="skipped" && (
+                    <div style={{fontSize:13,color:"#555",lineHeight:1.65}}>{log.observations}</div>
+                  )}
+                  {!log.feeling && !log.observations && <div style={{fontSize:12,color:"#ccc",fontStyle:"italic"}}>No notes left</div>}
                 </div>
               )}
             </div>
