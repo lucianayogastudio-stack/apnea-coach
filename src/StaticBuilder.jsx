@@ -596,7 +596,9 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
 }
 
 // ── Main Static Builder ───────────────────────────────────────────────────────
-export default function StaticBuilder({ initialData, onSave, isClient }) {
+export default function StaticBuilder({ initialData, onSave, isClient: isClientProp }) {
+  const isReadOnly = isClientProp === "readonly";
+  const isClient = isReadOnly ? false : !!isClientProp;
   const [environment, setEnvironment] = useState(initialData?.environment||"pool");
   const [sessionName, setSessionName] = useState(initialData?.sessionName||"");
   const [coachNotes,  setCoachNotes]  = useState(initialData?.coachNotes||"");
@@ -742,10 +744,16 @@ export default function StaticBuilder({ initialData, onSave, isClient }) {
         </>
       )}
 
+      {isReadOnly ? (
+        <div style={{background:"#f0f8ff",border:"1.5px solid #3a8ef4",borderRadius:9,padding:"12px 16px",textAlign:"center",fontSize:13,color:"#005fa3",fontWeight:500,marginTop:14}}>
+          👁 View mode — click <strong>✏️ Edit</strong> above to make changes
+        </div>
+      ) : (
       <button onClick={handleSave} disabled={saving}
         style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"12px 24px",borderRadius:9,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",width:"100%",marginTop:14,opacity:saving?0.6:1}}>
-        {saving?"Saving...":isClient?"Save Session Log":"Save Session Plan"}
+        {saving?"Saving...":"Save Session Plan"}
       </button>
+      )}
 
       {showPicker&&<ExercisePicker onAdd={addExercise} onClose={()=>setShowPicker(false)} />}
     </div>

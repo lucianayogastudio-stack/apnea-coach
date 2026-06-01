@@ -672,7 +672,9 @@ export function CompletedGymSessionView({ coachPlan, clientLog }) {
   );
 }
 
-export default function GymStrengthBuilder({ initialData, onSave, isClient }) {
+export default function GymStrengthBuilder({ initialData, onSave, isClient: isClientProp }) {
+  const isReadOnly = isClientProp === "readonly";
+  const isClient = isReadOnly ? false : !!isClientProp;
   const defaultSections = [
     { id:uid(), name:"Warm-up",  blocks:[] },
     { id:uid(), name:"Main Set", blocks:[] },
@@ -783,10 +785,16 @@ export default function GymStrengthBuilder({ initialData, onSave, isClient }) {
         </>
       )}
 
+      {isReadOnly ? (
+        <div style={{background:"#f0f8ff",border:"1.5px solid #3a8ef4",borderRadius:9,padding:"12px 16px",textAlign:"center",fontSize:13,color:"#005fa3",fontWeight:500,marginTop:14}}>
+          👁 View mode — click <strong>✏️ Edit</strong> above to make changes
+        </div>
+      ) : (
       <button onClick={handleSave} disabled={saving}
         style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"12px 24px",borderRadius:9,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",width:"100%",marginTop:14,opacity:saving?0.6:1}}>
-        {saving?"Saving...":isClient?"Save Workout Log":"Save Session Plan"}
+        {saving?"Saving...":"Save Session Plan"}
       </button>
+      )}
     </div>
   );
 }
