@@ -783,12 +783,17 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
 }
 
 // ── Assign Modal ──────────────────────────────────────────────────────────────
-function AssignModal({ date, clientName, onClose, onSave, existingSessions }) {
+function AssignModal({ date, clientName, onClose, onSave, existingSessions, templates, onSaveTemplate, onDeleteTemplate }) {
   const [method, setMethod] = useState("depth");
   const [plan, setPlan] = useState({warmup:"",mainSet:"",cooldown:"",targetDepth:"",openLine:false,coachNotes:""});
   const [saving, setSaving] = useState(false);
   const [templateSession, setTemplateSession] = useState(null);
   const [templateConfirmed, setTemplateConfirmed] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);      // show saved templates panel
+  const [saveTemplateModal, setSaveTemplateModal] = useState(null); // {gymData, method} pending save
+  const [templateName, setTemplateName] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
+
   const isDepth = method==="depth";
   const isGym    = method==="gym-strength";
   const isStatic = method==="static";
@@ -799,58 +804,162 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions }) {
   const isMobility   = method==="mobility";
   const hasBuilder = isGym||isStatic||isPool||isPool2||isDepthSess||isDryEq||isMobility;
   const prevSessions = existingSessions ? existingSessions.filter(s=>s.method===method).slice(-5).reverse() : [];
-  const needsTemplate = hasBuilder && prevSessions.length>0 && !templateConfirmed;
+  const methodTemplates = (templates||[]).filter(t=>t.method===method);
+  const needsTemplate = hasBuilder && (prevSessions.length>0||methodTemplates.length>0) && !templateConfirmed;
 
   async function handleSave() { setSaving(true); await onSave({method, plan:{...plan, targetDepth:plan.targetDepth?Number(plan.targetDepth):null}}); setSaving(false); }
 
+  // Wrap each builder's onSave to offer template saving
+  function builderOnSave(method) {
+    return async (data) => {
+      setSaving(true);
+      await onSave({ method, plan:{ ...plan, gymData: data } });
+      setSaving(false);
+      onClose();
+    };
+  }
+
+  // Save template dialog
+  function SaveTemplateDialog() {
+    if (!saveTemplateModal) return null;
+    return (
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+        <div style={{background:"#fff",borderRadius:16,padding:"28px 24px",maxWidth:360,width:"100%",boxShadow:"0 24px 64px rgba(0,0,0,.2)"}}>
+          <div style={{fontWeight:700,fontSize:17,letterSpacing:"-.02em",marginBottom:6}}>💾 Save as Template</div>
+          <div style={{fontSize:13,color:"#888",marginBottom:18,lineHeight:1.5}}>Give this session a name so you can reuse it with any athlete.</div>
+          <input value={templateName} onChange={e=>setTemplateName(e.target.value)}
+            placeholder="e.g. Beginner FRC Block, Elite Depth 1..."
+            autoFocus
+            style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",marginBottom:14,boxSizing:"border-box"}}
+            onKeyDown={e=>{ if(e.key==="Enter"&&templateName.trim()) handleSaveTemplate(); }} />
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={handleSaveTemplate}
+              disabled={!templateName.trim()||savingTemplate}
+              style={{flex:1,background:"#1a1a1a",color:"#fff",border:"none",padding:"11px",borderRadius:8,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:(!templateName.trim()||savingTemplate)?0.5:1}}>
+              {savingTemplate?"Saving…":"Save Template"}
+            </button>
+            <button onClick={()=>{setSaveTemplateModal(null);setTemplateName("");onClose();}}
+              style={{background:"transparent",color:"#888",border:"1.5px solid #e0e0e0",padding:"11px 16px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+              Skip
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Builder save handler that offers template saving after
+  function withTemplateSave(method) {
+    return async (data) => {
+      setSaving(true);
+      await onSave({ method, plan:{ ...plan, gymData: data } });
+      setSaving(false);
+      // Show template save dialog — onClose happens there
+      setSaveTemplateModal({ method, gymData: data });
+    };
+  }
+
+  function handleSaveTemplate() {
+    if (!templateName.trim()) return;
+    setSavingTemplate(true);
+    Promise.resolve(onSaveTemplate(templateName.trim(), saveTemplateModal.method, saveTemplateModal.gymData))
+      .then(()=>{ setSavingTemplate(false); setSaveTemplateModal(null); setTemplateName(""); onClose(); });
+  }
+
   return (
-    <Modal onClose={handleClose} wide>
+    <Modal onClose={onClose} wide>
+      <SaveTemplateDialog />
       <div style={{fontWeight:700,fontSize:18,marginBottom:4,letterSpacing:"-.02em"}}>Plan Session</div>
       <div style={{fontSize:13,color:"#999",marginBottom:20}}>{clientName} · {fmtFull(date)}</div>
       <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:10}}>Training Method</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:20}}>
         {METHODS.map(m=>{const sel=method===m.key;return(
-          <button key={m.key} onClick={()=>setMethod(m.key)} style={{borderRadius:10,padding:"10px 8px",border:`2px solid ${sel?m.dot:"#e8e8e8"}`,background:sel?m.bg:"#fff",color:sel?m.text:"#aaa",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",flexDirection:"column",alignItems:"center",gap:5,transition:"all .12s"}}>
+          <button key={m.key} onClick={()=>{setMethod(m.key);setTemplateConfirmed(false);setTemplateSession(null);}} style={{borderRadius:10,padding:"10px 8px",border:`2px solid ${sel?m.dot:"#e8e8e8"}`,background:sel?m.bg:"#fff",color:sel?m.text:"#aaa",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",flexDirection:"column",alignItems:"center",gap:5,transition:"all .12s"}}>
             <span style={{fontSize:20}}>{m.emoji}</span><span style={{lineHeight:1.3,textAlign:"center"}}>{m.label}</span>
           </button>
         );})}
       </div>
-      {/* Template suggester — shown when coach has previous sessions of same type */}
+
+      {/* Template picker — shown when templates or prev sessions exist */}
       {needsTemplate && (
         <div style={{background:"#f0f7ff",border:"1px solid #c0d8f0",borderLeft:"3px solid #3a8ef4",borderRadius:10,padding:"14px 16px",marginBottom:16}}>
-          <div style={{fontSize:11,fontWeight:700,color:"#005fa3",letterSpacing:".06em",textTransform:"uppercase",marginBottom:10}}>
-            Use a previous session as template?
+          {/* Tab switcher */}
+          <div style={{display:"flex",gap:6,marginBottom:12}}>
+            <button onClick={()=>setShowTemplates(false)}
+              style={{flex:1,padding:"7px",borderRadius:7,border:`1.5px solid ${!showTemplates?"#3a8ef4":"#c0d8f0"}`,background:!showTemplates?"#dbeeff":"#fff",color:!showTemplates?"#005fa3":"#666",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+              📅 Recent sessions {prevSessions.length > 0 ? `(${prevSessions.length})` : ""}
+            </button>
+            <button onClick={()=>setShowTemplates(true)}
+              style={{flex:1,padding:"7px",borderRadius:7,border:`1.5px solid ${showTemplates?"#3a8ef4":"#c0d8f0"}`,background:showTemplates?"#dbeeff":"#fff",color:showTemplates?"#005fa3":"#666",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+              📋 My Templates {methodTemplates.length > 0 ? `(${methodTemplates.length})` : ""}
+            </button>
           </div>
-          <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:12}}>
-            {prevSessions.map(s=>{
-              const m=gm(s.method);
-              const isSelected = templateSession?.id===s.id;
-              const label = s.plan?.gymData?.sessionName || s.plan?.gymData?.name || s.plan?.mainSet?.slice(0,40) || fmtFull(s.date);
-              const subLabel = s.method==="depth"
-                ? (s.plan?.gymData?.dives?.length||0)+" dives"
-                : s.method==="gym-strength"||s.method==="mobility"
-                ? (s.plan?.gymData?.sections?.reduce((a,sec)=>a+sec.blocks?.reduce((b,bl)=>b+bl.exercises?.length||0,0),0)||0)+" exercises"
-                : s.method==="pool-co2"
-                ? (s.plan?.gymData?.totalMeters||"")+"m total"
-                : s.plan?.gymData?.drills?.length
-                ? (s.plan.gymData.drills.length)+" drills"
-                : s.plan?.gymData?.exercises?.length
-                ? (s.plan.gymData.exercises.length)+" exercises"
-                : "";
-              return (
-                <div key={s.id} onClick={()=>setTemplateSession(isSelected?null:s)}
-                  style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:8,border:`1.5px solid ${isSelected?"#3a8ef4":"#c0d8f0"}`,background:isSelected?"#dbeeff":"#fff",cursor:"pointer",transition:"all .12s"}}>
-                  <div style={{width:8,height:8,borderRadius:"50%",background:m.dot,flexShrink:0}}/>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:500,color:"#1a1a1a"}}>{fmtFull(s.date)}</div>
-                    {label&&label!==fmtFull(s.date)&&<div style={{fontSize:11,color:"#555",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:320}}>{label}</div>}
-                    {subLabel&&<div style={{fontSize:11,color:"#3a8ef4",fontWeight:600,marginTop:1}}>{subLabel}</div>}
+
+          {/* Recent sessions */}
+          {!showTemplates && (
+            <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:12}}>
+              {prevSessions.length === 0 && <div style={{fontSize:13,color:"#aaa",textAlign:"center",padding:"12px 0"}}>No recent {method} sessions</div>}
+              {prevSessions.map(s=>{
+                const m=gm(s.method);
+                const isSelected = templateSession?.id===s.id&&templateSession?.type!=="template";
+                const label = s.plan?.gymData?.sessionName || s.plan?.gymData?.name || s.plan?.mainSet?.slice(0,40) || fmtFull(s.date);
+                const subLabel = s.method==="depth" ? (s.plan?.gymData?.dives?.length||0)+" dives"
+                  : s.method==="gym-strength"||s.method==="mobility" ? (s.plan?.gymData?.sections?.reduce((a,sec)=>a+sec.blocks?.reduce((b,bl)=>b+bl.exercises?.length||0,0),0)||0)+" exercises"
+                  : s.method==="pool-co2" ? (s.plan?.gymData?.totalMeters||"")+"m total"
+                  : s.plan?.gymData?.drills?.length ? s.plan.gymData.drills.length+" drills"
+                  : s.plan?.gymData?.exercises?.length ? s.plan.gymData.exercises.length+" exercises" : "";
+                return (
+                  <div key={s.id} onClick={()=>setTemplateSession(isSelected?null:{...s,type:"session"})}
+                    style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:8,border:`1.5px solid ${isSelected?"#3a8ef4":"#c0d8f0"}`,background:isSelected?"#dbeeff":"#fff",cursor:"pointer",transition:"all .12s"}}>
+                    <div style={{width:8,height:8,borderRadius:"50%",background:m.dot,flexShrink:0}}/>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:500,color:"#1a1a1a"}}>{fmtFull(s.date)}</div>
+                      {label&&label!==fmtFull(s.date)&&<div style={{fontSize:11,color:"#555",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:280}}>{label}</div>}
+                      {subLabel&&<div style={{fontSize:11,color:"#3a8ef4",fontWeight:600,marginTop:1}}>{subLabel}</div>}
+                    </div>
+                    {isSelected&&<span style={{fontSize:12,color:"#3a8ef4",fontWeight:700}}>✓</span>}
                   </div>
-                  {isSelected&&<span style={{fontSize:12,color:"#3a8ef4",fontWeight:700}}>Selected ✓</span>}
+                );
+              })}
+            </div>
+          )}
+
+          {/* Saved templates */}
+          {showTemplates && (
+            <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:12}}>
+              {methodTemplates.length === 0 && (
+                <div style={{fontSize:13,color:"#aaa",textAlign:"center",padding:"16px 0",lineHeight:1.6}}>
+                  No saved templates yet.<br/>
+                  <span style={{fontSize:12}}>Build a session and click "💾 Save as Template"</span>
                 </div>
-              );
-            })}
-          </div>
+              )}
+              {methodTemplates.map(t=>{
+                const isSelected = templateSession?.id===t.id&&templateSession?.type==="template";
+                return (
+                  <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:8,border:`1.5px solid ${isSelected?"#3a8ef4":"#c0d8f0"}`,background:isSelected?"#dbeeff":"#fff",transition:"all .12s"}}>
+                    <div style={{flex:1,cursor:"pointer"}} onClick={()=>setTemplateSession(isSelected?null:{id:t.id,plan:{gymData:t.gymData},type:"template",name:t.name})}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{fontSize:14}}>📋</span>
+                        <span style={{fontSize:13,fontWeight:600,color:"#1a1a1a"}}>{t.name}</span>
+                      </div>
+                      <div style={{fontSize:11,color:"#3a8ef4",marginTop:2}}>
+                        {t.gymData?.dives?.length ? t.gymData.dives.length+" dives"
+                          : t.gymData?.exercises?.length ? t.gymData.exercises.length+" exercises"
+                          : t.gymData?.drills?.length ? t.gymData.drills.length+" drills"
+                          : t.gymData?.sections?.length ? t.gymData.sections.length+" sections" : ""}
+                      </div>
+                    </div>
+                    {isSelected&&<span style={{fontSize:12,color:"#3a8ef4",fontWeight:700}}>✓</span>}
+                    <button onClick={()=>{ if(window.confirm(`Delete template "${t.name}"?`)) onDeleteTemplate(t.id); }}
+                      style={{background:"none",border:"none",color:"#ddd",fontSize:16,cursor:"pointer",padding:"2px 4px",flexShrink:0}}
+                      onMouseEnter={e=>e.currentTarget.style.color="#ef5350"}
+                      onMouseLeave={e=>e.currentTarget.style.color="#ddd"}>×</button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>{setTemplateSession(null);setTemplateConfirmed(true);}}
               style={{flex:1,padding:"9px",borderRadius:8,border:"1.5px solid #c0d8f0",background:"#fff",color:"#666",fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
@@ -859,7 +968,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions }) {
             <button onClick={()=>{ if(templateSession) setTemplateConfirmed(true); }}
               disabled={!templateSession}
               style={{flex:1,padding:"9px",borderRadius:8,border:"none",background:templateSession?"#1a1a1a":"#ccc",color:"#fff",fontSize:13,fontWeight:600,cursor:templateSession?"pointer":"default",fontFamily:"inherit",transition:"all .15s"}}>
-              Use this template →
+              Use this →
             </button>
           </div>
         </div>
@@ -870,11 +979,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions }) {
         <MobilityBuilder
           isClient={false}
           initialData={templateSession?.plan?.gymData || null}
-          onSave={async (data) => {
-            setSaving(true);
-            await onSave({ method, plan:{ ...plan, gymData: data } });
-            setSaving(false); onClose();
-          }}
+          onSave={withTemplateSave(method)}
         />
       )}
 
@@ -883,11 +988,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions }) {
         <DryEqBuilder
           isClient={false}
           initialData={templateSession?.plan?.gymData || null}
-          onSave={async (data) => {
-            setSaving(true);
-            await onSave({ method, plan:{ ...plan, gymData: data } });
-            setSaving(false); onClose();
-          }}
+          onSave={withTemplateSave(method)}
         />
       )}
 
@@ -896,11 +997,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions }) {
         <DepthBuilder
           isClient={false}
           initialData={templateSession?.plan?.gymData || null}
-          onSave={async (data) => {
-            setSaving(true);
-            await onSave({ method, plan:{ ...plan, gymData: data } });
-            setSaving(false); onClose();
-          }}
+          onSave={withTemplateSave(method)}
         />
       )}
 
@@ -909,11 +1006,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions }) {
         <PoolBuilder
           isClient={false}
           initialData={templateSession?.plan?.gymData || null}
-          onSave={async (data) => {
-            setSaving(true);
-            await onSave({ method, plan:{ ...plan, gymData: data } });
-            setSaving(false); onClose();
-          }}
+          onSave={withTemplateSave(method)}
         />
       )}
 
@@ -922,11 +1015,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions }) {
         <PoolTechniqueBuilder
           isClient={false}
           initialData={templateSession?.plan?.gymData || null}
-          onSave={async (data) => {
-            setSaving(true);
-            await onSave({ method, plan:{ ...plan, gymData: data } });
-            setSaving(false); onClose();
-          }}
+          onSave={withTemplateSave(method)}
         />
       )}
 
@@ -935,12 +1024,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions }) {
         <StaticBuilder
           isClient={false}
           initialData={templateSession?.plan?.gymData || null}
-          onSave={async (data) => {
-            setSaving(true);
-            await onSave({ method, plan:{ ...plan, gymData: data } });
-            setSaving(false);
-            onClose();
-          }}
+          onSave={withTemplateSave(method)}
         />
       )}
 
@@ -949,12 +1033,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions }) {
         <GymStrengthBuilder
           isClient={false}
           initialData={templateSession?.plan?.gymData || null}
-          onSave={async (gymData) => {
-            setSaving(true);
-            await onSave({ method, plan:{ ...plan, gymData } });
-            setSaving(false);
-            onClose();
-          }}
+          onSave={withTemplateSave(method)}
         />
       )}
 
@@ -1670,6 +1749,9 @@ export default function ApneaCoach() {
       }
       setClients((cr||[]).map(dbToClient));
       setSessions(sr.map(dbToSession));
+      // Load templates
+      const {data:tr} = await supabase.from("session_templates").select("*").eq("coach_id",currentUser.id).order("created_at",{ascending:false});
+      if (tr) setTemplates(tr.map(t=>({id:t.id,name:t.name,method:t.method,gymData:t.gym_data,createdAt:t.created_at})));
       // Load coach notes from client records
       const notesMap = {};
       (cr||[]).forEach(c=>{ if(c.coach_notes) notesMap[c.id]=c.coach_notes; });
@@ -1685,6 +1767,22 @@ export default function ApneaCoach() {
       }
       setSessions((sr||[]).map(dbToSession));
     }
+  }
+
+  // ── Session Templates ──
+  async function saveTemplate(name, method, gymData) {
+    const {data,error} = await supabase.from("session_templates").insert({
+      coach_id: user.id, name, method, gym_data: gymData
+    }).select().single();
+    if (!error && data) {
+      setTemplates(prev=>[{id:data.id,name:data.name,method:data.method,gymData:data.gym_data,createdAt:data.created_at},...prev]);
+      flash(`Template "${name}" saved! 📋`);
+    }
+  }
+  async function deleteTemplate(id) {
+    await supabase.from("session_templates").delete().eq("id",id);
+    setTemplates(prev=>prev.filter(t=>t.id!==id));
+    flash("Template deleted");
   }
 
   // ── Welcome message ──
@@ -1853,6 +1951,7 @@ export default function ApneaCoach() {
   const [coachPBNotifs, setCoachPBNotifs] = useState(() => {
     try { return JSON.parse(localStorage.getItem("apnea_coachPBNotifs")||"[]"); } catch { return []; }
   }); // [{athleteName, pbs, seenAt}]
+  const [templates, setTemplates] = useState([]); // coach's saved session templates
   const [coachNotes, setCoachNotes] = useState({}); // {clientId: "notes text"}
   const [savingNotes, setSavingNotes] = useState(false);
 
@@ -2779,7 +2878,7 @@ export default function ApneaCoach() {
         )}
       </div>
 
-      {assignModal&&activeClient&&<AssignModal date={assignModal} clientName={activeClient.name} onClose={()=>setAssignModal(null)} onSave={handleAssignSave} existingSessions={sessions.filter(s=>s.clientId===activeClient.id&&s.plan?.gymData)} />}
+      {assignModal&&activeClient&&<AssignModal date={assignModal} clientName={activeClient.name} onClose={()=>setAssignModal(null)} onSave={handleAssignSave} existingSessions={sessions.filter(s=>s.clientId===activeClient.id&&s.plan?.gymData)} templates={templates} onSaveTemplate={saveTemplate} onDeleteTemplate={deleteTemplate} />}
             {/* Clipboard banner */}
       {clipboard && view==="coachWeek" && (
         <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#1a1a1a",color:"#fff",padding:"12px 20px",borderRadius:12,fontSize:13,fontWeight:500,zIndex:400,display:"flex",alignItems:"center",gap:14,boxShadow:"0 8px 24px rgba(0,0,0,.2)"}}>
