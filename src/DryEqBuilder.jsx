@@ -171,12 +171,12 @@ function DrillCard({ drill, index, onChange, onRemove, isClient }) {
           )}
           {isClient && (
             <button onClick={() => setShowLog(v => !v)}
-              style={{ padding:"5px 9px", borderRadius:7, border:"1.5px solid #e0e0e0", background: showLog ? "#f0f0ec" : "transparent", fontSize:11, fontWeight:600, color:"#666", cursor:"pointer", fontFamily:"inherit" }}>
+              style={{ padding:"5px 9px", borderRadius:7, border:"1.5px solid #e0e0e0", background: showLog ? "#f0f0ec" : "#fff", fontSize:11, fontWeight:600, color:"#666", cursor:"pointer", fontFamily:"inherit" }}>
               {showLog ? "Hide" : "Log"}
             </button>
           )}
           <button onClick={() => { if (isClient && videoInfo) { setShowVideo(v => !v); } else if (!isClient) { setEditVideo(v => !v); } }}
-            style={{ padding:"5px 9px", borderRadius:7, border:"1.5px solid " + (drill.videoUrl ? "#f4a96a" : "#e0e0e0"), background: (showVideo || editVideo) ? "#fff0e0" : "transparent", fontSize:11, color: drill.videoUrl ? "#b85c00" : "#888", cursor:"pointer", fontFamily:"inherit" }}>
+            style={{ padding:"5px 9px", borderRadius:7, border:"1.5px solid " + (drill.videoUrl ? "#f4a96a" : "#e0e0e0"), background: (showVideo || editVideo) ? "#fff0e0" : "#fff", fontSize:11, color: drill.videoUrl ? "#b85c00" : "#888", cursor:"pointer", fontFamily:"inherit" }}>
             Video
           </button>
           {!isClient && (
@@ -194,7 +194,7 @@ function DrillCard({ drill, index, onChange, onRemove, isClient }) {
         ) : (
           <textarea value={drill.description} onChange={e => upd("description", e.target.value)}
             placeholder={"Describe the drill in detail — what to do, how to do it, what to feel...\ne.g. Fill your mouth completely, close the glottis, then try to move air from cheeks to inner ear without using your throat..."}
-            style={{ width:"100%", padding:"6px 0", border:"none", outline:"none", fontSize:14, fontFamily:"inherit", resize:"vertical", minHeight:80, color:"#1a1a1a", background:"transparent", lineHeight:1.75 }} />
+            style={{ width:"100%", padding:"6px 0", border:"none", outline:"none", fontSize:14, fontFamily:"inherit", resize:"vertical", minHeight:80, color:"#1a1a1a", background:"#fff", lineHeight:1.75 }} />
         )}
       </div>
 
@@ -209,7 +209,7 @@ function DrillCard({ drill, index, onChange, onRemove, isClient }) {
               style={{ background:"#f4803a", color:"#fff", border:"none", borderRadius:6, padding:"6px 14px", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>Save</button>
             {drill.videoUrl && (
               <button onClick={() => { setVideoInput(""); upd("videoUrl", ""); setEditVideo(false); }}
-                style={{ background:"transparent", border:"1.5px solid #e8c5c5", borderRadius:6, padding:"6px 9px", fontSize:12, cursor:"pointer", color:"#c0392b", fontFamily:"inherit" }}>Remove</button>
+                style={{ background:"#fff", border:"1.5px solid #e8c5c5", borderRadius:6, padding:"6px 9px", fontSize:12, cursor:"pointer", color:"#c0392b", fontFamily:"inherit" }}>Remove</button>
             )}
           </div>
           {videoInput && getVideoEmbed(videoInput) && getVideoEmbed(videoInput).type !== "link" && (
@@ -344,7 +344,7 @@ export default function DryEqBuilder({ initialData, onSave, isClient: isClientPr
           </div>
         ) : (
           <input value={sessionName} onChange={e => setSessionName(e.target.value)}
-            style={{ fontWeight:700, fontSize:17, border:"none", borderBottom:"2px solid #f0f0f0", outline:"none", fontFamily:"inherit", color:"#1a1a1a", background:"transparent", width:"100%", paddingBottom:6 }}
+            style={{ fontWeight:700, fontSize:17, border:"none", borderBottom:"2px solid #f0f0f0", outline:"none", fontFamily:"inherit", color:"#1a1a1a", background:"#fff", width:"100%", paddingBottom:6 }}
             placeholder="Session name (e.g. Mouthfill Fundamentals)..." />
         )}
       </div>
