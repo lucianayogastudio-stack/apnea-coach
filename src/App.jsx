@@ -1952,6 +1952,8 @@ export default function ApneaCoach() {
     try { return JSON.parse(localStorage.getItem("apnea_coachPBNotifs")||"[]"); } catch { return []; }
   }); // [{athleteName, pbs, seenAt}]
   const [templates, setTemplates] = useState([]); // coach's saved session templates
+  const [clientSearch, setClientSearch] = useState(""); // search query for client list
+  const [clientSort, setClientSort] = useState("name"); // name | pending | done
   const [coachNotes, setCoachNotes] = useState({}); // {clientId: "notes text"}
   const [savingNotes, setSavingNotes] = useState(false);
 
@@ -2237,16 +2239,73 @@ export default function ApneaCoach() {
             )}
 
             <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:12}}>Your Clients</div>
+
+            {/* Search + Sort bar */}
+            {clients.filter(c=>!c.archived).length > 0 && (
+              <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
+                <div style={{flex:1,position:"relative"}}>
+                  <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"#bbb",pointerEvents:"none"}}>🔍</span>
+                  <input
+                    value={clientSearch}
+                    onChange={e=>setClientSearch(e.target.value)}
+                    placeholder="Search by name, goal or level..."
+                    style={{width:"100%",padding:"8px 12px 8px 32px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:13,fontFamily:"inherit",outline:"none",color:"#1a1a1a",background:"#fff",boxSizing:"border-box",transition:"border-color .15s"}}
+                    onFocus={e=>e.target.style.borderColor="#1a1a1a"}
+                    onBlur={e=>e.target.style.borderColor="#e0e0e0"}
+                  />
+                  {clientSearch && (
+                    <button onClick={()=>setClientSearch("")} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#bbb",fontSize:16,cursor:"pointer",lineHeight:1,padding:0}}>×</button>
+                  )}
+                </div>
+                <select value={clientSort} onChange={e=>setClientSort(e.target.value)}
+                  style={{padding:"8px 10px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:12,fontFamily:"inherit",outline:"none",color:"#555",background:"#fff",cursor:"pointer"}}>
+                  <option value="name">A–Z</option>
+                  <option value="pending">Most pending</option>
+                  <option value="done">Most done</option>
+                  <option value="replies">Needs reply</option>
+                </select>
+              </div>
+            )}
+
             {clients.filter(c=>!c.archived).length===0&&<div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:40,textAlign:"center",color:"#bbb",fontSize:14}}>No active clients yet. Click "+ Add Client" to get started.</div>}
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {clients.filter(c=>!c.archived).map(c=>{
-                const cs=sessions.filter(s=>s.clientId===c.id);
-                const done=cs.filter(s=>s.feedback?.status==="completed").length;
-                const pending=cs.filter(s=>!s.feedback?.status).length;
-                return(
-                  <ClientCard key={c.id} client={c} done={done} pending={pending} sessions={cs} onClick={()=>{setActiveClient(c);setView("coachWeek");}} />
+              {(()=>{
+                const active = clients.filter(c=>!c.archived);
+                // Filter by search
+                const q = clientSearch.toLowerCase().trim();
+                const filtered = q ? active.filter(c =>
+                  c.name.toLowerCase().includes(q) ||
+                  (c.goal||"").toLowerCase().includes(q) ||
+                  (c.level||"").toLowerCase().includes(q) ||
+                  (c.email||"").toLowerCase().includes(q)
+                ) : active;
+
+                // Sort
+                const sorted = [...filtered].sort((a,b) => {
+                  if (clientSort==="name") return a.name.localeCompare(b.name);
+                  const csA = sessions.filter(s=>s.clientId===a.id);
+                  const csB = sessions.filter(s=>s.clientId===b.id);
+                  if (clientSort==="pending") return csB.filter(s=>!s.feedback?.status).length - csA.filter(s=>!s.feedback?.status).length;
+                  if (clientSort==="done") return csB.filter(s=>s.feedback?.status==="completed").length - csA.filter(s=>s.feedback?.status==="completed").length;
+                  if (clientSort==="replies") return csB.filter(s=>s.feedback?.status==="completed"&&!s.feedback?.coachComment).length - csA.filter(s=>s.feedback?.status==="completed"&&!s.feedback?.coachComment).length;
+                  return 0;
+                });
+
+                if (q && sorted.length===0) return (
+                  <div style={{background:"#fff",borderRadius:12,border:"1px solid #ebebeb",padding:"28px",textAlign:"center",color:"#bbb",fontSize:14}}>
+                    No clients match "<strong style={{color:"#888"}}>{clientSearch}</strong>"
+                  </div>
                 );
-              })}
+
+                return sorted.map(c=>{
+                  const cs=sessions.filter(s=>s.clientId===c.id);
+                  const done=cs.filter(s=>s.feedback?.status==="completed").length;
+                  const pending=cs.filter(s=>!s.feedback?.status).length;
+                  return(
+                    <ClientCard key={c.id} client={c} done={done} pending={pending} sessions={cs} onClick={()=>{setActiveClient(c);setView("coachWeek");}} />
+                  );
+                });
+              })()}
             </div>
 
             {/* Archived / Past Clients */}
