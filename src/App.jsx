@@ -206,13 +206,26 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   const isClient = role==="client";
   const [fb, setFb] = useState({...session.feedback});
   const [saving, setSaving] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
   // Coach editing: start in read-only mode for existing sessions
-  // isNew = session has no plan data yet (just created, no gymData)
   const hasExistingPlan = !!(session.plan?.gymData || session.plan?.mainSet || session.plan?.targetDepth);
-  const [isEditing, setIsEditing] = useState(!hasExistingPlan); // auto-edit if brand new
+  const [isEditing, setIsEditing] = useState(!hasExistingPlan);
 
   async function handleSave() { setSaving(true); await onSave(fb); setSaving(false); }
+
+  // Intercept close — show confirm if coach has unsaved edits
+  function handleClose() {
+    if (!isClient && isEditing && isDirty) {
+      setShowCloseConfirm(true);
+    } else {
+      onClose();
+    }
+  }
+
+  // Called by builders whenever coach changes something
+  function markDirty() { if (!isClient && isEditing) setIsDirty(true); }
 
   // Shared header for coach view with Edit/View toggle
   function CoachEditBar({ isCompleted }) {
@@ -221,6 +234,9 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
         <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`}}>{m.emoji} {m.label}</span>
         <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isCompleted?"Completed Session":"Coach View"}</span>
+        {isEditing && isDirty && !isCompleted && (
+          <span style={{fontSize:11,fontWeight:700,color:"#f59e0b",background:"#fffbeb",padding:"2px 8px",borderRadius:20,border:"1px solid #fcd34d"}}>● Unsaved</span>
+        )}
         <div style={{marginLeft:"auto",display:"flex",gap:6}}>
           {isCompleted && fb.status && (
             <button onClick={()=>setFb(p=>({...p,status:null}))} style={{background:"transparent",border:"1.5px solid #e0e0e0",color:"#888",padding:"5px 10px",borderRadius:7,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>↩ Reopen</button>
@@ -229,8 +245,38 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             <button onClick={()=>setIsEditing(true)} style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"6px 14px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>✏️ Edit</button>
           )}
           {!isCompleted && isEditing && hasExistingPlan && (
-            <button onClick={()=>setIsEditing(false)} style={{background:"transparent",border:"1.5px solid #ddd",color:"#888",padding:"6px 12px",borderRadius:7,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>✕ Cancel</button>
+            <button onClick={()=>{if(isDirty){setShowCloseConfirm(true);}else{setIsEditing(false);}}} style={{background:"transparent",border:"1.5px solid #ddd",color:"#888",padding:"6px 12px",borderRadius:7,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>✕ Cancel</button>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // Unsaved changes confirmation dialog
+  function CloseConfirmDialog() {
+    if (!showCloseConfirm) return null;
+    return (
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+        <div style={{background:"#fff",borderRadius:16,padding:"28px 24px",maxWidth:360,width:"100%",boxShadow:"0 24px 64px rgba(0,0,0,.2)",textAlign:"center"}}>
+          <div style={{fontSize:36,marginBottom:12}}>⚠️</div>
+          <div style={{fontWeight:700,fontSize:17,letterSpacing:"-.02em",marginBottom:8}}>Unsaved changes</div>
+          <div style={{fontSize:14,color:"#888",marginBottom:24,lineHeight:1.6}}>
+            You have unsaved changes to this session plan. If you close now, your edits will be lost.
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <button onClick={()=>setShowCloseConfirm(false)}
+              style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"12px",borderRadius:9,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+              Keep editing
+            </button>
+            <button onClick={()=>{setShowCloseConfirm(false);setIsEditing(false);setIsDirty(false);}}
+              style={{background:"transparent",color:"#888",border:"1.5px solid #e0e0e0",padding:"11px",borderRadius:9,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+              Discard changes
+            </button>
+            <button onClick={()=>{setShowCloseConfirm(false);onClose();}}
+              style={{background:"transparent",color:"#ef5350",border:"none",padding:"8px",borderRadius:9,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+              Close without saving
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -240,7 +286,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   if (isStatic) {
     const isCompleted_static = session.feedback?.status==="completed";
     return (
-      <Modal onClose={onClose} wide>
+      <Modal onClose={handleClose} wide>
         <CoachEditBar isCompleted={isCompleted_static} />
         {isClient && (
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -268,6 +314,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             )}
           </>
         ) : (
+        <div onInput={markDirty} onChange={markDirty}>
         <StaticBuilder
           isClient={isClient ? true : !isEditing ? "readonly" : false}
           initialData={(() => {
@@ -291,7 +338,9 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             setSaving(false); onClose();
           }}
         />
+        </div>
         )}
+        <CloseConfirmDialog />
       </Modal>
     );
   }
@@ -299,7 +348,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   if (isMobility) {
     const isCompleted_mobility = session.feedback?.status==="completed";
     return (
-      <Modal onClose={onClose} wide>
+      <Modal onClose={handleClose} wide>
         <CoachEditBar isCompleted={isCompleted_mobility} />
         {isClient && (
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -321,6 +370,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             )}
           </>
         ) : (
+          <div onInput={markDirty} onChange={markDirty}>
           <MobilityBuilder
             isClient={isClient ? true : !isEditing ? "readonly" : false}
             initialData={(() => {
@@ -335,7 +385,9 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             })()}
             onSave={async(data)=>{setSaving(true);if(isClient){await onSave({...fb,gymData:data,status:fb.status||"completed"});}else{await onSave({...fb,gymData:data});}setSaving(false);onClose();}}
           />
+          </div>
         )}
+        <CloseConfirmDialog />
       </Modal>
     );
   }
@@ -343,7 +395,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   if (isDryEq) {
     const isCompleted_dry_eq = session.feedback?.status==="completed";
     return (
-      <Modal onClose={onClose} wide>
+      <Modal onClose={handleClose} wide>
         <CoachEditBar isCompleted={isCompleted_dry_eq} />
         {isClient && (
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -365,7 +417,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             )}
           </>
         ) : (
-        <DryEqBuilder
+        <div onInput={markDirty} onChange={markDirty}><DryEqBuilder
           isClient={isClient ? true : !isEditing ? "readonly" : false}
           initialData={(() => {
             const cp=session.plan?.gymData||null; const cl=session.feedback?.clientGymData||null;
@@ -373,8 +425,9 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             return cp;
           })()}
           onSave={async(data)=>{setSaving(true);if(isClient){await onSave({...fb,gymData:data,status:fb.status||"completed"});}else{await onSave({...fb,gymData:data});}setSaving(false);onClose();}}
-        />
+        /></div>
         )}
+        <CloseConfirmDialog />
       </Modal>
     );
   }
@@ -383,7 +436,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
     const isCompleted = session.feedback?.status === "completed";
     const clientLog = session.feedback?.clientGymData || null;
     return (
-      <Modal onClose={onClose} wide>
+      <Modal onClose={handleClose} wide>
         <CoachEditBar isCompleted={isCompleted} />
         {isClient && (
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -404,6 +457,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             )}
           </>
         ) : (
+          <div onInput={markDirty} onChange={markDirty}>
           <DepthBuilder
             isClient={isClient ? true : !isEditing ? "readonly" : false}
             initialData={(() => {
@@ -415,7 +469,9 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             })()}
             onSave={async(data)=>{setSaving(true);if(isClient){await onSave({...fb,gymData:data,status:fb.status||"completed"});}else{await onSave({...fb,gymData:data});}setSaving(false);onClose();}}
           />
+          </div>
         )}
+        <CloseConfirmDialog />
       </Modal>
     );
   }
@@ -423,7 +479,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   if (isPool2) {
     const isCompleted_pool_co2 = session.feedback?.status==="completed";
     return (
-      <Modal onClose={onClose} wide>
+      <Modal onClose={handleClose} wide>
         <CoachEditBar isCompleted={isCompleted_pool_co2} />
         {isClient && (
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -445,6 +501,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             )}
           </>
         ) : (
+          <div onInput={markDirty} onChange={markDirty}>
           <PoolBuilder
             isClient={isClient ? true : !isEditing ? "readonly" : false}
             initialData={(() => {
@@ -454,7 +511,9 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             })()}
             onSave={async(data)=>{setSaving(true);if(isClient){await onSave({...fb,gymData:data,status:fb.status||"completed"});}else{await onSave({...fb,gymData:data});}setSaving(false);onClose();}}
           />
+          </div>
         )}
+        <CloseConfirmDialog />
       </Modal>
     );
   }
@@ -462,7 +521,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   if (isPool) {
     const isCompleted_pool_technique = session.feedback?.status==="completed";
     return (
-      <Modal onClose={onClose} wide>
+      <Modal onClose={handleClose} wide>
         <CoachEditBar isCompleted={isCompleted_pool_technique} />
         {isClient && (
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -490,6 +549,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             )}
           </>
         ) : (
+        <div onInput={markDirty} onChange={markDirty}>
         <PoolTechniqueBuilder
           isClient={isClient ? true : !isEditing ? "readonly" : false}
           initialData={(() => {
@@ -510,7 +570,9 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             setSaving(false); onClose();
           }}
         />
+        </div>
         )}
+        <CloseConfirmDialog />
       </Modal>
     );
   }
@@ -519,7 +581,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   if (isGym) {
     const isCompleted_gym_strength = session.feedback?.status==="completed";
     return (
-      <Modal onClose={onClose} wide>
+      <Modal onClose={handleClose} wide>
         <CoachEditBar isCompleted={isCompleted_gym_strength} />
         {isClient && (
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -548,6 +610,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             )}
           </>
         ) : (
+        <div onInput={markDirty} onChange={markDirty}>
         <GymStrengthBuilder
           isClient={isClient ? true : !isEditing ? "readonly" : false}
           initialData={(() => {
@@ -583,13 +646,15 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             onClose();
           }}
         />
+        </div>
         )}
+        <CloseConfirmDialog />
       </Modal>
     );
   }
 
   return (
-    <Modal onClose={onClose} wide>
+    <Modal onClose={handleClose} wide>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
         <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`}}>{m.emoji} {m.label}</span>
         <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>{isClient?"Athlete View":"Coach View"}</span>
@@ -683,9 +748,10 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
         {isClient&&session.feedback?.coachComment&&<div style={{background:"#e8f5e9",border:"1px solid #a5d6a7",borderRadius:10,padding:"13px 16px",marginBottom:14}}><div style={{fontSize:10,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"#2e7d32",marginBottom:6}}>💬 Coach's Response</div><div style={{fontSize:14,color:"#1b5e20",lineHeight:1.65}}>{session.feedback.coachComment}</div></div>}
         <div style={{display:"flex",gap:10}}>
           <button onClick={handleSave} disabled={saving} style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"11px 22px",borderRadius:8,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:saving?0.6:1}}>{saving?"Saving...":"Save Feedback"}</button>
-          <button onClick={onClose} style={{background:"transparent",color:"#1a1a1a",border:"1.5px solid #ddd",color:"#444",padding:"10px 20px",borderRadius:8,fontSize:14,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>Close</button>
+          <button onClick={handleClose} style={{background:"transparent",border:"1.5px solid #ddd",color:"#444",padding:"10px 20px",borderRadius:8,fontSize:14,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>Close</button>
         </div>
       </div>
+      <CloseConfirmDialog />
     </Modal>
   );
 }
@@ -712,7 +778,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions }) {
   async function handleSave() { setSaving(true); await onSave({method, plan:{...plan, targetDepth:plan.targetDepth?Number(plan.targetDepth):null}}); setSaving(false); }
 
   return (
-    <Modal onClose={onClose} wide>
+    <Modal onClose={handleClose} wide>
       <div style={{fontWeight:700,fontSize:18,marginBottom:4,letterSpacing:"-.02em"}}>Plan Session</div>
       <div style={{fontSize:13,color:"#999",marginBottom:20}}>{clientName} · {fmtFull(date)}</div>
       <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:10}}>Training Method</div>
@@ -935,7 +1001,7 @@ function AddClientModal({ onClose, onSave, initialClient, isEditing }) {
   }
 
   return (
-    <Modal onClose={onClose}>
+    <Modal onClose={handleClose}>
       <div style={{fontWeight:700,fontSize:18,marginBottom:20,letterSpacing:"-.02em"}}>{isEditing?"Edit Client":"New Client"}</div>
       <div style={{display:"flex",flexDirection:"column",gap:13}}>
 
@@ -1054,7 +1120,7 @@ function AddCoachModal({ onClose, onSave }) {
   }
 
   return (
-    <Modal onClose={onClose}>
+    <Modal onClose={handleClose}>
       <div style={{fontWeight:700,fontSize:18,marginBottom:6,letterSpacing:"-.02em"}}>Add New Coach</div>
       <div style={{fontSize:13,color:"#999",marginBottom:20}}>Create a coach account — they'll only see their own clients.</div>
       <div style={{display:"flex",flexDirection:"column",gap:13}}>
