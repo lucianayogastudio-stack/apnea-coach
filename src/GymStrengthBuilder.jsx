@@ -468,6 +468,11 @@ function Section({ section, onChange, onRemove, isClient }) {
   function updateBlock(id, updated) { onChange({...section,blocks:section.blocks.map(b=>b.id===id?updated:b)}); }
   function removeBlock(id) { onChange({...section,blocks:section.blocks.filter(b=>b.id!==id)}); }
   function addBlock(type) { onChange({...section,blocks:[...section.blocks,makeBlock(type)]}); }
+  function reorderBlocks(from, to) {
+    if (to < 0 || to >= section.blocks.length) return;
+    const a=[...section.blocks]; const [item]=a.splice(from,1); a.splice(to,0,item);
+    onChange({...section, blocks:a});
+  }
 
   const totalSets = section.blocks.reduce((a,b)=>a+b.exercises.reduce((c,e)=>c+e.sets.length,0),0);
   const doneSets  = section.blocks.reduce((a,b)=>a+b.exercises.reduce((c,e)=>c+e.sets.filter(s=>s.done).length,0),0);
@@ -487,10 +492,27 @@ function Section({ section, onChange, onRemove, isClient }) {
         {!isClient&&<button onClick={onRemove} style={{background:"none",border:"none",fontSize:11,color:"#ccc",cursor:"pointer"}}>Remove</button>}
       </div>
 
-      {section.blocks.map(b=>(
-        <Block key={b.id} block={b} isClient={isClient}
-          onChange={updated=>updateBlock(b.id,updated)}
-          onRemove={()=>removeBlock(b.id)} />
+      {section.blocks.map((b,i)=>(
+        <div key={b.id}
+          draggable={!isClient}
+          onDragStart={!isClient?e=>{ e.dataTransfer.setData("blkIdx",i); e.currentTarget.style.opacity="0.5"; }:undefined}
+          onDragEnd={!isClient?e=>{ e.currentTarget.style.opacity="1"; }:undefined}
+          onDragOver={!isClient?e=>e.preventDefault():undefined}
+          onDrop={!isClient?e=>{ e.preventDefault(); reorderBlocks(parseInt(e.dataTransfer.getData("blkIdx")),i); }:undefined}
+          style={{display:"flex",alignItems:"flex-start",gap:6}}>
+          {!isClient && (
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,paddingTop:14,flexShrink:0}}>
+              <div title="Drag to reorder" style={{cursor:"grab",color:"#ccc",fontSize:16,lineHeight:1,padding:"2px 4px",userSelect:"none"}} onMouseEnter={e=>e.currentTarget.style.color="#999"} onMouseLeave={e=>e.currentTarget.style.color="#ccc"}>⠿</div>
+              <button onClick={()=>reorderBlocks(i,i-1)} disabled={i===0} title="Move up" style={{background:"none",border:"none",cursor:i===0?"default":"pointer",color:i===0?"#eee":"#bbb",fontSize:13,padding:"1px 4px",lineHeight:1}} onMouseEnter={e=>{if(i>0)e.currentTarget.style.color="#555"}} onMouseLeave={e=>e.currentTarget.style.color=i===0?"#eee":"#bbb"}>▲</button>
+              <button onClick={()=>reorderBlocks(i,i+1)} disabled={i===section.blocks.length-1} title="Move down" style={{background:"none",border:"none",cursor:i===section.blocks.length-1?"default":"pointer",color:i===section.blocks.length-1?"#eee":"#bbb",fontSize:13,padding:"1px 4px",lineHeight:1}} onMouseEnter={e=>{if(i<section.blocks.length-1)e.currentTarget.style.color="#555"}} onMouseLeave={e=>e.currentTarget.style.color=i===section.blocks.length-1?"#eee":"#bbb"}>▼</button>
+            </div>
+          )}
+          <div style={{flex:1}}>
+            <Block block={b} isClient={isClient}
+              onChange={updated=>updateBlock(b.id,updated)}
+              onRemove={()=>removeBlock(b.id)} />
+          </div>
+        </div>
       ))}
 
       {!isClient&&(

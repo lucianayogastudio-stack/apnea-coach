@@ -295,6 +295,10 @@ export default function DryEqBuilder({ initialData, onSave, isClient: isClientPr
   function updateDrill(id, updated) { setDrills(prev => prev.map(d => d.id === id ? updated : d)); }
   function removeDrill(id)          { setDrills(prev => prev.filter(d => d.id !== id)); }
   function addDrill()               { setDrills(prev => [...prev, makeDrill()]); }
+  function reorderDrills(from, to) {
+    if (to < 0 || to >= drills.length) return;
+    setDrills(prev => { const a=[...prev]; const [item]=a.splice(from,1); a.splice(to,0,item); return a; });
+  }
 
   const doneCount  = drills.filter(d => d.log?.status === "completed").length;
   const totalCount = drills.length;
@@ -443,9 +447,26 @@ export default function DryEqBuilder({ initialData, onSave, isClient: isClientPr
             </div>
           )}
           {drills.map((drill, i) => (
-            <DrillCard key={drill.id} drill={drill} index={i + 1} isClient={isClient}
-              onChange={updated => updateDrill(drill.id, updated)}
-              onRemove={() => removeDrill(drill.id)} />
+            <div key={drill.id}
+              draggable={!isClient}
+              onDragStart={!isClient?e=>{ e.dataTransfer.setData("drillIdx",i); e.currentTarget.style.opacity="0.5"; }:undefined}
+              onDragEnd={!isClient?e=>{ e.currentTarget.style.opacity="1"; }:undefined}
+              onDragOver={!isClient?e=>e.preventDefault():undefined}
+              onDrop={!isClient?e=>{ e.preventDefault(); reorderDrills(parseInt(e.dataTransfer.getData("drillIdx")),i); }:undefined}
+              style={{display:"flex",alignItems:"flex-start",gap:6}}>
+              {!isClient && (
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,paddingTop:14,flexShrink:0}}>
+                  <div title="Drag to reorder" style={{cursor:"grab",color:"#ccc",fontSize:16,lineHeight:1,padding:"2px 4px",userSelect:"none"}} onMouseEnter={e=>e.currentTarget.style.color="#999"} onMouseLeave={e=>e.currentTarget.style.color="#ccc"}>⠿</div>
+                  <button onClick={()=>reorderDrills(i,i-1)} disabled={i===0} title="Move up" style={{background:"none",border:"none",cursor:i===0?"default":"pointer",color:i===0?"#eee":"#bbb",fontSize:13,padding:"1px 4px",lineHeight:1}} onMouseEnter={e=>{if(i>0)e.currentTarget.style.color="#555"}} onMouseLeave={e=>e.currentTarget.style.color=i===0?"#eee":"#bbb"}>▲</button>
+                  <button onClick={()=>reorderDrills(i,i+1)} disabled={i===drills.length-1} title="Move down" style={{background:"none",border:"none",cursor:i===drills.length-1?"default":"pointer",color:i===drills.length-1?"#eee":"#bbb",fontSize:13,padding:"1px 4px",lineHeight:1}} onMouseEnter={e=>{if(i<drills.length-1)e.currentTarget.style.color="#555"}} onMouseLeave={e=>e.currentTarget.style.color=i===drills.length-1?"#eee":"#bbb"}>▼</button>
+                </div>
+              )}
+              <div style={{flex:1}}>
+                <DrillCard drill={drill} index={i + 1} isClient={isClient}
+                  onChange={updated => updateDrill(drill.id, updated)}
+                  onRemove={() => removeDrill(drill.id)} />
+              </div>
+            </div>
           ))}
           {!isClient && (
             <button onClick={addDrill}

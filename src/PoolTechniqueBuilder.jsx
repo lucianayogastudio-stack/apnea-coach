@@ -298,6 +298,10 @@ export default function PoolTechniqueBuilder({ initialData, onSave, isClient: is
   function updateExercise(id, updated) { setExercises(prev => prev.map(e => e.id === id ? updated : e)); }
   function removeExercise(id)          { setExercises(prev => prev.filter(e => e.id !== id)); }
   function addExercise()               { setExercises(prev => [...prev, makeExercise()]); }
+  function reorderExercises(from, to) {
+    if (to < 0 || to >= exercises.length) return;
+    setExercises(prev => { const a=[...prev]; const [item]=a.splice(from,1); a.splice(to,0,item); return a; });
+  }
 
   const doneCount  = exercises.filter(e => e.log?.status === "completed").length;
   const totalCount = exercises.length;
@@ -395,9 +399,26 @@ export default function PoolTechniqueBuilder({ initialData, onSave, isClient: is
 
       {/* Exercise list */}
       {exercises.map((ex, i) => (
-        <ExerciseCard key={ex.id} exercise={ex} index={i + 1} isClient={isClient}
-          onChange={updated => updateExercise(ex.id, updated)}
-          onRemove={() => removeExercise(ex.id)} />
+        <div key={ex.id}
+          draggable={!isClient}
+          onDragStart={!isClient?e=>{ e.dataTransfer.setData("exIdx",i); e.currentTarget.style.opacity="0.5"; }:undefined}
+          onDragEnd={!isClient?e=>{ e.currentTarget.style.opacity="1"; }:undefined}
+          onDragOver={!isClient?e=>e.preventDefault():undefined}
+          onDrop={!isClient?e=>{ e.preventDefault(); reorderExercises(parseInt(e.dataTransfer.getData("exIdx")),i); }:undefined}
+          style={{display:"flex",alignItems:"flex-start",gap:6}}>
+          {!isClient && (
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,paddingTop:14,flexShrink:0}}>
+              <div title="Drag to reorder" style={{cursor:"grab",color:"#ccc",fontSize:16,lineHeight:1,padding:"2px 4px",userSelect:"none"}} onMouseEnter={e=>e.currentTarget.style.color="#999"} onMouseLeave={e=>e.currentTarget.style.color="#ccc"}>⠿</div>
+              <button onClick={()=>reorderExercises(i,i-1)} disabled={i===0} title="Move up" style={{background:"none",border:"none",cursor:i===0?"default":"pointer",color:i===0?"#eee":"#bbb",fontSize:13,padding:"1px 4px",lineHeight:1}} onMouseEnter={e=>{if(i>0)e.currentTarget.style.color="#555"}} onMouseLeave={e=>e.currentTarget.style.color=i===0?"#eee":"#bbb"}>▲</button>
+              <button onClick={()=>reorderExercises(i,i+1)} disabled={i===exercises.length-1} title="Move down" style={{background:"none",border:"none",cursor:i===exercises.length-1?"default":"pointer",color:i===exercises.length-1?"#eee":"#bbb",fontSize:13,padding:"1px 4px",lineHeight:1}} onMouseEnter={e=>{if(i<exercises.length-1)e.currentTarget.style.color="#555"}} onMouseLeave={e=>e.currentTarget.style.color=i===exercises.length-1?"#eee":"#bbb"}>▼</button>
+            </div>
+          )}
+          <div style={{flex:1}}>
+            <ExerciseCard exercise={ex} index={i + 1} isClient={isClient}
+              onChange={updated => updateExercise(ex.id, updated)}
+              onRemove={() => removeExercise(ex.id)} />
+          </div>
+        </div>
       ))}
 
       {/* Add exercise button */}
