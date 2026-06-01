@@ -208,12 +208,32 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [undoSnapshot, setUndoSnapshot] = useState(null); // snapshot of gymData when Edit was clicked
+  const [builderKey, setBuilderKey] = useState(0); // increment to force builder remount (undo)
 
   // Coach editing: start in read-only mode for existing sessions
   const hasExistingPlan = !!(session.plan?.gymData || session.plan?.mainSet || session.plan?.targetDepth);
   const [isEditing, setIsEditing] = useState(!hasExistingPlan);
 
+  // When entering edit mode, snapshot the current plan
+  function enterEditMode() {
+    setUndoSnapshot(session.plan?.gymData ? JSON.parse(JSON.stringify(session.plan.gymData)) : null);
+    setIsEditing(true);
+  }
+
+  // Undo — restore snapshot by remounting builder with original data
+  function handleUndo() {
+    setBuilderKey(k => k + 1);
+    setIsDirty(false);
+  }
+
   async function handleSave() { setSaving(true); await onSave(fb); setSaving(false); }
+
+  // When undo was triggered (builderKey > 0), use snapshot as initialData for coach view
+  function coachInitialData(computedData) {
+    if (!isClient && builderKey > 0 && undoSnapshot) return undoSnapshot;
+    return computedData;
+  }
 
   // Intercept close — show confirm if coach has unsaved edits
   function handleClose() {
@@ -242,7 +262,13 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             <button onClick={()=>setFb(p=>({...p,status:null}))} style={{background:"transparent",border:"1.5px solid #e0e0e0",color:"#888",padding:"5px 10px",borderRadius:7,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>↩ Reopen</button>
           )}
           {!isCompleted && !isEditing && (
-            <button onClick={()=>setIsEditing(true)} style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"6px 14px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>✏️ Edit</button>
+            <button onClick={enterEditMode} style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"6px 14px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>✏️ Edit</button>
+          )}
+          {!isCompleted && isEditing && isDirty && undoSnapshot && (
+            <button onClick={handleUndo} title="Undo all changes since you clicked Edit"
+              style={{background:"#fffbeb",color:"#b45309",border:"1.5px solid #fcd34d",padding:"6px 12px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+              ↩ Undo
+            </button>
           )}
           {!isCompleted && isEditing && hasExistingPlan && (
             <button onClick={()=>{if(isDirty){setShowCloseConfirm(true);}else{setIsEditing(false);}}} style={{background:"transparent",border:"1.5px solid #ddd",color:"#888",padding:"6px 12px",borderRadius:7,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>✕ Cancel</button>
@@ -315,7 +341,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
           </>
         ) : (
         <div onInput={markDirty} onChange={markDirty}>
-        <StaticBuilder
+        <StaticBuilder key={builderKey}
           isClient={isClient ? true : !isEditing ? "readonly" : false}
           initialData={(() => {
             const coachPlan = session.plan?.gymData || null;
@@ -329,7 +355,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
               }
               return coachPlan;
             }
-            return coachPlan;
+            return coachInitialData(coachPlan);
           })()}
           onSave={async (data) => {
             setSaving(true);
@@ -371,7 +397,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
           </>
         ) : (
           <div onInput={markDirty} onChange={markDirty}>
-          <MobilityBuilder
+          <MobilityBuilder key={builderKey}
             isClient={isClient ? true : !isEditing ? "readonly" : false}
             initialData={(() => {
               const cp = session.plan?.gymData||null; const cl = session.feedback?.clientGymData||null;
@@ -417,12 +443,12 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             )}
           </>
         ) : (
-        <div onInput={markDirty} onChange={markDirty}><DryEqBuilder
+        <div onInput={markDirty} onChange={markDirty}><DryEqBuilder key={builderKey}
           isClient={isClient ? true : !isEditing ? "readonly" : false}
           initialData={(() => {
             const cp=session.plan?.gymData||null; const cl=session.feedback?.clientGymData||null;
             if(isClient&&cp&&cl){return{...cp,drills:cp.drills?cp.drills.map(drill=>{const logged=cl.drills?.find(l=>l.id===drill.id);return logged?{...drill,log:logged.log}:drill;}):[],clientNotes:cl.clientNotes||"",overallRating:cl.overallRating||null,focusAreas:cl.focusAreas||cp.focusAreas||[]};}
-            return cp;
+            return coachInitialData(cp);
           })()}
           onSave={async(data)=>{setSaving(true);if(isClient){await onSave({...fb,gymData:data,status:fb.status||"completed"});}else{await onSave({...fb,gymData:data});}setSaving(false);onClose();}}
         /></div>
@@ -458,14 +484,14 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
           </>
         ) : (
           <div onInput={markDirty} onChange={markDirty}>
-          <DepthBuilder
+          <DepthBuilder key={builderKey}
             isClient={isClient ? true : !isEditing ? "readonly" : false}
             initialData={(() => {
               const cp = session.plan?.gymData||null; const cl = session.feedback?.clientGymData||null;
               if (isClient && cp && cl) {
                 return { ...cp, dives: cp.dives?cp.dives.map(dive=>{const logged=cl.dives?.find(l=>l.id===dive.id);return logged?{...dive,log:logged.log}:dive;}):[], energyBefore:cl.energyBefore||null, energyAfter:cl.energyAfter||null, clientNotes:cl.clientNotes||"", incident:cl.incident!==undefined?cl.incident:null };
               }
-              return cp;
+              return coachInitialData(cp);
             })()}
             onSave={async(data)=>{setSaving(true);if(isClient){await onSave({...fb,gymData:data,status:fb.status||"completed"});}else{await onSave({...fb,gymData:data});}setSaving(false);onClose();}}
           />
@@ -502,12 +528,12 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
           </>
         ) : (
           <div onInput={markDirty} onChange={markDirty}>
-          <PoolBuilder
+          <PoolBuilder key={builderKey}
             isClient={isClient ? true : !isEditing ? "readonly" : false}
             initialData={(() => {
               const cp=session.plan?.gymData||null; const cl=session.feedback?.clientGymData||null;
               if(isClient&&cp&&cl&&cl.sections){return{...cp,sections:cp.sections.map(sec=>({...sec,blocks:sec.blocks.map(bl=>{const logged=cl.sections?.flatMap(s=>s.blocks||[]).find(b=>b.id===bl.id);return logged?{...bl,log:logged.log}:bl;})})),clientNotes:cl.clientNotes||"",rating:cl.rating||null};}
-              return cp;
+              return coachInitialData(cp);
             })()}
             onSave={async(data)=>{setSaving(true);if(isClient){await onSave({...fb,gymData:data,status:fb.status||"completed"});}else{await onSave({...fb,gymData:data});}setSaving(false);onClose();}}
           />
@@ -550,7 +576,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
           </>
         ) : (
         <div onInput={markDirty} onChange={markDirty}>
-        <PoolTechniqueBuilder
+        <PoolTechniqueBuilder key={builderKey}
           isClient={isClient ? true : !isEditing ? "readonly" : false}
           initialData={(() => {
             const coachPlan = session.plan?.gymData || null;
@@ -561,7 +587,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
                 return logged ? { ...ex, log: logged.log } : ex;
               }), clientNotes: clientLog.clientNotes || "", rating: clientLog.rating || null };
             }
-            return coachPlan;
+            return coachInitialData(coachPlan);
           })()}
           onSave={async (data) => {
             setSaving(true);
@@ -611,7 +637,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
           </>
         ) : (
         <div onInput={markDirty} onChange={markDirty}>
-        <GymStrengthBuilder
+        <GymStrengthBuilder key={builderKey}
           isClient={isClient ? true : !isEditing ? "readonly" : false}
           initialData={(() => {
             const coachPlan = session.plan?.gymData || null;
@@ -633,7 +659,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
                 rating: clientLog.rating || null,
               };
             }
-            return coachPlan;
+            return coachInitialData(coachPlan);
           })()}
           onSave={async (gymData) => {
             setSaving(true);
