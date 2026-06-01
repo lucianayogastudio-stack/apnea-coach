@@ -193,7 +193,7 @@ function Spinner() {
 }
 
 // ── Day Modal ─────────────────────────────────────────────────────────────────
-function DayModal({ session, role, onClose, onSave, onEdit }) {
+function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate }) {
   const m = gm(session.method);
   const isGym    = session.method==="gym-strength";
   const isStatic = session.method==="static";
@@ -208,8 +208,11 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
-  const [undoSnapshot, setUndoSnapshot] = useState(null); // snapshot of gymData when Edit was clicked
-  const [builderKey, setBuilderKey] = useState(0); // increment to force builder remount (undo)
+  const [undoSnapshot, setUndoSnapshot] = useState(null);
+  const [builderKey, setBuilderKey] = useState(0);
+  const [saveTemplateModal, setSaveTemplateModal] = useState(null); // {method, gymData}
+  const [templateName, setTemplateName] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   // Coach editing: start in read-only mode for existing sessions
   const hasExistingPlan = !!(session.plan?.gymData || session.plan?.mainSet || session.plan?.targetDepth);
@@ -228,6 +231,58 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
   }
 
   async function handleSave() { setSaving(true); await onSave(fb); setSaving(false); }
+
+  // Coach plan save — saves session then offers template
+  function coachSave(method) {
+    return async (data) => {
+      setSaving(true);
+      await onSave({ ...fb, gymData: data });
+      setSaving(false);
+      setIsDirty(false);
+      setIsEditing(false);
+      if (onSaveTemplate) setSaveTemplateModal({ method, gymData: data });
+      else onClose();
+    };
+  }
+
+  // Save as template dialog
+  function SaveTemplateDialog() {
+    if (!saveTemplateModal) return null;
+    return (
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+        <div style={{background:"#fff",borderRadius:16,padding:"28px 24px",maxWidth:360,width:"100%",boxShadow:"0 24px 64px rgba(0,0,0,.2)"}}>
+          <div style={{fontSize:28,textAlign:"center",marginBottom:8}}>💾</div>
+          <div style={{fontWeight:700,fontSize:17,letterSpacing:"-.02em",marginBottom:6,textAlign:"center"}}>Session saved!</div>
+          <div style={{fontSize:13,color:"#888",marginBottom:18,lineHeight:1.6,textAlign:"center"}}>
+            Want to save this as a reusable template for future athletes?
+          </div>
+          <input value={templateName} onChange={e=>setTemplateName(e.target.value)}
+            placeholder="e.g. Beginner FRC Block, Elite Depth 1..."
+            autoFocus
+            style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",marginBottom:12,boxSizing:"border-box"}}
+            onKeyDown={e=>{ if(e.key==="Enter"&&templateName.trim()) handleSaveTemplate(); }}
+          />
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <button onClick={handleSaveTemplate} disabled={!templateName.trim()||savingTemplate}
+              style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"12px",borderRadius:9,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:(!templateName.trim()||savingTemplate)?0.5:1}}>
+              {savingTemplate?"Saving…":"💾 Save as Template"}
+            </button>
+            <button onClick={()=>{setSaveTemplateModal(null);setTemplateName("");onClose();}}
+              style={{background:"transparent",color:"#888",border:"1.5px solid #e0e0e0",padding:"11px",borderRadius:9,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+              No thanks, just close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function handleSaveTemplate() {
+    if (!templateName.trim()||!saveTemplateModal) return;
+    setSavingTemplate(true);
+    Promise.resolve(onSaveTemplate(templateName.trim(), saveTemplateModal.method, saveTemplateModal.gymData))
+      .then(()=>{ setSavingTemplate(false); setSaveTemplateModal(null); setTemplateName(""); onClose(); });
+  }
 
   // When undo was triggered (builderKey > 0), use snapshot as initialData for coach view
   function coachInitialData(computedData) {
@@ -357,16 +412,14 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             }
             return coachInitialData(coachPlan);
           })()}
-          onSave={async (data) => {
-            setSaving(true);
-            if (isClient) { await onSave({ ...fb, gymData:data, status: fb.status||"completed" }); }
-            else { await onSave({ ...fb, gymData:data }); }
-            setSaving(false); onClose();
-          }}
+          onSave={isClient
+            ? async(data)=>{setSaving(true);await onSave({...fb,gymData:data,status:fb.status||"completed"});setSaving(false);onClose();}
+            : coachSave(session.method)}
         />
         </div>
         )}
         <CloseConfirmDialog />
+        <SaveTemplateDialog />
       </Modal>
     );
   }
@@ -409,11 +462,12 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
               }
               return cp;
             })()}
-            onSave={async(data)=>{setSaving(true);if(isClient){await onSave({...fb,gymData:data,status:fb.status||"completed"});}else{await onSave({...fb,gymData:data});}setSaving(false);onClose();}}
+            onSave={isClient?async(data)=>{setSaving(true);await onSave({...fb,gymData:data,status:fb.status||"completed"});setSaving(false);onClose();}:coachSave(session.method)}
           />
           </div>
         )}
         <CloseConfirmDialog />
+        <SaveTemplateDialog />
       </Modal>
     );
   }
@@ -450,10 +504,11 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             if(isClient&&cp&&cl){return{...cp,drills:cp.drills?cp.drills.map(drill=>{const logged=cl.drills?.find(l=>l.id===drill.id);return logged?{...drill,log:logged.log}:drill;}):[],clientNotes:cl.clientNotes||"",overallRating:cl.overallRating||null,focusAreas:cl.focusAreas||cp.focusAreas||[]};}
             return coachInitialData(cp);
           })()}
-          onSave={async(data)=>{setSaving(true);if(isClient){await onSave({...fb,gymData:data,status:fb.status||"completed"});}else{await onSave({...fb,gymData:data});}setSaving(false);onClose();}}
+          onSave={isClient?async(data)=>{setSaving(true);await onSave({...fb,gymData:data,status:fb.status||"completed"});setSaving(false);onClose();}:coachSave(session.method)}
         /></div>
         )}
         <CloseConfirmDialog />
+        <SaveTemplateDialog />
       </Modal>
     );
   }
@@ -493,11 +548,12 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
               }
               return coachInitialData(cp);
             })()}
-            onSave={async(data)=>{setSaving(true);if(isClient){await onSave({...fb,gymData:data,status:fb.status||"completed"});}else{await onSave({...fb,gymData:data});}setSaving(false);onClose();}}
+            onSave={isClient?async(data)=>{setSaving(true);await onSave({...fb,gymData:data,status:fb.status||"completed"});setSaving(false);onClose();}:coachSave(session.method)}
           />
           </div>
         )}
         <CloseConfirmDialog />
+        <SaveTemplateDialog />
       </Modal>
     );
   }
@@ -535,11 +591,12 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
               if(isClient&&cp&&cl&&cl.sections){return{...cp,sections:cp.sections.map(sec=>({...sec,blocks:sec.blocks.map(bl=>{const logged=cl.sections?.flatMap(s=>s.blocks||[]).find(b=>b.id===bl.id);return logged?{...bl,log:logged.log}:bl;})})),clientNotes:cl.clientNotes||"",rating:cl.rating||null};}
               return coachInitialData(cp);
             })()}
-            onSave={async(data)=>{setSaving(true);if(isClient){await onSave({...fb,gymData:data,status:fb.status||"completed"});}else{await onSave({...fb,gymData:data});}setSaving(false);onClose();}}
+            onSave={isClient?async(data)=>{setSaving(true);await onSave({...fb,gymData:data,status:fb.status||"completed"});setSaving(false);onClose();}:coachSave(session.method)}
           />
           </div>
         )}
         <CloseConfirmDialog />
+        <SaveTemplateDialog />
       </Modal>
     );
   }
@@ -589,16 +646,14 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             }
             return coachInitialData(coachPlan);
           })()}
-          onSave={async (data) => {
-            setSaving(true);
-            if (isClient) { await onSave({ ...fb, gymData:data, status: fb.status||"completed" }); }
-            else { await onSave({ ...fb, gymData:data }); }
-            setSaving(false); onClose();
-          }}
+          onSave={isClient
+            ? async(data)=>{setSaving(true);await onSave({...fb,gymData:data,status:fb.status||"completed"});setSaving(false);onClose();}
+            : coachSave(session.method)}
         />
         </div>
         )}
         <CloseConfirmDialog />
+        <SaveTemplateDialog />
       </Modal>
     );
   }
@@ -661,20 +716,14 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
             }
             return coachInitialData(coachPlan);
           })()}
-          onSave={async (gymData) => {
-            setSaving(true);
-            if (isClient) {
-              await onSave({ ...fb, gymData, status: fb.status||"completed" });
-            } else {
-              await onSave({ ...fb, gymData });
-            }
-            setSaving(false);
-            onClose();
-          }}
+          onSave={isClient
+            ? async(gymData)=>{setSaving(true);await onSave({...fb,gymData,status:fb.status||"completed"});setSaving(false);onClose();}
+            : coachSave(session.method)}
         />
         </div>
         )}
         <CloseConfirmDialog />
+        <SaveTemplateDialog />
       </Modal>
     );
   }
@@ -778,6 +827,7 @@ function DayModal({ session, role, onClose, onSave, onEdit }) {
         </div>
       </div>
       <CloseConfirmDialog />
+        <SaveTemplateDialog />
     </Modal>
   );
 }
@@ -2946,7 +2996,7 @@ export default function ApneaCoach() {
         </div>
       )}
 
-      {dayModal&&<DayModal session={sessions.find(s=>s.id===dayModal.session.id)||dayModal.session} role={dayModal.role} onClose={()=>setDayModal(null)} onSave={fb=>handleFeedbackSave(dayModal.session.id,fb)} onEdit={s=>setEditModal(s)}/>}
+      {dayModal&&<DayModal session={sessions.find(s=>s.id===dayModal.session.id)||dayModal.session} role={dayModal.role} onClose={()=>setDayModal(null)} onSave={fb=>handleFeedbackSave(dayModal.session.id,fb)} onEdit={s=>setEditModal(s)} onSaveTemplate={saveTemplate} />}
       {editClientModal&&(
         <AddClientModal
           onClose={()=>setEditClientModal(null)}
