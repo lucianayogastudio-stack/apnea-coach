@@ -1993,7 +1993,12 @@ export default function ApneaCoach() {
       plan_warmup:plan.warmup||null, plan_mainset:mainSetValue, plan_cooldown:plan.cooldown||null,
       plan_target_depth:plan.targetDepth||null, plan_open_line:plan.openLine||false, plan_coach_notes:plan.coachNotes||null,
     }).select().single();
-    if (!error&&data) { setSessions(prev=>[...prev, dbToSession({...data,feedback:null})]); setAssignModal(null); flash("Session planned!"); }
+    if (!error&&data) {
+      setSessions(prev=>[...prev, dbToSession({...data,feedback:null})]);
+      // For builder sessions, don't close yet — withTemplateSave shows the template dialog first
+      if (!plan.gymData) { setAssignModal(null); flash("Session planned!"); }
+      else flash("Session saved!");
+    }
   }
 
   async function removeSession(id) {
