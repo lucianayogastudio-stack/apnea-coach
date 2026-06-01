@@ -427,6 +427,10 @@ export default function DepthBuilder({ initialData, onSave, isClient: isClientPr
   function addDive()           { setDives(prev => [...prev, makeDive()]); }
   function removeDive(id)      { setDives(prev => prev.filter(d => d.id !== id)); }
   function updateDive(id, upd) { setDives(prev => prev.map(d => d.id === id ? upd : d)); }
+  function reorderDives(from, to) {
+    if (to < 0 || to >= dives.length) return;
+    setDives(prev => { const a=[...prev]; const [item]=a.splice(from,1); a.splice(to,0,item); return a; });
+  }
 
   const completedCount = dives.filter(d => d.log && d.log.status === "completed").length;
   const totalDives     = dives.length;
@@ -472,9 +476,27 @@ export default function DepthBuilder({ initialData, onSave, isClient: isClientPr
           </div>
         )}
         {dives.map((dive, i) => (
-          <DivePlanRow key={dive.id} dive={dive} index={i + 1}
-            onChange={upd => updateDive(dive.id, upd)}
-            onRemove={() => removeDive(dive.id)} />
+          <div key={dive.id}
+            draggable
+            onDragStart={e=>{ e.dataTransfer.setData("diveIdx", i); e.currentTarget.style.opacity="0.5"; }}
+            onDragEnd={e=>{ e.currentTarget.style.opacity="1"; }}
+            onDragOver={e=>e.preventDefault()}
+            onDrop={e=>{ e.preventDefault(); const from=parseInt(e.dataTransfer.getData("diveIdx")); reorderDives(from,i); }}
+            style={{display:"flex",alignItems:"flex-start",gap:6,marginBottom:10}}>
+            {/* Drag handle + arrows */}
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,paddingTop:14,flexShrink:0}}>
+              <div title="Drag to reorder" style={{cursor:"grab",color:"#ccc",fontSize:16,lineHeight:1,padding:"2px 4px",userSelect:"none"}} onMouseEnter={e=>e.currentTarget.style.color="#999"} onMouseLeave={e=>e.currentTarget.style.color="#ccc"}>⠿</div>
+              <button onClick={()=>reorderDives(i,i-1)} disabled={i===0} title="Move up"
+                style={{background:"none",border:"none",cursor:i===0?"default":"pointer",color:i===0?"#eee":"#bbb",fontSize:13,padding:"1px 4px",lineHeight:1}} onMouseEnter={e=>{if(i>0)e.currentTarget.style.color="#555"}} onMouseLeave={e=>e.currentTarget.style.color=i===0?"#eee":"#bbb"}>▲</button>
+              <button onClick={()=>reorderDives(i,i+1)} disabled={i===dives.length-1} title="Move down"
+                style={{background:"none",border:"none",cursor:i===dives.length-1?"default":"pointer",color:i===dives.length-1?"#eee":"#bbb",fontSize:13,padding:"1px 4px",lineHeight:1}} onMouseEnter={e=>{if(i<dives.length-1)e.currentTarget.style.color="#555"}} onMouseLeave={e=>e.currentTarget.style.color=i===dives.length-1?"#eee":"#bbb"}>▼</button>
+            </div>
+            <div style={{flex:1}}>
+              <DivePlanRow dive={dive} index={i + 1}
+                onChange={upd => updateDive(dive.id, upd)}
+                onRemove={() => removeDive(dive.id)} />
+            </div>
+          </div>
         ))}
 
         <button onClick={addDive}
