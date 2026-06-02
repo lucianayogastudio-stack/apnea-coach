@@ -1816,44 +1816,64 @@ export default function ApneaCoach() {
 
   // ── Add Client ──
   async function handleAddClient(form) {
-    // Use single server-side function that does everything without touching auth session
-    const { data: result, error: rpcError } = await supabase.rpc("create_client_account", {
-      user_email: form.email,
-      user_password: form.password,
-      client_name: form.name,
-      coach_uuid: user.id,
-      client_level: form.level || "Beginner",
-      client_goal: form.goal || "",
-      client_age: form.age ? Number(form.age) : null,
+    // Step 1: Create auth user — suppress onAuthStateChange so coach doesn't get logged out
+    ignoringAuthChange.current = true;
+    let newUserId = null;
+    try {
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+      });
+      if (signUpError) {
+        flash("Error creating account: " + signUpError.message);
+        throw signUpError;
+      }
+      newUserId = authData?.user?.id;
+      if (!newUserId) {
+        flash("Error: could not create user account");
+        throw new Error("No user ID returned");
+      }
+    } finally {
+      // Always restore auth listening after a short delay
+      setTimeout(() => { ignoringAuthChange.current = false; }, 2000);
+    }
+
+    // Step 2: Create client row
+    const { data: clientRow, error: clientError } = await supabase.from("clients").insert({
+      coach_id: user.id,
+      name: form.name,
+      age: form.age ? Number(form.age) : null,
+      level: form.level || "Beginner",
+      goal: form.goal || "",
+      plan_type: form.planType || "weeks",
+      plan_weeks: form.planWeeks ? Number(form.planWeeks) : null,
+      plan_start_date: form.planStartDate || null,
+      competition_date: form.competitionDate || null,
+      competition_name: form.competitionName || null,
       pb_cwt: form.pb?.CWT ? Number(form.pb.CWT) : null,
       pb_sta: form.pb?.STA || null,
       pb_dyn: form.pb?.DYN ? Number(form.pb.DYN) : null,
-      plan_type_val: form.planType || "weeks",
-      plan_weeks_val: form.planWeeks ? Number(form.planWeeks) : null,
-      plan_start: form.planStartDate || null,
-      comp_date: form.competitionDate || null,
-      comp_name: form.competitionName || null,
-    });
+      avatar_url: form.avatarUrl || null,
+    }).select().single();
 
-    if (rpcError) { flash("Error: " + rpcError.message); throw new Error(rpcError.message); }
+    if (clientError) { flash("Error creating client: " + clientError.message); throw clientError; }
 
-    // Optimistically update state with returned client row
-    const clientRow = result?.client || (typeof result === 'object' && result?.id ? result : null);
-    if (clientRow) {
-      setClients(prev => [...prev, dbToClient(clientRow)]);
-    } else {
-      setTimeout(async () => {
-        const { data: updatedClients } = await supabase.from("clients").select("*, profiles(email)").eq("coach_id", user.id).order("created_at");
-        if (updatedClients) setClients(updatedClients.map(dbToClient));
-      }, 500);
-    }
+    // Step 3: Create profile linking auth user → client
+    await supabase.from("profiles").upsert({
+      id: newUserId,
+      role: "client",
+      client_id: clientRow.id,
+    }, { onConflict: "id" });
+
+    // Step 4: Update local state
+    setClients(prev => [...prev, dbToClient({ ...clientRow, email: form.email })]);
 
     await supabase.from("activity_log").insert({
       event_type: "client_added", coach_email: user.email, coach_id: user.id,
       details: `Added client: ${form.name} (${form.email})`,
-    }).catch(()=>{});
+    }).catch(() => {});
 
-    flash(`Client added! They can log in with ${form.email}`);
+    flash(`✓ ${form.name} added! They can log in with ${form.email}`);
   }
 
   // ── Add Coach (admin only) ──
