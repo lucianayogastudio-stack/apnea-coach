@@ -23,20 +23,79 @@ function makeDive() {
     openLineMax: "",
     drillNotes: "",
     coachNotes: "",
-    hang: "",          // hang duration in seconds
+    hang: "",          // hang duration in mm:ss
+    isWarmup: false,   // warm-up dive flag
+    isOptional: false, // optional dive flag
     // athlete log
     log: {
-      status: null,        // "completed" | "early-turn" | "missed"
+      status: null,        // "completed" | "early-turn" | "missed" | "skipped"
       actualDepth: "",
       turnDepth: "",
       diveTime: "",
       reason: "",
+      didOptional: null,   // true/false for optional dives
     },
+  };
+}
+
+// CO2 table block (separate from individual dives)
+function makeCO2Block() {
+  return {
+    id: uid(),
+    type: "co2table",
+    discipline: "CWT",
+    lungVolume: "Full",
+    targetDepth: "",
+    rounds: 6,
+    startRest: "4:00",   // starting rest in mm:ss
+    decrement: "0:15",   // rest decreases by this each round
+    coachNotes: "",
+    log: { roundLogs: [] }, // per-round actual depths
   };
 }
 
 function getDiscipline(key) {
   return DISCIPLINES.find(d => d.key === key) || DISCIPLINES[0];
+}
+
+// ── mm:ss helpers ─────────────────────────────────────────────────────────────
+function formatMmSs(val) {
+  // accepts seconds number or "mm:ss" string, returns "mm:ss"
+  if (!val && val !== 0) return "";
+  if (typeof val === "string" && val.includes(":")) return val;
+  const s = parseInt(val) || 0;
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+
+function parseMmSs(str) {
+  // returns total seconds from "mm:ss" string
+  if (!str) return 0;
+  if (!str.includes(":")) return parseInt(str) || 0;
+  const [m, s] = str.split(":").map(Number);
+  return (m || 0) * 60 + (s || 0);
+}
+
+function MmSsInput({ value, onChange, placeholder, style }) {
+  const [local, setLocal] = useState(value || "");
+  function handleBlur() {
+    // auto-format on blur: "130" → "2:10", "2:5" → "2:05"
+    if (!local) { onChange(""); return; }
+    if (local.includes(":")) {
+      const [m, s] = local.split(":");
+      const fmt = (m||"0") + ":" + String(parseInt(s)||0).padStart(2,"0");
+      setLocal(fmt); onChange(fmt);
+    } else {
+      const secs = parseInt(local) || 0;
+      const fmt = Math.floor(secs/60) + ":" + String(secs%60).padStart(2,"0");
+      setLocal(fmt); onChange(fmt);
+    }
+  }
+  return (
+    <input value={local} placeholder={placeholder || "m:ss"}
+      onChange={e => { setLocal(e.target.value); onChange(e.target.value); }}
+      onBlur={handleBlur}
+      style={style} />
+  );
 }
 
 // ── Energy scale ──────────────────────────────────────────────────────────────
@@ -76,9 +135,29 @@ function DivePlanRow({ dive, index, onChange, onRemove }) {
 
   function upd(f, v) { onChange({ ...dive, [f]: v }); }
 
+  // Border color: warmup = orange, optional = purple, default = grey
+  const borderColor = dive.isWarmup ? "#ffb74d" : dive.isOptional ? "#b39ddb" : "#ebebeb";
+  const bgColor     = dive.isWarmup ? "#fffbf2" : dive.isOptional ? "#f8f5ff" : "#fff";
+
   return (
-    <div style={{ background:"#fff", borderRadius:11, border:"1.5px solid #ebebeb", marginBottom:10, overflow:"hidden" }}>
-      <div style={{ padding:"12px 16px", display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+    <div style={{ background: bgColor, borderRadius:11, border:"1.5px solid " + borderColor, marginBottom:10, overflow:"hidden" }}>
+      {/* Warmup / Optional badges row */}
+      <div style={{ padding:"8px 16px 0", display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+        <label style={{ display:"flex", alignItems:"center", gap:5, cursor:"pointer", fontSize:11, fontWeight:700, color: dive.isWarmup ? "#e65100" : "#bbb", userSelect:"none" }}>
+          <input type="checkbox" checked={!!dive.isWarmup} onChange={e => upd("isWarmup", e.target.checked)}
+            style={{ width:13, height:13, accentColor:"#ff9800", cursor:"pointer" }} />
+          🔥 Warm-up
+        </label>
+        <label style={{ display:"flex", alignItems:"center", gap:5, cursor:"pointer", fontSize:11, fontWeight:700, color: dive.isOptional ? "#7e57c2" : "#bbb", userSelect:"none" }}>
+          <input type="checkbox" checked={!!dive.isOptional} onChange={e => upd("isOptional", e.target.checked)}
+            style={{ width:13, height:13, accentColor:"#7e57c2", cursor:"pointer" }} />
+          ⭐ Optional
+        </label>
+        {dive.isWarmup && <span style={{ fontSize:10, background:"#fff3e0", color:"#e65100", borderRadius:20, padding:"2px 8px", fontWeight:700 }}>WARM-UP</span>}
+        {dive.isOptional && <span style={{ fontSize:10, background:"#ede7f6", color:"#7e57c2", borderRadius:20, padding:"2px 8px", fontWeight:700 }}>OPTIONAL</span>}
+      </div>
+
+      <div style={{ padding:"10px 16px", display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
         {/* Index */}
         <span style={{ fontSize:13, fontWeight:700, color:"#bbb", flexShrink:0 }}>#{index}</span>
 
@@ -102,29 +181,28 @@ function DivePlanRow({ dive, index, onChange, onRemove }) {
         </label>
 
         {/* Target depth or open line max */}
-        {(
-          dive.openLine ? (
-            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-              <span style={{ fontSize:11, color:"#bbb", fontWeight:700 }}>MAX</span>
-              <input type="number" placeholder="e.g. 40" value={dive.openLineMax} onChange={e => upd("openLineMax", e.target.value)}
-                style={{ width:60, padding:"5px 7px", border:"1.5px solid #6a7ef4", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", color:"#1a1a1a", textAlign:"center", background:"#fff" }} />
-              <span style={{ fontSize:11, color:"#aaa" }}>m</span>
-            </div>
-          ) : (
-            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-              <span style={{ fontSize:11, color:"#bbb", fontWeight:700 }}>TARGET</span>
-              <input type="number" placeholder="e.g. 60" value={dive.targetDepth} onChange={e => upd("targetDepth", e.target.value)}
-                style={{ width:64, padding:"5px 7px", border:"1.5px solid #e0e0e0", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", color:"#1a1a1a", textAlign:"center", background:"#fff" }} />
-              <span style={{ fontSize:11, color:"#aaa" }}>m</span>
-            </div>
-          )
+        {dive.openLine ? (
+          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <span style={{ fontSize:11, color:"#bbb", fontWeight:700 }}>MAX</span>
+            <input type="number" placeholder="e.g. 40" value={dive.openLineMax} onChange={e => upd("openLineMax", e.target.value)}
+              style={{ width:60, padding:"5px 7px", border:"1.5px solid #6a7ef4", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", color:"#1a1a1a", textAlign:"center", background:"#fff" }} />
+            <span style={{ fontSize:11, color:"#aaa" }}>m</span>
+          </div>
+        ) : (
+          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <span style={{ fontSize:11, color:"#bbb", fontWeight:700 }}>TARGET</span>
+            <input type="number" placeholder="e.g. 60" value={dive.targetDepth} onChange={e => upd("targetDepth", e.target.value)}
+              style={{ width:64, padding:"5px 7px", border:"1.5px solid #e0e0e0", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", color:"#1a1a1a", textAlign:"center", background:"#fff" }} />
+            <span style={{ fontSize:11, color:"#aaa" }}>m</span>
+          </div>
         )}
 
-        {/* Hang */}
+        {/* Hang in mm:ss */}
         <div style={{ display:"flex", alignItems:"center", gap:6 }}>
           <span style={{ fontSize:11, color:"#bbb", fontWeight:700 }}>HANG</span>
-          <input type="number" placeholder="—" value={dive.hang || ""} onChange={e => upd("hang", e.target.value)}
-            style={{ width:48, padding:"5px 7px", border:"1.5px solid #e8cc4d", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", color:"#7a6200", textAlign:"center", background:"#fffbe6" }} />
+          <MmSsInput value={dive.hang || ""} onChange={v => upd("hang", v)}
+            placeholder="—"
+            style={{ width:56, padding:"5px 7px", border:"1.5px solid #e8cc4d", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", color:"#7a6200", textAlign:"center", background:"#fffbe6" }} />
           <span style={{ fontSize:11, color:"#aaa" }}>s</span>
         </div>
 
@@ -176,9 +254,13 @@ function AthleteTable({ dives, onChange }) {
             const isMissed    = log.status === "missed";
 
             return (
-              <tr key={dive.id} style={{ borderBottom:"1px solid #f5f5f5", background: isCompleted ? "#f8fdf8" : isMissed ? "#fff8f8" : "transparent" }}>
-                {/* Index */}
-                <td style={{ padding:"10px 10px", fontWeight:700, color:"#aaa", fontSize:12 }}>#{i+1}</td>
+              <tr key={dive.id} style={{ borderBottom:"1px solid #f5f5f5", background: dive.isWarmup ? "#fffbf2" : isCompleted ? "#f8fdf8" : isMissed ? "#fff8f8" : "transparent" }}>
+                {/* Index + badges */}
+                <td style={{ padding:"10px 10px", fontWeight:700, color:"#aaa", fontSize:12, whiteSpace:"nowrap" }}>
+                  #{i+1}
+                  {dive.isWarmup && <span style={{ display:"block", fontSize:9, background:"#fff3e0", color:"#e65100", borderRadius:20, padding:"1px 5px", fontWeight:700, marginTop:2 }}>WARM-UP</span>}
+                  {dive.isOptional && <span style={{ display:"block", fontSize:9, background:"#ede7f6", color:"#7e57c2", borderRadius:20, padding:"1px 5px", fontWeight:700, marginTop:2 }}>OPTIONAL</span>}
+                </td>
 
                 {/* Discipline */}
                 <td style={{ padding:"10px 6px" }}>
@@ -202,29 +284,49 @@ function AthleteTable({ dives, onChange }) {
 
                 {/* Status buttons */}
                 <td style={{ padding:"10px 6px" }}>
-                  <div style={{ display:"flex", gap:4 }}>
-                    {[
-                      { s:"completed",  emoji:"✓", color:"#4caf50", dim:"#e8f5e9" },
-                      { s:"early-turn", emoji:"↩", color:"#ff9800", dim:"#fff8e1" },
-                      { s:"missed",     emoji:"✗", color:"#ef5350", dim:"#fce4ec" },
-                    ].map(opt => {
-                      const active = log.status === opt.s;
-                      const any = !!log.status;
-                      return (
-                        <button key={opt.s} title={opt.s}
-                          onClick={() => updLog(dive.id, "status", active ? null : opt.s)}
-                          style={{ width:28, height:28, borderRadius:"50%",
-                            border: active ? `2.5px solid ${opt.color}` : "2px solid #e0e0e0",
-                            background: active ? opt.color : any ? opt.dim : "#f5f5f5",
-                            color: active ? "#fff" : any ? opt.color : "#bbb",
-                            fontSize:13, fontWeight:900, cursor:"pointer",
-                            display:"flex", alignItems:"center", justifyContent:"center",
-                            transition:"all .15s", opacity: any && !active ? 0.35 : 1, lineHeight:1 }}>
-                          {opt.emoji}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {dive.isOptional ? (
+                    // Optional dive — just Did it / Skipped
+                    <div style={{ display:"flex", gap:4 }}>
+                      {[
+                        { v:true,  label:"Did it", color:"#4caf50", bg:"#e8f5e9" },
+                        { v:false, label:"Skipped", color:"#aaa",    bg:"#f5f5f5" },
+                      ].map(opt => {
+                        const active = log.didOptional === opt.v;
+                        return (
+                          <button key={String(opt.v)} onClick={() => updLog(dive.id, "didOptional", active ? null : opt.v)}
+                            style={{ padding:"3px 8px", borderRadius:20, border:`1.5px solid ${active ? opt.color : "#e0e0e0"}`,
+                              background: active ? opt.color : "#fff", color: active ? "#fff" : "#aaa",
+                              fontSize:10, fontWeight:700, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ display:"flex", gap:4 }}>
+                      {[
+                        { s:"completed",  emoji:"✓", color:"#4caf50", dim:"#e8f5e9" },
+                        { s:"early-turn", emoji:"↩", color:"#ff9800", dim:"#fff8e1" },
+                        { s:"missed",     emoji:"✗", color:"#ef5350", dim:"#fce4ec" },
+                      ].map(opt => {
+                        const active = log.status === opt.s;
+                        const any = !!log.status;
+                        return (
+                          <button key={opt.s} title={opt.s}
+                            onClick={() => updLog(dive.id, "status", active ? null : opt.s)}
+                            style={{ width:28, height:28, borderRadius:"50%",
+                              border: active ? `2.5px solid ${opt.color}` : "2px solid #e0e0e0",
+                              background: active ? opt.color : any ? opt.dim : "#f5f5f5",
+                              color: active ? "#fff" : any ? opt.color : "#bbb",
+                              fontSize:13, fontWeight:900, cursor:"pointer",
+                              display:"flex", alignItems:"center", justifyContent:"center",
+                              transition:"all .15s", opacity: any && !active ? 0.35 : 1, lineHeight:1 }}>
+                            {opt.emoji}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </td>
 
                 {/* Actual depth (for completed or early turn) */}
@@ -276,7 +378,139 @@ function AthleteTable({ dives, onChange }) {
 }
 
 
-// ── Completed Session Summary (coach read-only view) ─────────────────────────
+// ── CO2 Table Block ───────────────────────────────────────────────────────────
+function CO2TableBlock({ block, index, onChange, onRemove, isClient }) {
+  function upd(f, v) { onChange({ ...block, [f]: v }); }
+
+  // Compute the table rows
+  const rows = [];
+  let restSecs = parseMmSs(block.startRest || "4:00");
+  const decSecs = parseMmSs(block.decrement || "0:15");
+  for (let r = 0; r < (Number(block.rounds) || 6); r++) {
+    rows.push({ round: r + 1, rest: formatMmSs(restSecs) });
+    restSecs = Math.max(0, restSecs - decSecs);
+  }
+
+  const disc = getDiscipline(block.discipline || "CWT");
+
+  return (
+    <div style={{ background:"#f0f6ff", borderRadius:11, border:"1.5px solid #3a8ef4", marginBottom:10, overflow:"hidden" }}>
+      {/* Header */}
+      <div style={{ background:"#3a8ef4", padding:"10px 16px", display:"flex", alignItems:"center", gap:8 }}>
+        <span style={{ fontSize:13, fontWeight:700, color:"#fff", opacity:0.7 }}>#{index}</span>
+        <span style={{ fontSize:13, fontWeight:800, color:"#fff", letterSpacing:".04em" }}>🌊 CO₂ TABLE</span>
+        <div style={{ flex:1 }} />
+        {!isClient && <button onClick={onRemove} style={{ background:"rgba(255,255,255,0.2)", border:"none", borderRadius:6, padding:"3px 8px", fontSize:11, color:"#fff", cursor:"pointer", fontFamily:"inherit" }}>Remove</button>}
+      </div>
+
+      <div style={{ padding:"14px 16px" }}>
+        {isClient ? (
+          // Client view — show computed table + log per round
+          <div>
+            <div style={{ marginBottom:10, fontSize:12, color:"#005fa3", fontWeight:600 }}>
+              {block.rounds} rounds · starting rest {block.startRest} · decreasing by {block.decrement} each round
+            </div>
+            {block.coachNotes && (
+              <div style={{ background:"#fffbe6", border:"1px solid #ffe082", borderRadius:8, padding:"8px 12px", marginBottom:12, fontSize:12, color:"#5a4800" }}>
+                {block.coachNotes}
+              </div>
+            )}
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+              <thead>
+                <tr style={{ borderBottom:"2px solid #c0d8f0" }}>
+                  {["Round","Rest","Target","Actual Depth"].map(h => (
+                    <th key={h} style={{ padding:"6px 8px", textAlign:"left", fontSize:10, fontWeight:800, color:"#3a8ef4", letterSpacing:".06em", textTransform:"uppercase" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, ri) => {
+                  const roundLog = (block.log?.roundLogs || [])[ri] || {};
+                  return (
+                    <tr key={ri} style={{ borderBottom:"1px solid #dbeeff", background: ri % 2 === 0 ? "#f8fbff" : "#fff" }}>
+                      <td style={{ padding:"8px 8px", fontWeight:700, color:"#3a8ef4" }}>{row.round}</td>
+                      <td style={{ padding:"8px 8px", color:"#005fa3", fontWeight:600 }}>{row.rest}</td>
+                      <td style={{ padding:"8px 8px", color:"#1a1a1a", fontWeight:600 }}>
+                        {block.targetDepth ? block.targetDepth + "m" : <span style={{ color:"#ccc" }}>—</span>}
+                      </td>
+                      <td style={{ padding:"8px 4px" }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                          <input type="number" placeholder="m" value={roundLog.actualDepth || ""}
+                            onChange={e => {
+                              const logs = [...(block.log?.roundLogs || Array(rows.length).fill({}))];
+                              logs[ri] = { ...logs[ri], actualDepth: e.target.value };
+                              onChange({ ...block, log: { ...block.log, roundLogs: logs } });
+                            }}
+                            style={{ width:56, padding:"4px 6px", border:"1.5px solid #a5d6a7", borderRadius:6, fontSize:12, fontFamily:"inherit", outline:"none", color:"#2e7d32", textAlign:"center", background:"#f1f8f1" }} />
+                          <span style={{ fontSize:11, color:"#aaa" }}>m</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          // Coach view — configure the table
+          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+            <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
+              <select value={block.discipline || "CWT"} onChange={e => upd("discipline", e.target.value)}
+                style={{ padding:"5px 8px", border:"1.5px solid " + disc.border, borderRadius:8, fontSize:12, fontWeight:700, fontFamily:"inherit", outline:"none", background:disc.bg, color:disc.color, cursor:"pointer" }}>
+                {DISCIPLINES.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}
+              </select>
+              <select value={block.lungVolume || "Full"} onChange={e => upd("lungVolume", e.target.value)}
+                style={{ padding:"5px 8px", border:"1.5px solid #e0e0e0", borderRadius:8, fontSize:12, fontWeight:600, fontFamily:"inherit", outline:"none", background:"#f8f8f6", color:"#555", cursor:"pointer" }}>
+                {LUNG_VOLUMES.map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                <span style={{ fontSize:11, color:"#3a8ef4", fontWeight:700 }}>ROUNDS</span>
+                <input type="number" min="1" max="20" value={block.rounds || 6} onChange={e => upd("rounds", parseInt(e.target.value)||6)}
+                  style={{ width:52, padding:"5px 7px", border:"1.5px solid #3a8ef4", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", color:"#005fa3", textAlign:"center", background:"#f0f6ff" }} />
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                <span style={{ fontSize:11, color:"#3a8ef4", fontWeight:700 }}>START REST</span>
+                <MmSsInput value={block.startRest || "4:00"} onChange={v => upd("startRest", v)} placeholder="4:00"
+                  style={{ width:60, padding:"5px 7px", border:"1.5px solid #3a8ef4", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", color:"#005fa3", textAlign:"center", background:"#f0f6ff" }} />
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                <span style={{ fontSize:11, color:"#3a8ef4", fontWeight:700 }}>DECREMENT</span>
+                <MmSsInput value={block.decrement || "0:15"} onChange={v => upd("decrement", v)} placeholder="0:15"
+                  style={{ width:60, padding:"5px 7px", border:"1.5px solid #3a8ef4", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", color:"#005fa3", textAlign:"center", background:"#f0f6ff" }} />
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                <span style={{ fontSize:11, color:"#3a8ef4", fontWeight:700 }}>TARGET</span>
+                <input type="number" placeholder="—" value={block.targetDepth || ""} onChange={e => upd("targetDepth", e.target.value)}
+                  style={{ width:56, padding:"5px 7px", border:"1.5px solid #3a8ef4", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", color:"#005fa3", textAlign:"center", background:"#f0f6ff" }} />
+                <span style={{ fontSize:11, color:"#aaa" }}>m</span>
+              </div>
+            </div>
+
+            {/* Preview table */}
+            <div style={{ background:"#fff", borderRadius:8, border:"1px solid #c0d8f0", overflow:"hidden" }}>
+              <div style={{ fontSize:10, fontWeight:800, color:"#3a8ef4", letterSpacing:".07em", textTransform:"uppercase", padding:"8px 12px", borderBottom:"1px solid #dbeeff" }}>Preview</div>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:0 }}>
+                {rows.map(row => (
+                  <div key={row.round} style={{ padding:"6px 12px", borderRight:"1px solid #eef4ff", borderBottom:"1px solid #eef4ff", minWidth:80, textAlign:"center" }}>
+                    <div style={{ fontSize:10, color:"#aaa", fontWeight:700 }}>Round {row.round}</div>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#005fa3" }}>{row.rest}</div>
+                    {block.targetDepth && <div style={{ fontSize:10, color:"#3a8ef4" }}>{block.targetDepth}m</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <textarea value={block.coachNotes || ""} onChange={e => upd("coachNotes", e.target.value)}
+              placeholder="Notes for this CO₂ table (focus, recovery tips...)..."
+              style={{ width:"100%", padding:"7px 10px", border:"1.5px solid #c0d8f0", borderRadius:7, outline:"none", fontSize:12, fontFamily:"inherit", resize:"vertical", minHeight:44, color:"#555", background:"#fff" }} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Main DepthBuilder export ──────────────────────────────────────────────────
 export function CompletedDepthSessionView({ coachPlan, clientLog }) {
   const data = clientLog;
   const DISC_COLORS = {
@@ -492,19 +726,34 @@ export default function DepthBuilder({ initialData, onSave, isClient: isClientPr
                 style={{background:"none",border:"none",cursor:i===dives.length-1?"default":"pointer",color:i===dives.length-1?"#eee":"#bbb",fontSize:13,padding:"1px 4px",lineHeight:1}} onMouseEnter={e=>{if(i<dives.length-1)e.currentTarget.style.color="#555"}} onMouseLeave={e=>e.currentTarget.style.color=i===dives.length-1?"#eee":"#bbb"}>▼</button>
             </div>
             <div style={{flex:1}}>
-              <DivePlanRow dive={dive} index={i + 1}
-                onChange={upd => updateDive(dive.id, upd)}
-                onRemove={() => removeDive(dive.id)} />
+              {dive.type === "co2table" ? (
+                <CO2TableBlock block={dive} index={i+1}
+                  onChange={upd => updateDive(dive.id, upd)}
+                  onRemove={() => removeDive(dive.id)}
+                  isClient={false} />
+              ) : (
+                <DivePlanRow dive={dive} index={i + 1}
+                  onChange={upd => updateDive(dive.id, upd)}
+                  onRemove={() => removeDive(dive.id)} />
+              )}
             </div>
           </div>
         ))}
 
-        <button onClick={addDive}
-          style={{ background:"#f0f0ec", border:"none", borderRadius:10, padding:"11px", fontSize:13, fontWeight:600, color:"#555", cursor:"pointer", fontFamily:"inherit", width:"100%", marginBottom:14, transition:"all .15s" }}
-          onMouseEnter={e => e.currentTarget.style.background = "#e8e8e4"}
-          onMouseLeave={e => e.currentTarget.style.background = "#f0f0ec"}>
-          + Add Dive
-        </button>
+        <div style={{ display:"flex", gap:8, marginBottom:14 }}>
+          <button onClick={addDive}
+            style={{ flex:1, background:"#f0f0ec", border:"none", borderRadius:10, padding:"11px", fontSize:13, fontWeight:600, color:"#555", cursor:"pointer", fontFamily:"inherit", transition:"all .15s" }}
+            onMouseEnter={e => e.currentTarget.style.background = "#e8e8e4"}
+            onMouseLeave={e => e.currentTarget.style.background = "#f0f0ec"}>
+            + Add Dive
+          </button>
+          <button onClick={() => setDives(prev => [...prev, makeCO2Block()])}
+            style={{ flex:1, background:"#f0f6ff", border:"1.5px solid #c0d8f0", borderRadius:10, padding:"11px", fontSize:13, fontWeight:600, color:"#005fa3", cursor:"pointer", fontFamily:"inherit", transition:"all .15s" }}
+            onMouseEnter={e => e.currentTarget.style.background = "#dbeeff"}
+            onMouseLeave={e => e.currentTarget.style.background = "#f0f6ff"}>
+            + CO₂ Table
+          </button>
+        </div>
 
         {isReadOnly ? (
           <div style={{background:"#f0f8ff",border:"1.5px solid #3a8ef4",borderRadius:9,padding:"12px 16px",textAlign:"center",fontSize:13,color:"#005fa3",fontWeight:500}}>
@@ -591,7 +840,11 @@ export default function DepthBuilder({ initialData, onSave, isClient: isClientPr
         <div style={{ marginBottom:16 }}>
           <div style={{ fontSize:11, fontWeight:700, color:"#bbb", letterSpacing:".07em", textTransform:"uppercase", marginBottom:10 }}>Dive Log</div>
           <div style={{ background:"#fff", borderRadius:12, border:"1px solid #ebebeb", overflow:"hidden" }}>
-            <AthleteTable dives={dives} onChange={setDives} />
+            <AthleteTable dives={dives.filter(d => d.type !== "co2table")} onChange={newDives => {
+          // merge back, keeping co2 blocks in place
+          let ni = 0;
+          setDives(dives.map(d => d.type === "co2table" ? d : newDives[ni++]));
+        }} />
           </div>
           {/* Legend */}
           <div style={{ display:"flex", gap:16, marginTop:8, fontSize:11, color:"#aaa" }}>
