@@ -35,7 +35,9 @@ function makeExercise() {
   return {
     id: uid(),
     discipline: "DNF",
+    distMode: "meters", // "meters" | "time"
     meters: "",
+    duration: "",
     reps: "",
     description: "",
     videoUrl: "",
@@ -65,9 +67,15 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
   function upd(field, val) { onChange({ ...exercise, [field]: val }); }
   function updLog(field, val) { onChange({ ...exercise, log: { ...exercise.log, [field]: val } }); }
 
+  const isTime = exercise.distMode === "time";
+
   const distLabel = exercise.reps
-    ? exercise.reps + " x " + (exercise.meters || "?") + "m"
-    : exercise.meters ? exercise.meters + "m" : "";
+    ? isTime
+      ? exercise.reps + " x " + (exercise.duration || "?")
+      : exercise.reps + " x " + (exercise.meters || "?") + "m"
+    : isTime
+      ? (exercise.duration || "")
+      : exercise.meters ? exercise.meters + "m" : "";
 
   const inp = {
     padding:"8px 10px", border:"1.5px solid #e0e0e0", borderRadius:7,
@@ -95,13 +103,32 @@ function ExerciseCard({ exercise, index, onChange, onRemove, isClient }) {
         {isClient ? (
           <span style={{ fontWeight:700, fontSize:15, color:"#1a1a1a" }}>{distLabel}</span>
         ) : (
-          <div style={{ display:"flex", gap:6, alignItems:"center", flexShrink:0 }}>
+          <div style={{ display:"flex", gap:6, alignItems:"center", flexShrink:0, flexWrap:"wrap" }}>
+            {/* Meters / Time toggle */}
+            <div style={{ display:"flex", borderRadius:7, border:"1.5px solid #e0e0e0", overflow:"hidden", flexShrink:0 }}>
+              {["meters","time"].map(mode => (
+                <button key={mode} onClick={() => upd("distMode", mode)}
+                  style={{ padding:"4px 10px", border:"none", fontSize:11, fontWeight:700, cursor:"pointer", fontFamily:"inherit",
+                    background: (exercise.distMode||"meters")===mode ? "#1a1a1a" : "#fff",
+                    color: (exercise.distMode||"meters")===mode ? "#fff" : "#aaa",
+                    transition:"all .12s" }}>
+                  {mode === "meters" ? "m" : "⏱"}
+                </button>
+              ))}
+            </div>
             <input type="number" placeholder="Reps" value={exercise.reps} onChange={e => upd("reps", e.target.value)}
               style={{ width:52, padding:"5px 7px", border:"1.5px solid #e0e0e0", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", color:"#1a1a1a", textAlign:"center" }} />
             <span style={{ color:"#bbb", fontSize:13 }}>x</span>
-            <input type="number" placeholder="Meters" value={exercise.meters} onChange={e => upd("meters", e.target.value)}
-              style={{ width:72, padding:"5px 7px", border:"1.5px solid #e0e0e0", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", color:"#1a1a1a", textAlign:"center" }} />
-            <span style={{ color:"#aaa", fontSize:12 }}>m</span>
+            {isTime ? (
+              <input placeholder="e.g. 2:30" value={exercise.duration||""} onChange={e => upd("duration", e.target.value)}
+                style={{ width:72, padding:"5px 7px", border:"1.5px solid #e0e0e0", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", color:"#1a1a1a", textAlign:"center" }} />
+            ) : (
+              <>
+                <input type="number" placeholder="Meters" value={exercise.meters} onChange={e => upd("meters", e.target.value)}
+                  style={{ width:72, padding:"5px 7px", border:"1.5px solid #e0e0e0", borderRadius:7, fontSize:13, fontFamily:"inherit", outline:"none", color:"#1a1a1a", textAlign:"center" }} />
+                <span style={{ color:"#aaa", fontSize:12 }}>m</span>
+              </>
+            )}
           </div>
         )}
 
@@ -306,7 +333,7 @@ export default function PoolTechniqueBuilder({ initialData, onSave, isClient: is
   const doneCount  = exercises.filter(e => e.log?.status === "completed").length;
   const totalCount = exercises.length;
   const progress   = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
-  const totalM     = exercises.reduce((sum, ex) => sum + (Number(ex.reps) || 1) * (Number(ex.meters) || 0), 0);
+  const totalM = exercises.reduce((sum, ex) => sum + (ex.distMode==="time" ? 0 : (Number(ex.reps) || 1) * (Number(ex.meters) || 0)), 0);
 
   const mainDisc = DISCIPLINES.find(d => d.key === discipline) || DISCIPLINES[0];
 
