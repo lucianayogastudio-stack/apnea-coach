@@ -1076,7 +1076,7 @@ function AddClientModal({ onClose, onSave, initialClient, isEditing }) {
   }
 
   return (
-    <Modal onClose={handleClose}>
+    <Modal onClose={onClose}>
       <div style={{fontWeight:700,fontSize:18,marginBottom:20,letterSpacing:"-.02em"}}>{isEditing?"Edit Client":"New Client"}</div>
       <div style={{display:"flex",flexDirection:"column",gap:13}}>
 
@@ -1195,7 +1195,7 @@ function AddCoachModal({ onClose, onSave }) {
   }
 
   return (
-    <Modal onClose={handleClose}>
+    <Modal onClose={onClose}>
       <div style={{fontWeight:700,fontSize:18,marginBottom:6,letterSpacing:"-.02em"}}>Add New Coach</div>
       <div style={{fontSize:13,color:"#999",marginBottom:20}}>Create a coach account — they'll only see their own clients.</div>
       <div style={{display:"flex",flexDirection:"column",gap:13}}>
