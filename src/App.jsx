@@ -193,7 +193,7 @@ function Spinner() {
 }
 
 // ── Day Modal ─────────────────────────────────────────────────────────────────
-function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate }) {
+function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOfferTemplate }) {
   const m = gm(session.method);
   const isGym    = session.method==="gym-strength";
   const isStatic = session.method==="static";
@@ -210,9 +210,6 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate }) {
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [undoSnapshot, setUndoSnapshot] = useState(null);
   const [builderKey, setBuilderKey] = useState(0);
-  const [saveTemplateModal, setSaveTemplateModal] = useState(null); // {method, gymData}
-  const [templateName, setTemplateName] = useState("");
-  const [savingTemplate, setSavingTemplate] = useState(false);
 
   // Coach editing: start in read-only mode for existing sessions
   const hasExistingPlan = !!(session.plan?.gymData || session.plan?.mainSet || session.plan?.targetDepth);
@@ -232,17 +229,15 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate }) {
 
   async function handleSave() { setSaving(true); await onSave(fb); setSaving(false); }
 
-  // Coach plan save — saves session then offers template
   function coachSave(method) {
     return async (data) => {
       setSaving(true);
       await onSave({ ...fb, gymData: data });
       setSaving(false);
       setIsDirty(false);
-      // Show template save dialog — it handles closing the modal
-      if (onSaveTemplate) {
-        setIsEditing(false);
-        setSaveTemplateModal({ method, gymData: data });
+      setIsEditing(false);
+      if (onOfferTemplate) {
+        onOfferTemplate({ method, gymData: data, onClose });
       } else {
         onClose();
       }
@@ -250,43 +245,7 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate }) {
   }
 
   // Save as template dialog
-  function SaveTemplateDialog() {
-    if (!saveTemplateModal) return null;
-    return (
-      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-        <div style={{background:"#fff",borderRadius:16,padding:"28px 24px",maxWidth:360,width:"100%",boxShadow:"0 24px 64px rgba(0,0,0,.2)"}}>
-          <div style={{fontSize:28,textAlign:"center",marginBottom:8}}>💾</div>
-          <div style={{fontWeight:700,fontSize:17,letterSpacing:"-.02em",marginBottom:6,textAlign:"center"}}>Session saved!</div>
-          <div style={{fontSize:13,color:"#888",marginBottom:18,lineHeight:1.6,textAlign:"center"}}>
-            Want to save this as a reusable template for future athletes?
-          </div>
-          <input value={templateName} onChange={e=>setTemplateName(e.target.value)}
-            placeholder="e.g. Beginner FRC Block, Elite Depth 1..."
-            autoFocus
-            style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",marginBottom:12,boxSizing:"border-box"}}
-            onKeyDown={e=>{ if(e.key==="Enter"&&templateName.trim()) handleSaveTemplate(); }}
-          />
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <button onClick={handleSaveTemplate} disabled={!templateName.trim()||savingTemplate}
-              style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"12px",borderRadius:9,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:(!templateName.trim()||savingTemplate)?0.5:1}}>
-              {savingTemplate?"Saving…":"💾 Save as Template"}
-            </button>
-            <button onClick={()=>{setSaveTemplateModal(null);setTemplateName("");onClose();}}
-              style={{background:"transparent",color:"#888",border:"1.5px solid #e0e0e0",padding:"11px",borderRadius:9,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
-              No thanks, just close
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
-  function handleSaveTemplate() {
-    if (!templateName.trim()||!saveTemplateModal) return;
-    setSavingTemplate(true);
-    Promise.resolve(onSaveTemplate(templateName.trim(), saveTemplateModal.method, saveTemplateModal.gymData))
-      .then(()=>{ setSavingTemplate(false); setSaveTemplateModal(null); setTemplateName(""); onClose(); });
-  }
 
   // When undo was triggered (builderKey > 0), use snapshot as initialData for coach view
   function coachInitialData(computedData) {
@@ -423,7 +382,6 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate }) {
         </div>
         )}
         <CloseConfirmDialog />
-        <SaveTemplateDialog />
       </Modal>
     );
   }
@@ -471,7 +429,6 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate }) {
           </div>
         )}
         <CloseConfirmDialog />
-        <SaveTemplateDialog />
       </Modal>
     );
   }
@@ -512,7 +469,6 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate }) {
         /></div>
         )}
         <CloseConfirmDialog />
-        <SaveTemplateDialog />
       </Modal>
     );
   }
@@ -557,7 +513,6 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate }) {
           </div>
         )}
         <CloseConfirmDialog />
-        <SaveTemplateDialog />
       </Modal>
     );
   }
@@ -600,7 +555,6 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate }) {
           </div>
         )}
         <CloseConfirmDialog />
-        <SaveTemplateDialog />
       </Modal>
     );
   }
@@ -657,7 +611,6 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate }) {
         </div>
         )}
         <CloseConfirmDialog />
-        <SaveTemplateDialog />
       </Modal>
     );
   }
@@ -727,7 +680,6 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate }) {
         </div>
         )}
         <CloseConfirmDialog />
-        <SaveTemplateDialog />
       </Modal>
     );
   }
@@ -831,22 +783,18 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate }) {
         </div>
       </div>
       <CloseConfirmDialog />
-        <SaveTemplateDialog />
     </Modal>
   );
 }
 
 // ── Assign Modal ──────────────────────────────────────────────────────────────
-function AssignModal({ date, clientName, onClose, onSave, existingSessions, templates, onSaveTemplate, onDeleteTemplate }) {
+function AssignModal({ date, clientName, onClose, onSave, existingSessions, templates, onSaveTemplate, onDeleteTemplate, onOfferTemplate }) {
   const [method, setMethod] = useState("depth");
   const [plan, setPlan] = useState({warmup:"",mainSet:"",cooldown:"",targetDepth:"",openLine:false,coachNotes:""});
   const [saving, setSaving] = useState(false);
   const [templateSession, setTemplateSession] = useState(null);
   const [templateConfirmed, setTemplateConfirmed] = useState(false);
-  const [showTemplates, setShowTemplates] = useState(false);      // show saved templates panel
-  const [saveTemplateModal, setSaveTemplateModal] = useState(null); // {gymData, method} pending save
-  const [templateName, setTemplateName] = useState("");
-  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   const isDepth = method==="depth";
   const isGym    = method==="gym-strength";
@@ -874,55 +822,23 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions, temp
   }
 
   // Save template dialog
-  function SaveTemplateDialog() {
-    if (!saveTemplateModal) return null;
-    return (
-      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-        <div style={{background:"#fff",borderRadius:16,padding:"28px 24px",maxWidth:360,width:"100%",boxShadow:"0 24px 64px rgba(0,0,0,.2)"}}>
-          <div style={{fontWeight:700,fontSize:17,letterSpacing:"-.02em",marginBottom:6}}>💾 Save as Template</div>
-          <div style={{fontSize:13,color:"#888",marginBottom:18,lineHeight:1.5}}>Give this session a name so you can reuse it with any athlete.</div>
-          <input value={templateName} onChange={e=>setTemplateName(e.target.value)}
-            placeholder="e.g. Beginner FRC Block, Elite Depth 1..."
-            autoFocus
-            style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",marginBottom:14,boxSizing:"border-box"}}
-            onKeyDown={e=>{ if(e.key==="Enter"&&templateName.trim()) handleSaveTemplate(); }} />
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={handleSaveTemplate}
-              disabled={!templateName.trim()||savingTemplate}
-              style={{flex:1,background:"#1a1a1a",color:"#fff",border:"none",padding:"11px",borderRadius:8,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:(!templateName.trim()||savingTemplate)?0.5:1}}>
-              {savingTemplate?"Saving…":"Save Template"}
-            </button>
-            <button onClick={()=>{setSaveTemplateModal(null);setTemplateName("");onClose();}}
-              style={{background:"transparent",color:"#888",border:"1.5px solid #e0e0e0",padding:"11px 16px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
-              Skip
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Builder save handler that offers template saving after
-  function withTemplateSave(method) {
+  // Builder save handler — saves session, then triggers app-level template dialog
+  function withTemplateSave(sessionMethod) {
     return async (data) => {
       setSaving(true);
-      await onSave({ method, plan:{ ...plan, gymData: data } });
+      await onSave({ method: sessionMethod, plan:{ ...plan, gymData: data } });
       setSaving(false);
-      // Show template save dialog — onClose happens there
-      setSaveTemplateModal({ method, gymData: data });
+      // Trigger app-level template dialog (rendered outside all modals, no overflow issues)
+      if (onOfferTemplate) {
+        onOfferTemplate({ method: sessionMethod, gymData: data, onClose });
+      } else {
+        onClose();
+      }
     };
-  }
-
-  function handleSaveTemplate() {
-    if (!templateName.trim()) return;
-    setSavingTemplate(true);
-    Promise.resolve(onSaveTemplate(templateName.trim(), saveTemplateModal.method, saveTemplateModal.gymData))
-      .then(()=>{ setSavingTemplate(false); setSaveTemplateModal(null); setTemplateName(""); onClose(); });
   }
 
   return (
     <Modal onClose={onClose} wide>
-      <SaveTemplateDialog />
       <div style={{fontWeight:700,fontSize:18,marginBottom:4,letterSpacing:"-.02em"}}>Plan Session</div>
       <div style={{fontSize:13,color:"#999",marginBottom:20}}>{clientName} · {fmtFull(date)}</div>
       <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:10}}>Training Method</div>
@@ -2013,6 +1929,10 @@ export default function ApneaCoach() {
   const [templates, setTemplates] = useState([]); // coach's saved session templates
   const [clientSearch, setClientSearch] = useState(""); // search query for client list
   const [clientSort, setClientSort] = useState("name"); // name | pending | done
+  // App-level template save dialog — rendered outside all modals to avoid overflow clipping
+  const [pendingTemplate, setPendingTemplate] = useState(null); // {method, gymData, onClose}
+  const [pendingTemplateName, setPendingTemplateName] = useState("");
+  const [savingPendingTemplate, setSavingPendingTemplate] = useState(false);
   const [coachNotes, setCoachNotes] = useState({}); // {clientId: "notes text"}
   const [savingNotes, setSavingNotes] = useState(false);
 
@@ -3001,7 +2921,7 @@ export default function ApneaCoach() {
         )}
       </div>
 
-      {assignModal&&activeClient&&<AssignModal date={assignModal} clientName={activeClient.name} onClose={()=>setAssignModal(null)} onSave={handleAssignSave} existingSessions={sessions.filter(s=>s.clientId===activeClient.id&&s.plan?.gymData)} templates={templates} onSaveTemplate={saveTemplate} onDeleteTemplate={deleteTemplate} />}
+      {assignModal&&activeClient&&<AssignModal date={assignModal} clientName={activeClient.name} onClose={()=>setAssignModal(null)} onSave={handleAssignSave} existingSessions={sessions.filter(s=>s.clientId===activeClient.id&&s.plan?.gymData)} templates={templates} onSaveTemplate={saveTemplate} onDeleteTemplate={deleteTemplate} onOfferTemplate={t=>setPendingTemplate(t)} />}
             {/* Clipboard banner */}
       {clipboard && view==="coachWeek" && (
         <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#1a1a1a",color:"#fff",padding:"12px 20px",borderRadius:12,fontSize:13,fontWeight:500,zIndex:400,display:"flex",alignItems:"center",gap:14,boxShadow:"0 8px 24px rgba(0,0,0,.2)"}}>
@@ -3010,7 +2930,7 @@ export default function ApneaCoach() {
         </div>
       )}
 
-      {dayModal&&<DayModal session={sessions.find(s=>s.id===dayModal.session.id)||dayModal.session} role={dayModal.role} onClose={()=>setDayModal(null)} onSave={fb=>handleFeedbackSave(dayModal.session.id,fb)} onEdit={s=>setEditModal(s)} onSaveTemplate={saveTemplate} />}
+      {dayModal&&<DayModal session={sessions.find(s=>s.id===dayModal.session.id)||dayModal.session} role={dayModal.role} onClose={()=>setDayModal(null)} onSave={fb=>handleFeedbackSave(dayModal.session.id,fb)} onEdit={s=>setEditModal(s)} onSaveTemplate={saveTemplate} onOfferTemplate={t=>setPendingTemplate(t)} />}
       {editClientModal&&(
         <AddClientModal
           onClose={()=>setEditClientModal(null)}
@@ -3101,6 +3021,51 @@ export default function ApneaCoach() {
           </div>
         </div>
       )}
+      {/* App-level template save dialog — outside all modals to avoid overflow clipping */}
+      {pendingTemplate && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#fff",borderRadius:16,padding:"28px 24px",maxWidth:360,width:"100%",boxShadow:"0 24px 64px rgba(0,0,0,.25)",textAlign:"center"}}>
+            <div style={{fontSize:32,marginBottom:8}}>💾</div>
+            <div style={{fontWeight:700,fontSize:17,letterSpacing:"-.02em",marginBottom:6}}>Session saved!</div>
+            <div style={{fontSize:13,color:"#888",marginBottom:18,lineHeight:1.6}}>
+              Want to save this as a reusable template for future athletes?
+            </div>
+            <input
+              value={pendingTemplateName}
+              onChange={e=>setPendingTemplateName(e.target.value)}
+              placeholder="e.g. Beginner FRC Block, Elite Depth 1..."
+              autoFocus
+              style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",marginBottom:12,boxSizing:"border-box",textAlign:"left"}}
+              onKeyDown={e=>{
+                if(e.key==="Enter"&&pendingTemplateName.trim()){
+                  setSavingPendingTemplate(true);
+                  saveTemplate(pendingTemplateName.trim(), pendingTemplate.method, pendingTemplate.gymData)
+                    .then(()=>{ setSavingPendingTemplate(false); setPendingTemplate(null); setPendingTemplateName(""); pendingTemplate.onClose?.(); });
+                }
+              }}
+            />
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              <button
+                onClick={()=>{
+                  if(!pendingTemplateName.trim()) return;
+                  setSavingPendingTemplate(true);
+                  saveTemplate(pendingTemplateName.trim(), pendingTemplate.method, pendingTemplate.gymData)
+                    .then(()=>{ setSavingPendingTemplate(false); setPendingTemplate(null); setPendingTemplateName(""); pendingTemplate.onClose?.(); });
+                }}
+                disabled={!pendingTemplateName.trim()||savingPendingTemplate}
+                style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"12px",borderRadius:9,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:(!pendingTemplateName.trim()||savingPendingTemplate)?0.5:1}}>
+                {savingPendingTemplate?"Saving…":"💾 Save as Template"}
+              </button>
+              <button
+                onClick={()=>{ setPendingTemplate(null); setPendingTemplateName(""); pendingTemplate.onClose?.(); }}
+                style={{background:"transparent",color:"#888",border:"1.5px solid #e0e0e0",padding:"11px",borderRadius:9,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+                No thanks, just close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {toast&&<div style={{position:"fixed",bottom:24,right:24,background:"#1a1a1a",color:"#fff",padding:"12px 20px",borderRadius:10,fontSize:13,fontWeight:500,zIndex:999,animation:"fi .2s"}}>✓ {toast}<style>{`@keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style></div>}
     </div>
   );
