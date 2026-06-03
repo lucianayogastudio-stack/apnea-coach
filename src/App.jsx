@@ -2566,6 +2566,8 @@ export default function ApneaCoach() {
               <div style={{display:"flex",gap:8}}>
                 <button onClick={()=>generateWeekPDF(weekDates, sessions.filter(s=>s.clientId===activeClient.id), activeClient.name, "")}
                   style={{background:"#f0f0ec",border:"none",borderRadius:8,padding:"8px 13px",fontSize:12,fontWeight:600,color:"#555",cursor:"pointer",fontFamily:"inherit"}}>📄 PDF</button>
+                <button onClick={()=>{ import("./generatePDF.js").then(m=>m.generateAthleteReport({client:activeClient, sessions:sessions.filter(s=>s.clientId===activeClient.id), coachName:profile?.email?.split("@")[0]||"Coach"})); }}
+                  style={{background:"#1a1a1a",color:"#fff",border:"none",borderRadius:8,padding:"8px 13px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>📊 Progress Report</button>
                 {[["‹ Prev",()=>setWeekStart(addDays(weekStart,-7))],["Today",()=>setWeekStart(mondayOf(new Date()))],["Next ›",()=>setWeekStart(addDays(weekStart,7))]].map(([l,fn])=>(
                   <button key={l} onClick={fn} style={{background:"transparent",color:"#1a1a1a",border:"1.5px solid #ddd",color:"#444",padding:"8px 13px",borderRadius:8,fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>{l}</button>
                 ))}
