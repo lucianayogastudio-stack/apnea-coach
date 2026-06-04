@@ -1957,7 +1957,23 @@ export default function ApneaCoach() {
   const [savingNotes, setSavingNotes] = useState(false);
 
   async function handleFeedbackSave(sessionId, fb) {
-    // Store gym/static workout log as JSON in client_notes field
+    const isCoachPlanSave = fb.gymData && !fb.status;
+
+    // Coach plan save — update sessions table plan_mainset
+    if (isCoachPlanSave) {
+      const { error } = await supabase.from("sessions").update({
+        plan_mainset: JSON.stringify(fb.gymData),
+      }).eq("id", sessionId);
+      if (!error) {
+        setSessions(prev => prev.map(s => s.id === sessionId
+          ? { ...s, plan: { ...s.plan, gymData: fb.gymData } }
+          : s
+        ));
+      }
+      return;
+    }
+
+    // Athlete/feedback save — update feedback table
     const clientNotesValue = fb.gymData
       ? JSON.stringify(fb.gymData)
       : fb.clientNotes||null;
@@ -1970,12 +1986,7 @@ export default function ApneaCoach() {
     },{onConflict:"session_id"});
     if (!error) {
       setSessions(prev=>prev.map(s=>s.id===sessionId?{...s,feedback:{...fb, clientGymData: fb.gymData || s.feedback?.clientGymData, gymData: undefined}}:s));
-      // Only close modal and flash here for athlete saves (status set) or non-gymData saves
-      // For coach plan saves (gymData present, no status), coachSave() handles closing after template dialog
-      const isCoachPlanSave = fb.gymData && !fb.status;
-      if (!isCoachPlanSave) {
-        setDayModal(null); flash("Saved!");
-      }
+      setDayModal(null); flash("Saved!");
 
       // ── PB detection ──
       const session = sessions.find(s=>s.id===sessionId);
