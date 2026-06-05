@@ -279,8 +279,8 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
         {isEditing && isDirty && !isCompleted && (
           <span style={{fontSize:11,fontWeight:700,color:"#f59e0b",background:"#fffbeb",padding:"2px 8px",borderRadius:20,border:"1px solid #fcd34d"}}>● Unsaved</span>
         )}
-        {/* Difficulty picker */}
-        {!isCompleted && (
+        {/* Difficulty picker — hidden for appointments */}
+        {!isCompleted && !isAppointment && (
           <div style={{display:"flex",alignItems:"center",gap:3}}>
             {[1,2,3,4,5].map(d => {
               const dc = ["#4caf50","#8bc34a","#ff9800","#f44336","#9c27b0"][d-1];
@@ -455,8 +455,12 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
                 {appt.title || "Appointment"}
               </div>
               {appt.time && (
-                <div style={{fontSize:14,color:"#9333ea",fontWeight:600,marginBottom:8}}>🕐 {appt.time}</div>
+                <div style={{fontSize:14,color:"#9333ea",fontWeight:600,marginBottom:4}}>🕐 {appt.time}</div>
               )}
+              {/* Timezone reminder */}
+              <div style={{fontSize:11,color:"#a855f7",background:"#ede9fe",borderRadius:6,padding:"4px 10px",display:"inline-block",marginBottom:8}}>
+                🌍 Your timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}
+              </div>
               {appt.notes && (
                 <div style={{fontSize:14,color:"#555",lineHeight:1.7,borderTop:"1px solid #e9d5ff",paddingTop:10,marginTop:8}}>{appt.notes}</div>
               )}
@@ -465,32 +469,35 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
               )}
             </div>
 
-            {/* Calendar export buttons */}
+            {/* Calendar export buttons — always shown */}
             <div style={{marginBottom:8}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#888",letterSpacing:".06em",textTransform:"uppercase",marginBottom:10}}>Add to your calendar</div>
+              <div style={{fontSize:12,fontWeight:700,color:"#888",letterSpacing:".06em",textTransform:"uppercase",marginBottom:10}}>📲 Add to your calendar</div>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
                 <button onClick={openGoogleCalendar}
-                  style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderRadius:10,border:"1.5px solid #e0e0e0",background:"#fff",cursor:"pointer",fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor="#4285f4"}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor="#e0e0e0"}>
+                  style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",borderRadius:10,border:"1.5px solid #4285f4",background:"#f0f6ff",cursor:"pointer",fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}
+                  onMouseEnter={e=>e.currentTarget.style.background="#dbeeff"}
+                  onMouseLeave={e=>e.currentTarget.style.background="#f0f6ff"}>
                   <span style={{fontSize:22}}>📆</span>
-                  <div>
+                  <div style={{flex:1}}>
                     <div style={{fontWeight:700,fontSize:14,color:"#1a1a1a"}}>Google Calendar</div>
-                    <div style={{fontSize:12,color:"#888"}}>Opens in your browser</div>
+                    <div style={{fontSize:12,color:"#888"}}>Opens in your browser — sign in and click Save</div>
                   </div>
-                  <span style={{marginLeft:"auto",fontSize:12,color:"#bbb"}}>→</span>
+                  <span style={{fontSize:16,color:"#4285f4"}}>→</span>
                 </button>
                 <button onClick={downloadICS}
-                  style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderRadius:10,border:"1.5px solid #e0e0e0",background:"#fff",cursor:"pointer",fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor="#555"}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor="#e0e0e0"}>
+                  style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",borderRadius:10,border:"1.5px solid #555",background:"#f8f8f6",cursor:"pointer",fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}
+                  onMouseEnter={e=>e.currentTarget.style.background="#efefed"}
+                  onMouseLeave={e=>e.currentTarget.style.background="#f8f8f6"}>
                   <span style={{fontSize:22}}>🗓</span>
-                  <div>
+                  <div style={{flex:1}}>
                     <div style={{fontWeight:700,fontSize:14,color:"#1a1a1a"}}>Apple Calendar / Outlook</div>
-                    <div style={{fontSize:12,color:"#888"}}>Downloads a .ics file</div>
+                    <div style={{fontSize:12,color:"#888"}}>Downloads a .ics file — tap to open in your calendar</div>
                   </div>
-                  <span style={{marginLeft:"auto",fontSize:12,color:"#bbb"}}>↓</span>
+                  <span style={{fontSize:16,color:"#555"}}>↓</span>
                 </button>
+              </div>
+              <div style={{fontSize:11,color:"#bbb",marginTop:8,textAlign:"center"}}>
+                Times are saved in your local timezone ({Intl.DateTimeFormat().resolvedOptions().timeZone})
               </div>
             </div>
           </div>
@@ -504,10 +511,11 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
                 style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",boxSizing:"border-box"}} />
             </div>
             <div>
-              <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Time</div>
+              <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Time <span style={{fontWeight:400,color:"#aaa",fontSize:11}}>— your local timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}</span></div>
               <input value={apptTime} onChange={e=>setApptTime(e.target.value)}
                 placeholder="e.g. 9:00 AM, 14:30..."
                 style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",boxSizing:"border-box"}} />
+              <div style={{fontSize:11,color:"#bbb",marginTop:4}}>💡 Tip: include timezone if your athlete is in a different location, e.g. "9:00 AM Bali time (WITA)"</div>
             </div>
             <div>
               <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Notes</div>
