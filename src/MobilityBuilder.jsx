@@ -541,7 +541,7 @@ function Section({ section, onChange, onRemove, isClient }) {
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
-export default function MobilityBuilder({ initialData, onSave, isClient: isClientProp }) {
+export default function MobilityBuilder({ initialData, onSave, isClient: isClientProp , difficultyPicker=null}) {
   const isReadOnly = isClientProp === "readonly";
   const isClient = isReadOnly ? false : !!isClientProp;
   const defaultSections = [
@@ -659,10 +659,13 @@ export default function MobilityBuilder({ initialData, onSave, isClient: isClien
           👁 View mode — click <strong>✏️ Edit</strong> above to make changes
         </div>
       ) : (
+      <>
+      {difficultyPicker}
       <button onClick={handleSave} disabled={saving}
         style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"12px 24px",borderRadius:9,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",width:"100%",marginTop:14,opacity:saving?0.6:1}}>
         {saving?"Saving...":"Save Session Plan"}
       </button>
+      </>
       )}
     </div>
   );

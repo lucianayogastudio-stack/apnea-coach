@@ -831,6 +831,32 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions, temp
   const [templateConfirmed, setTemplateConfirmed] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
 
+  // Difficulty picker element — passed to builders to render before save button
+  const DIFF_COLORS = ["#4caf50","#8bc34a","#ff9800","#f44336","#9c27b0"];
+  const DIFF_LABELS = ["Very Easy","Easy","Moderate","Hard","Very Hard"];
+  const difficultyPickerEl = (
+    <div style={{marginBottom:12,padding:"14px 16px",background:"#f8f8f6",borderRadius:10,border:"1.5px solid #e8e8e4"}}>
+      <div style={{fontSize:11,fontWeight:700,color:"#888",letterSpacing:".06em",textTransform:"uppercase",marginBottom:10}}>Session Difficulty</div>
+      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+        {[1,2,3,4,5].map(d => {
+          const sel = plan.difficulty === d;
+          return (
+            <button key={d} onClick={()=>setPlan(p=>({...p,difficulty:sel?null:d}))}
+              title={DIFF_LABELS[d-1]}
+              style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:8,
+                border:`2px solid ${sel?DIFF_COLORS[d-1]:"#e0e0e0"}`,
+                background:sel?DIFF_COLORS[d-1]:"#fff",
+                color:sel?"#fff":"#888",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",transition:"all .15s"}}>
+              <span style={{fontSize:15,fontWeight:900}}>{d}</span>
+              <span style={{fontSize:11}}>{DIFF_LABELS[d-1]}</span>
+            </button>
+          );
+        })}
+        {!plan.difficulty && <span style={{fontSize:12,color:"#bbb",fontStyle:"italic"}}>Optional</span>}
+      </div>
+    </div>
+  );
+
   const isDepth = method==="depth";
   const isGym    = method==="gym-strength";
   const isStatic = method==="static";
@@ -1010,6 +1036,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions, temp
         <MobilityBuilder
           isClient={false}
           initialData={templateSession?.plan?.gymData || null}
+          difficultyPicker={difficultyPickerEl}
           onSave={withTemplateSave(method)}
         />
       )}
@@ -1019,6 +1046,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions, temp
         <DryEqBuilder
           isClient={false}
           initialData={templateSession?.plan?.gymData || null}
+          difficultyPicker={difficultyPickerEl}
           onSave={withTemplateSave(method)}
         />
       )}
@@ -1028,6 +1056,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions, temp
         <DepthBuilder
           isClient={false}
           initialData={templateSession?.plan?.gymData || null}
+          difficultyPicker={difficultyPickerEl}
           onSave={withTemplateSave(method)}
         />
       )}
@@ -1037,6 +1066,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions, temp
         <PoolBuilder
           isClient={false}
           initialData={templateSession?.plan?.gymData || null}
+          difficultyPicker={difficultyPickerEl}
           onSave={withTemplateSave(method)}
         />
       )}
@@ -1046,6 +1076,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions, temp
         <PoolTechniqueBuilder
           isClient={false}
           initialData={templateSession?.plan?.gymData || null}
+          difficultyPicker={difficultyPickerEl}
           onSave={withTemplateSave(method)}
         />
       )}
@@ -1055,6 +1086,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions, temp
         <StaticBuilder
           isClient={false}
           initialData={templateSession?.plan?.gymData || null}
+          difficultyPicker={difficultyPickerEl}
           onSave={withTemplateSave(method)}
         />
       )}
@@ -1064,6 +1096,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions, temp
         <GymStrengthBuilder
           isClient={false}
           initialData={templateSession?.plan?.gymData || null}
+          difficultyPicker={difficultyPickerEl}
           onSave={withTemplateSave(method)}
         />
       )}

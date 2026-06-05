@@ -310,7 +310,7 @@ function EquipmentSelector({ selected, onChange, isClient }) {
   );
 }
 
-export default function PoolTechniqueBuilder({ initialData, onSave, isClient: isClientProp }) {
+export default function PoolTechniqueBuilder({ initialData, onSave, isClient: isClientProp , difficultyPicker=null}) {
   const isReadOnly = isClientProp === "readonly";
   const isClient = isReadOnly ? false : !!isClientProp;
   const [sessionName, setSessionName] = useState((initialData && initialData.sessionName) || "");
@@ -489,10 +489,13 @@ export default function PoolTechniqueBuilder({ initialData, onSave, isClient: is
           👁 View mode — click <strong>✏️ Edit</strong> above to make changes
         </div>
       ) : (
+      <>
+      {difficultyPicker}
       <button onClick={handleSave} disabled={saving}
         style={{ background:"#1a1a1a", color:"#fff", border:"none", padding:"12px 24px", borderRadius:9, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"inherit", width:"100%", marginTop:14, opacity: saving ? 0.6 : 1 }}>
         {saving ? "Saving..." : "Save Session Plan"}
       </button>
+      </>
       )}
     </div>
   );

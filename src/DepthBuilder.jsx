@@ -642,7 +642,7 @@ export function CompletedDepthSessionView({ coachPlan, clientLog }) {
 }
 
 // ── Main Depth Builder ────────────────────────────────────────────────────────
-export default function DepthBuilder({ initialData, onSave, isClient: isClientProp }) {
+export default function DepthBuilder({ initialData, onSave, isClient: isClientProp , difficultyPicker=null}) {
   const isReadOnly = isClientProp === "readonly";
   const isClient = isReadOnly ? false : !!isClientProp;
   const [sessionName,   setSessionName]   = useState((initialData && initialData.sessionName) || "");
@@ -938,6 +938,7 @@ export default function DepthBuilder({ initialData, onSave, isClient: isClientPr
         )}
       </div>
 
+      {difficultyPicker}
       <button onClick={handleSave} disabled={saving}
         style={{ background:"#1a1a1a", color:"#fff", border:"none", padding:"12px 24px", borderRadius:9, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"inherit", width:"100%", opacity: saving ? 0.6 : 1 }}>
         {saving ? "Saving..." : "Save Dive Log"}
