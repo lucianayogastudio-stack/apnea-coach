@@ -514,6 +514,26 @@ export default function CompletedSessionView({ method, coachPlan, clientLog, onR
             {clientLog.incident.notes&&<div style={{fontSize:13,color:"#555",marginTop:8,paddingTop:8,borderTop:"1px solid #ef9a9a",lineHeight:1.6}}>{clientLog.incident.notes}</div>}
           </div>
         )}
+
+        {/* Extra dives outside the plan */}
+        {clientLog?.extraDives?.length > 0 && (
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:11,fontWeight:700,color:"#e65100",letterSpacing:".07em",textTransform:"uppercase",marginBottom:8}}>⚠️ Extra Dives (Outside Plan)</div>
+            {clientLog.extraDives.map((d, i) => (
+              <div key={d.id||i} style={{background:"#fff8f0",border:"1.5px solid #ffe0c0",borderRadius:10,padding:"10px 14px",marginBottom:8}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                  <span style={{fontSize:11,fontWeight:700,color:"#e65100"}}>Extra #{i+1}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:"#555",background:"#f0f0ec",padding:"2px 8px",borderRadius:6}}>{d.discipline}</span>
+                  <span style={{fontSize:12,color:"#888"}}>{d.lungVolume}</span>
+                  {d.depth && <span style={{fontWeight:700,fontSize:14,color:"#1a2fa3"}}>{d.depth}m</span>}
+                  {d.diveTime && <span style={{fontSize:12,color:"#555"}}>⏱ {d.diveTime}</span>}
+                </div>
+                {d.notes && <div style={{fontSize:12,color:"#888",marginTop:6,fontStyle:"italic"}}>{d.notes}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+
         <AthleteNotes clientLog={clientLog} energyLabels={energyLabels} />
         <CoachReply coachComment={coachComment} onReply={onReply} saving={saving} onSave={onSave} />
       </div>

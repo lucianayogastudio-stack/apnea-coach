@@ -654,9 +654,16 @@ export default function DepthBuilder({ initialData, onSave, isClient: isClientPr
   const [energyAfter,   setEnergyAfter]   = useState((initialData && initialData.energyAfter)  || null);
   const [clientNotes,   setClientNotes]   = useState((initialData && initialData.clientNotes)  || "");
   const [incident,      setIncident]      = useState((initialData && initialData.incident)     || null);
+  const [extraDives,    setExtraDives]    = useState((initialData && initialData.extraDives)   || []);
   // incident = null (not answered) | false (no incident) | { types: [], details: {} }
   const [saving,        setSaving]        = useState(false);
   const [logMode,       setLogMode]       = useState(false);
+
+  function addExtraDive() {
+    setExtraDives(prev => [...prev, { id: uid(), discipline:"CWT", lungVolume:"Full", depth:"", diveTime:"", notes:"" }]);
+  }
+  function updateExtraDive(id, upd) { setExtraDives(prev => prev.map(d => d.id === id ? { ...d, ...upd } : d)); }
+  function removeExtraDive(id) { setExtraDives(prev => prev.filter(d => d.id !== id)); }
 
   function addDive()           { setDives(prev => [...prev, makeDive()]); }
   function removeDive(id)      { setDives(prev => prev.filter(d => d.id !== id)); }
@@ -671,7 +678,7 @@ export default function DepthBuilder({ initialData, onSave, isClient: isClientPr
 
   async function handleSave() {
     setSaving(true);
-    await onSave({ sessionName, location, coachNotes, dives, energyBefore, energyAfter, clientNotes, incident });
+    await onSave({ sessionName, location, coachNotes, dives, energyBefore, energyAfter, clientNotes, incident, extraDives });
     setSaving(false);
   }
 
@@ -859,6 +866,55 @@ export default function DepthBuilder({ initialData, onSave, isClient: isClientPr
       <div style={{ marginBottom:16 }}>
         <EnergyScale value={energyAfter} onChange={setEnergyAfter} isClient={true}
           label="How do you feel AFTER the session? (1 = very tired, 5 = fully charged)" />
+      </div>
+
+      {/* Extra dives outside the plan */}
+      <div style={{ marginBottom:16 }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+          <div>
+            <div style={{ fontSize:12, fontWeight:700, color:"#555", marginBottom:2 }}>Extra dives outside the plan</div>
+            <div style={{ fontSize:11, color:"#aaa" }}>Did you do any dives outside the planned session?</div>
+          </div>
+          <button onClick={addExtraDive}
+            style={{ background:"#f0f0ec", border:"none", borderRadius:8, padding:"6px 12px", fontSize:12, fontWeight:600, color:"#555", cursor:"pointer", fontFamily:"inherit", flexShrink:0 }}>
+            + Add dive
+          </button>
+        </div>
+        {extraDives.length > 0 && (
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {extraDives.map((d, i) => {
+              const disc = getDiscipline(d.discipline);
+              return (
+                <div key={d.id} style={{ background:"#fff8f0", border:"1.5px solid #ffe0c0", borderRadius:10, padding:"12px 14px" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap", marginBottom:8 }}>
+                    <span style={{ fontSize:11, fontWeight:700, color:"#e65100" }}>Extra #{i+1}</span>
+                    <select value={d.discipline} onChange={e=>updateExtraDive(d.id,{discipline:e.target.value})}
+                      style={{ padding:"4px 8px", border:"1.5px solid "+disc.border, borderRadius:7, fontSize:12, fontWeight:700, fontFamily:"inherit", outline:"none", background:disc.bg, color:disc.color, cursor:"pointer" }}>
+                      {DISCIPLINES.map(dis => <option key={dis.key} value={dis.key}>{dis.label}</option>)}
+                    </select>
+                    <select value={d.lungVolume} onChange={e=>updateExtraDive(d.id,{lungVolume:e.target.value})}
+                      style={{ padding:"4px 8px", border:"1.5px solid #e0e0e0", borderRadius:7, fontSize:12, fontFamily:"inherit", outline:"none", background:"#f8f8f6", color:"#555", cursor:"pointer" }}>
+                      {LUNG_VOLUMES.map(v => <option key={v} value={v}>{v}</option>)}
+                    </select>
+                    <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                      <input type="number" placeholder="Depth" value={d.depth||""} onChange={e=>updateExtraDive(d.id,{depth:e.target.value})}
+                        style={{ width:60, padding:"4px 7px", border:"1.5px solid #e0e0e0", borderRadius:7, fontSize:12, fontFamily:"inherit", outline:"none", textAlign:"center" }} />
+                      <span style={{ fontSize:11, color:"#aaa" }}>m</span>
+                    </div>
+                    <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                      <input placeholder="Time" value={d.diveTime||""} onChange={e=>updateExtraDive(d.id,{diveTime:e.target.value})}
+                        style={{ width:60, padding:"4px 7px", border:"1.5px solid #e0e0e0", borderRadius:7, fontSize:12, fontFamily:"inherit", outline:"none", textAlign:"center" }} />
+                    </div>
+                    <button onClick={()=>removeExtraDive(d.id)}
+                      style={{ marginLeft:"auto", background:"none", border:"1.5px solid #e8c5c5", borderRadius:6, padding:"3px 8px", fontSize:11, color:"#c0392b", cursor:"pointer", fontFamily:"inherit" }}>×</button>
+                  </div>
+                  <input placeholder="Notes (optional — why was this dive outside the plan?)" value={d.notes||""} onChange={e=>updateExtraDive(d.id,{notes:e.target.value})}
+                    style={{ width:"100%", padding:"6px 10px", border:"1.5px solid #ffe0c0", borderRadius:7, fontSize:12, fontFamily:"inherit", outline:"none", color:"#555", background:"#fff", boxSizing:"border-box" }} />
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Client notes */}
