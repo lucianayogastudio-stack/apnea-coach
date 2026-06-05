@@ -56,6 +56,7 @@ function dbToSession(row) {
       warmup: row.plan_warmup||"", mainSet: gymData?null:row.plan_mainset||"", cooldown: row.plan_cooldown||"",
       targetDepth: row.plan_target_depth||null, openLine: row.plan_open_line||false, coachNotes: row.plan_coach_notes||"",
       gymData,
+      difficulty: row.difficulty||null,
     },
     feedback: row.feedback ? {
       status: row.feedback.status||null, actualDepth: row.feedback.actual_depth||"",
@@ -205,6 +206,7 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
   const isDepth = session.method==="depth";
   const isClient = role==="client";
   const [fb, setFb] = useState({...session.feedback});
+  const [difficulty, setDifficulty] = useState(session.plan?.difficulty||null);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -275,7 +277,33 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
         {isEditing && isDirty && !isCompleted && (
           <span style={{fontSize:11,fontWeight:700,color:"#f59e0b",background:"#fffbeb",padding:"2px 8px",borderRadius:20,border:"1px solid #fcd34d"}}>● Unsaved</span>
         )}
-        <div style={{marginLeft:"auto",display:"flex",gap:6}}>
+        {/* Difficulty picker */}
+        {!isCompleted && (
+          <div style={{display:"flex",alignItems:"center",gap:3}}>
+            {[1,2,3,4,5].map(d => {
+              const dc = ["#4caf50","#8bc34a","#ff9800","#f44336","#9c27b0"][d-1];
+              const dl = ["Very Easy","Easy","Moderate","Hard","Very Hard"][d-1];
+              const sel = difficulty === d;
+              return (
+                <button key={d} onClick={()=>{ const nd=sel?null:d; setDifficulty(nd); saveDifficulty(nd); }}
+                  title={dl}
+                  style={{width:22,height:22,borderRadius:5,border:`2px solid ${sel?dc:"#e0e0e0"}`,
+                    background:sel?dc:"#fff",color:sel?"#fff":"#ccc",
+                    fontSize:10,fontWeight:800,cursor:"pointer",fontFamily:"inherit",transition:"all .15s",lineHeight:1,padding:0}}>
+                  {d}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <div style={{marginLeft:"auto",display:"flex",gap:6,flexWrap:"wrap"}}>
+          {hasExistingPlan && onOfferTemplate && !isEditing && (
+            <button onClick={()=>onOfferTemplate({method:session.method, gymData:session.plan?.gymData, onClose:()=>{}})}
+              title="Save this session as a reusable template"
+              style={{background:"#fffbeb",color:"#b45309",border:"1.5px solid #fcd34d",padding:"5px 11px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+              💾 Save as Template
+            </button>
+          )}
           {isCompleted && fb.status && (
             <button onClick={()=>setFb(p=>({...p,status:null}))} style={{background:"transparent",border:"1.5px solid #e0e0e0",color:"#888",padding:"5px 10px",borderRadius:7,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>↩ Reopen</button>
           )}
@@ -295,6 +323,13 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
       </div>
     );
   }
+
+  // Save difficulty instantly without opening edit mode
+  async function saveDifficulty(d) {
+    await supabase.from("sessions").update({ difficulty: d }).eq("id", session.id);
+    onSave({ _difficultyOnly: true, difficulty: d, sessionId: session.id });
+  }
+
 
   // Unsaved changes confirmation dialog
   function CloseConfirmDialog() {
@@ -790,7 +825,7 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
 // ── Assign Modal ──────────────────────────────────────────────────────────────
 function AssignModal({ date, clientName, onClose, onSave, existingSessions, templates, onSaveTemplate, onDeleteTemplate, onOfferTemplate }) {
   const [method, setMethod] = useState("depth");
-  const [plan, setPlan] = useState({warmup:"",mainSet:"",cooldown:"",targetDepth:"",openLine:false,coachNotes:""});
+  const [plan, setPlan] = useState({warmup:"",mainSet:"",cooldown:"",targetDepth:"",openLine:false,coachNotes:"",difficulty:null});
   const [saving, setSaving] = useState(false);
   const [templateSession, setTemplateSession] = useState(null);
   const [templateConfirmed, setTemplateConfirmed] = useState(false);
@@ -842,12 +877,38 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions, temp
       <div style={{fontWeight:700,fontSize:18,marginBottom:4,letterSpacing:"-.02em"}}>Plan Session</div>
       <div style={{fontSize:13,color:"#999",marginBottom:20}}>{clientName} · {fmtFull(date)}</div>
       <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:10}}>Training Method</div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:20}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:16}}>
         {METHODS.map(m=>{const sel=method===m.key;return(
           <button key={m.key} onClick={()=>{setMethod(m.key);setTemplateConfirmed(false);setTemplateSession(null);}} style={{borderRadius:10,padding:"10px 8px",border:`2px solid ${sel?m.dot:"#e8e8e8"}`,background:sel?m.bg:"#fff",color:sel?m.text:"#aaa",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",flexDirection:"column",alignItems:"center",gap:5,transition:"all .12s"}}>
             <span style={{fontSize:20}}>{m.emoji}</span><span style={{lineHeight:1.3,textAlign:"center"}}>{m.label}</span>
           </button>
         );})}
+      </div>
+
+      {/* Difficulty picker */}
+      <div style={{marginBottom:20}}>
+        <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:8}}>Difficulty</div>
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          {[1,2,3,4,5].map(d => {
+            const colors = ["#4caf50","#8bc34a","#ff9800","#f44336","#9c27b0"];
+            const labels = ["Very Easy","Easy","Moderate","Hard","Very Hard"];
+            const sel = plan.difficulty === d;
+            return (
+              <button key={d} onClick={()=>setPlan(p=>({...p,difficulty:sel?null:d}))}
+                title={labels[d-1]}
+                style={{width:36,height:36,borderRadius:8,border:`2px solid ${sel?colors[d-1]:"#e0e0e0"}`,
+                  background:sel?colors[d-1]:"#fff",color:sel?"#fff":"#bbb",
+                  fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"inherit",transition:"all .15s"}}>
+                {d}
+              </button>
+            );
+          })}
+          {plan.difficulty && (
+            <span style={{fontSize:12,color:"#888",marginLeft:4}}>
+              {["Very Easy","Easy","Moderate","Hard","Very Hard"][plan.difficulty-1]}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Template picker — shown when templates or prev sessions exist */}
@@ -1568,10 +1629,20 @@ function WeekGrid({ weekDates, clientId, sessions, onClickSession, onClickAdd, o
                   style={{borderRadius:10,border:`1.5px solid ${m.border}`,borderLeft:`3px solid ${m.dot}`,background:"#fff",marginBottom:8,cursor:isClient?"grab":"pointer",transition:"box-shadow .15s,transform .1s",overflow:"hidden",opacity:draggingId===s.id?0.5:1}}
                   onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,.1)";e.currentTarget.style.transform="translateY(-1px)";}}
                   onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";e.currentTarget.style.transform="none";}}>
+                  {/* Difficulty bar at top */}
+                  {s.plan?.difficulty && (() => {
+                    const dc = ["#4caf50","#8bc34a","#ff9800","#f44336","#9c27b0"][s.plan.difficulty-1];
+                    return <div style={{height:3,background:dc,width:"100%"}}/>;
+                  })()}
                   <div style={{padding:"9px 10px"}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
                       <span style={{fontSize:16}}>{m.emoji}</span>
                       <div style={{display:"flex",alignItems:"center",gap:4}}>
+                        {s.plan?.difficulty && (() => {
+                          const dc = ["#4caf50","#8bc34a","#ff9800","#f44336","#9c27b0"][s.plan.difficulty-1];
+                          const dl = ["Very Easy","Easy","Moderate","Hard","Very Hard"][s.plan.difficulty-1];
+                          return <span title={dl} style={{fontSize:9,fontWeight:800,color:dc,background:dc+"18",borderRadius:4,padding:"1px 5px"}}>{s.plan.difficulty}</span>;
+                        })()}
                         {isClient && s.feedback?.coachComment && s.feedback?.status==="completed" && (
                           <div title="Coach left feedback" style={{width:7,height:7,borderRadius:"50%",background:"#2e7d32",flexShrink:0}}/>
                         )}
@@ -1928,6 +1999,7 @@ export default function ApneaCoach() {
       client_id:activeClient.id, date:assignModal, method,
       plan_warmup:plan.warmup||null, plan_mainset:mainSetValue, plan_cooldown:plan.cooldown||null,
       plan_target_depth:plan.targetDepth||null, plan_open_line:plan.openLine||false, plan_coach_notes:plan.coachNotes||null,
+      difficulty:plan.difficulty||null,
     }).select().single();
     if (!error&&data) {
       setSessions(prev=>[...prev, dbToSession({...data,feedback:null})]);
@@ -1957,6 +2029,12 @@ export default function ApneaCoach() {
   const [savingNotes, setSavingNotes] = useState(false);
 
   async function handleFeedbackSave(sessionId, fb) {
+    // Difficulty-only save — already saved to DB in saveDifficulty, just update local state
+    if (fb._difficultyOnly) {
+      setSessions(prev => prev.map(s => s.id===sessionId ? {...s, plan:{...s.plan, difficulty:fb.difficulty}} : s));
+      return;
+    }
+
     const isCoachPlanSave = fb.gymData && !fb.status;
 
     // Coach plan save — update sessions table plan_mainset
