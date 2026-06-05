@@ -378,6 +378,66 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
       onClose();
     }
 
+    // Build datetime string from session.date + appt.time
+    function buildDateTime(dateStr, timeStr, durationHours=1) {
+      const d = new Date(dateStr + "T12:00:00"); // base date
+      // Try to parse time like "9:00 AM", "14:30", "9am", "09:00"
+      if (timeStr) {
+        const t = timeStr.trim().toLowerCase();
+        const ampm = t.includes("am") || t.includes("pm");
+        const nums = t.replace(/[^0-9:]/g,"");
+        const [h,min=0] = nums.split(":").map(Number);
+        let hour = h;
+        if (ampm && t.includes("pm") && h !== 12) hour += 12;
+        if (ampm && t.includes("am") && h === 12) hour = 0;
+        d.setHours(hour, Number(min), 0, 0);
+      }
+      const end = new Date(d.getTime() + durationHours * 3600000);
+      const fmt = dt => dt.toISOString().replace(/[-:]/g,"").split(".")[0];
+      return { start: fmt(d), end: fmt(end) };
+    }
+
+    function openGoogleCalendar() {
+      const { start, end } = buildDateTime(session.date, appt.time);
+      const params = new URLSearchParams({
+        action: "TEMPLATE",
+        text: appt.title || "Appointment",
+        dates: `${start}/${end}`,
+        details: [appt.notes, "Added via ApneaCoach"].filter(Boolean).join("\n"),
+      });
+      window.open(`https://calendar.google.com/calendar/render?${params}`, "_blank");
+    }
+
+    function downloadICS() {
+      const { start, end } = buildDateTime(session.date, appt.time);
+      const uid = `apneacoach-${session.id}@apnea-coach-pi.vercel.app`;
+      const ics = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//ApneaCoach//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        "BEGIN:VEVENT",
+        `UID:${uid}`,
+        `DTSTART:${start}`,
+        `DTEND:${end}`,
+        `SUMMARY:${(appt.title||"Appointment").replace(/\n/g," ")}`,
+        appt.notes ? `DESCRIPTION:${appt.notes.replace(/\n/g,"\\n")}` : "",
+        `CREATED:${new Date().toISOString().replace(/[-:]/g,"").split(".")[0]}Z`,
+        "STATUS:CONFIRMED",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].filter(Boolean).join("\r\n");
+
+      const blob = new Blob([ics], { type:"text/calendar;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(appt.title||"appointment").replace(/\s+/g,"-")}.ics`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
     return (
       <Modal onClose={onClose}>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
@@ -387,24 +447,55 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:20}}>{fmtFull(session.date)}</div>
 
         {isClient ? (
-          // Athlete sees read-only reminder
-          <div style={{background:"#f3e8ff",border:"2px solid #c084fc",borderRadius:14,padding:"20px 22px"}}>
-            <div style={{fontSize:24,marginBottom:8}}>📅</div>
-            <div style={{fontWeight:700,fontSize:18,color:"#7e22ce",marginBottom:6}}>
-              {appt.title || "Appointment"}
+          // Athlete sees read-only reminder + calendar buttons
+          <div>
+            <div style={{background:"#f3e8ff",border:"2px solid #c084fc",borderRadius:14,padding:"20px 22px",marginBottom:16}}>
+              <div style={{fontSize:24,marginBottom:8}}>📅</div>
+              <div style={{fontWeight:700,fontSize:18,color:"#7e22ce",marginBottom:6}}>
+                {appt.title || "Appointment"}
+              </div>
+              {appt.time && (
+                <div style={{fontSize:14,color:"#9333ea",fontWeight:600,marginBottom:8}}>🕐 {appt.time}</div>
+              )}
+              {appt.notes && (
+                <div style={{fontSize:14,color:"#555",lineHeight:1.7,borderTop:"1px solid #e9d5ff",paddingTop:10,marginTop:8}}>{appt.notes}</div>
+              )}
+              {!appt.title && !appt.notes && (
+                <div style={{fontSize:14,color:"#aaa"}}>No details added yet.</div>
+              )}
             </div>
-            {appt.time && (
-              <div style={{fontSize:14,color:"#9333ea",fontWeight:600,marginBottom:8}}>🕐 {appt.time}</div>
-            )}
-            {appt.notes && (
-              <div style={{fontSize:14,color:"#555",lineHeight:1.7,borderTop:"1px solid #e9d5ff",paddingTop:10,marginTop:8}}>{appt.notes}</div>
-            )}
-            {!appt.title && !appt.notes && (
-              <div style={{fontSize:14,color:"#aaa"}}>No details added yet.</div>
-            )}
+
+            {/* Calendar export buttons */}
+            <div style={{marginBottom:8}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#888",letterSpacing:".06em",textTransform:"uppercase",marginBottom:10}}>Add to your calendar</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <button onClick={openGoogleCalendar}
+                  style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderRadius:10,border:"1.5px solid #e0e0e0",background:"#fff",cursor:"pointer",fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor="#4285f4"}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor="#e0e0e0"}>
+                  <span style={{fontSize:22}}>📆</span>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:14,color:"#1a1a1a"}}>Google Calendar</div>
+                    <div style={{fontSize:12,color:"#888"}}>Opens in your browser</div>
+                  </div>
+                  <span style={{marginLeft:"auto",fontSize:12,color:"#bbb"}}>→</span>
+                </button>
+                <button onClick={downloadICS}
+                  style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderRadius:10,border:"1.5px solid #e0e0e0",background:"#fff",cursor:"pointer",fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor="#555"}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor="#e0e0e0"}>
+                  <span style={{fontSize:22}}>🗓</span>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:14,color:"#1a1a1a"}}>Apple Calendar / Outlook</div>
+                    <div style={{fontSize:12,color:"#888"}}>Downloads a .ics file</div>
+                  </div>
+                  <span style={{marginLeft:"auto",fontSize:12,color:"#bbb"}}>↓</span>
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
-          // Coach can edit appointment details
+          // Coach can edit appointment details + also export
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
             <div>
               <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Title</div>
@@ -429,6 +520,24 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
               style={{background:"#7e22ce",color:"#fff",border:"none",padding:"12px",borderRadius:9,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:apptSaving?0.6:1}}>
               {apptSaving ? "Saving..." : "💾 Save Appointment"}
             </button>
+
+            {/* Calendar export for coach too */}
+            {hasExistingPlan && appt.title && (
+              <div style={{borderTop:"1px solid #f0f0f0",paddingTop:14}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#888",letterSpacing:".06em",textTransform:"uppercase",marginBottom:8}}>Add to your calendar</div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={openGoogleCalendar}
+                    style={{flex:1,padding:"9px",borderRadius:8,border:"1.5px solid #e0e0e0",background:"#fff",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",color:"#555"}}>
+                    📆 Google Calendar
+                  </button>
+                  <button onClick={downloadICS}
+                    style={{flex:1,padding:"9px",borderRadius:8,border:"1.5px solid #e0e0e0",background:"#fff",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",color:"#555"}}>
+                    🗓 iCal / Outlook
+                  </button>
+                </div>
+              </div>
+            )}
+
             {hasExistingPlan && (
               <button onClick={()=>{ supabase.from("sessions").delete().eq("id",session.id); onClose(); }}
                 style={{background:"transparent",color:"#ef5350",border:"none",fontSize:12,cursor:"pointer",fontFamily:"inherit",padding:"4px"}}>
