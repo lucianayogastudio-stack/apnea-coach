@@ -19,6 +19,7 @@ const METHODS = [
   { key:"mobility",       label:"Mobility",       emoji:"🤸",  bg:"#fce4ec", border:"#f48fb1", text:"#880e4f", dot:"#e91e63" },
   { key:"static",         label:"Static",         emoji:"🧘",  bg:"#fffbe6", border:"#e8cc4d", text:"#7a6200", dot:"#d4aa00" },
   { key:"depth",          label:"Depth",          emoji:"🌊",  bg:"#e8f0ff", border:"#6a7ef4", text:"#1a2fa3", dot:"#3a4df4" },
+  { key:"appointment",    label:"Appointment",    emoji:"📅",  bg:"#f3e8ff", border:"#c084fc", text:"#7e22ce", dot:"#a855f7" },
 ];
 const DAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
@@ -204,6 +205,7 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
   const isDryEq      = session.method==="dry-eq";
   const isMobility   = session.method==="mobility";
   const isDepth = session.method==="depth";
+  const isAppointment = session.method==="appointment";
   const isClient = role==="client";
   const [fb, setFb] = useState({...session.feedback});
   const [difficulty, setDifficulty] = useState(session.plan?.difficulty||null);
@@ -358,6 +360,84 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
           </div>
         </div>
       </div>
+    );
+  }
+
+  // Appointment block — simple reminder card
+  if (isAppointment) {
+    const appt = session.plan?.gymData || {};
+    const [apptTitle, setApptTitle] = useState(appt.title || "");
+    const [apptTime,  setApptTime]  = useState(appt.time  || "");
+    const [apptNotes, setApptNotes] = useState(appt.notes || "");
+    const [apptSaving, setApptSaving] = useState(false);
+
+    async function saveAppt() {
+      setApptSaving(true);
+      await onSave({ gymData: { title:apptTitle, time:apptTime, notes:apptNotes } });
+      setApptSaving(false);
+      onClose();
+    }
+
+    return (
+      <Modal onClose={onClose}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+          <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:m.bg,color:m.text,border:`1px solid ${m.border}`}}>📅 Appointment</span>
+          {!isClient && <span style={{fontSize:11,fontWeight:700,color:"#bbb",letterSpacing:".06em",textTransform:"uppercase"}}>Coach View</span>}
+        </div>
+        <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:20}}>{fmtFull(session.date)}</div>
+
+        {isClient ? (
+          // Athlete sees read-only reminder
+          <div style={{background:"#f3e8ff",border:"2px solid #c084fc",borderRadius:14,padding:"20px 22px"}}>
+            <div style={{fontSize:24,marginBottom:8}}>📅</div>
+            <div style={{fontWeight:700,fontSize:18,color:"#7e22ce",marginBottom:6}}>
+              {appt.title || "Appointment"}
+            </div>
+            {appt.time && (
+              <div style={{fontSize:14,color:"#9333ea",fontWeight:600,marginBottom:8}}>🕐 {appt.time}</div>
+            )}
+            {appt.notes && (
+              <div style={{fontSize:14,color:"#555",lineHeight:1.7,borderTop:"1px solid #e9d5ff",paddingTop:10,marginTop:8}}>{appt.notes}</div>
+            )}
+            {!appt.title && !appt.notes && (
+              <div style={{fontSize:14,color:"#aaa"}}>No details added yet.</div>
+            )}
+          </div>
+        ) : (
+          // Coach can edit appointment details
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Title</div>
+              <input value={apptTitle} onChange={e=>setApptTitle(e.target.value)}
+                placeholder="e.g. Pool session, Video call, Ocean dive day..."
+                style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",boxSizing:"border-box"}} />
+            </div>
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Time</div>
+              <input value={apptTime} onChange={e=>setApptTime(e.target.value)}
+                placeholder="e.g. 9:00 AM, 14:30..."
+                style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",boxSizing:"border-box"}} />
+            </div>
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Notes</div>
+              <textarea value={apptNotes} onChange={e=>setApptNotes(e.target.value)}
+                placeholder="Location, what to bring, preparation notes..."
+                rows={3}
+                style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",resize:"vertical",boxSizing:"border-box"}} />
+            </div>
+            <button onClick={saveAppt} disabled={apptSaving}
+              style={{background:"#7e22ce",color:"#fff",border:"none",padding:"12px",borderRadius:9,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:apptSaving?0.6:1}}>
+              {apptSaving ? "Saving..." : "💾 Save Appointment"}
+            </button>
+            {hasExistingPlan && (
+              <button onClick={()=>{ supabase.from("sessions").delete().eq("id",session.id); onClose(); }}
+                style={{background:"transparent",color:"#ef5350",border:"none",fontSize:12,cursor:"pointer",fontFamily:"inherit",padding:"4px"}}>
+                Delete appointment
+              </button>
+            )}
+          </div>
+        )}
+      </Modal>
     );
   }
 
@@ -865,6 +945,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions, temp
   const isDepthSess  = method==="depth";
   const isDryEq      = method==="dry-eq";
   const isMobility   = method==="mobility";
+  const isAppt       = method==="appointment";
   const hasBuilder = isGym||isStatic||isPool||isPool2||isDepthSess||isDryEq||isMobility;
   const prevSessions = existingSessions ? existingSessions.filter(s=>s.method===method).slice(-5).reverse() : [];
   const methodTemplates = (templates||[]).filter(t=>t.method===method);
@@ -1102,7 +1183,47 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions, temp
       )}
 
       {/* All other methods — text fields */}
-      {!needsTemplate && !isGym && !isStatic && !isPool && !isPool2 && !isDepthSess && !isDryEq && !isMobility && (<>
+      {/* Appointment form */}
+      {isAppt && (
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          <div style={{background:"#f3e8ff",border:"2px solid #c084fc",borderRadius:12,padding:"16px 18px",display:"flex",gap:12,alignItems:"center"}}>
+            <span style={{fontSize:28}}>📅</span>
+            <div>
+              <div style={{fontWeight:700,fontSize:15,color:"#7e22ce"}}>Appointment Reminder</div>
+              <div style={{fontSize:12,color:"#9333ea",marginTop:2}}>Appears on the athlete's training week as a reminder</div>
+            </div>
+          </div>
+          <div>
+            <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Title</div>
+            <input value={plan.apptTitle||""} onChange={e=>setPlan(p=>({...p,apptTitle:e.target.value}))}
+              placeholder="e.g. Pool session at Blue Hole, Video call, Ocean dive day..."
+              style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",boxSizing:"border-box"}} />
+          </div>
+          <div>
+            <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Time</div>
+            <input value={plan.apptTime||""} onChange={e=>setPlan(p=>({...p,apptTime:e.target.value}))}
+              placeholder="e.g. 9:00 AM, 14:30..."
+              style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",boxSizing:"border-box"}} />
+          </div>
+          <div>
+            <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Notes</div>
+            <textarea value={plan.apptNotes||""} onChange={e=>setPlan(p=>({...p,apptNotes:e.target.value}))}
+              placeholder="Location, what to bring, preparation notes..."
+              rows={3}
+              style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",resize:"vertical",boxSizing:"border-box"}} />
+          </div>
+          <button onClick={async()=>{
+            setSaving(true);
+            await onSave({method:"appointment", plan:{gymData:{title:plan.apptTitle||"", time:plan.apptTime||"", notes:plan.apptNotes||""}}});
+            setSaving(false);
+          }} disabled={saving}
+            style={{background:"#7e22ce",color:"#fff",border:"none",padding:"12px",borderRadius:9,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:saving?0.6:1}}>
+            {saving?"Saving...":"💾 Add Appointment"}
+          </button>
+        </div>
+      )}
+
+      {!needsTemplate && !isGym && !isStatic && !isPool && !isPool2 && !isDepthSess && !isDryEq && !isMobility && !isAppt && (<>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
           <div><div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:8}}>Warm-up</div><textarea style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,background:"#fff",outline:"none",resize:"vertical",minHeight:80,fontFamily:"inherit",color:"#1a1a1a"}} placeholder="e.g. 3×FRC to 20m..." value={plan.warmup} onChange={e=>setPlan(p=>({...p,warmup:e.target.value}))} /></div>
           <div><div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:8}}>Cool-down</div><textarea style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,background:"#fff",outline:"none",resize:"vertical",minHeight:80,fontFamily:"inherit",color:"#1a1a1a"}} placeholder="e.g. 2 easy hangs..." value={plan.cooldown} onChange={e=>setPlan(p=>({...p,cooldown:e.target.value}))} /></div>
@@ -1663,7 +1784,7 @@ function WeekGrid({ weekDates, clientId, sessions, onClickSession, onClickAdd, o
                   onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,.1)";e.currentTarget.style.transform="translateY(-1px)";}}
                   onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";e.currentTarget.style.transform="none";}}>
                   {/* Difficulty bar at top */}
-                  {s.plan?.difficulty && (() => {
+                  {s.plan?.difficulty && s.method !== "appointment" && (() => {
                     const dc = ["#4caf50","#8bc34a","#ff9800","#f44336","#9c27b0"][s.plan.difficulty-1];
                     return <div style={{height:3,background:dc,width:"100%"}}/>;
                   })()}
@@ -1689,9 +1810,11 @@ function WeekGrid({ weekDates, clientId, sessions, onClickSession, onClickAdd, o
                     </div>
                     <div style={{fontSize:11,fontWeight:700,color:m.text,marginBottom:3}}>{m.label}</div>
                     {isCompleted&&<div style={{fontSize:9,color:"#bbb",fontWeight:600,letterSpacing:".04em"}}>COMPLETED</div>}
-                    {s.method==="depth"&&s.plan?.targetDepth&&<div style={{fontSize:10,color:"#999",fontWeight:600}}>🎯 {s.plan.targetDepth}m{s.plan.openLine?" (open)":""}</div>}
-                    {s.plan?.gymData?.sessionName&&<div style={{fontSize:10,color:"#aaa",marginTop:2,lineHeight:1.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.plan.gymData.sessionName}</div>}
-                    {s.plan?.mainSet&&!s.plan?.gymData&&<div style={{fontSize:10,color:"#aaa",marginTop:3,lineHeight:1.4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{s.plan.mainSet}</div>}
+                    {s.method==="appointment"&&s.plan?.gymData?.title&&<div style={{fontSize:10,color:"#7e22ce",fontWeight:600,marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.plan.gymData.title}</div>}
+                    {s.method==="appointment"&&s.plan?.gymData?.time&&<div style={{fontSize:10,color:"#9333ea",marginTop:1}}>🕐 {s.plan.gymData.time}</div>}
+                    {s.method!=="appointment"&&s.method==="depth"&&s.plan?.targetDepth&&<div style={{fontSize:10,color:"#999",fontWeight:600}}>🎯 {s.plan.targetDepth}m{s.plan.openLine?" (open)":""}</div>}
+                    {s.method!=="appointment"&&s.plan?.gymData?.sessionName&&<div style={{fontSize:10,color:"#aaa",marginTop:2,lineHeight:1.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.plan.gymData.sessionName}</div>}
+                    {s.method!=="appointment"&&s.plan?.mainSet&&!s.plan?.gymData&&<div style={{fontSize:10,color:"#aaa",marginTop:3,lineHeight:1.4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{s.plan.mainSet}</div>}
                   </div>
                 </div>
               );
