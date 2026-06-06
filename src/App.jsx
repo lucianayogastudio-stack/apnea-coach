@@ -981,7 +981,7 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
 }
 
 // ── Assign Modal ──────────────────────────────────────────────────────────────
-function AssignModal({ date, clientName, onClose, onSave, existingSessions, templates, onSaveTemplate, onDeleteTemplate, onOfferTemplate }) {
+function AssignModal({ date, clientName, onClose, onSave, existingSessions, templates, onSaveTemplate, onDeleteTemplate, onOfferTemplate, coachTimezone }) {
   const [method, setMethod] = useState("depth");
   const [plan, setPlan] = useState({warmup:"",mainSet:"",cooldown:"",targetDepth:"",openLine:false,coachNotes:"",difficulty:null});
   const [saving, setSaving] = useState(false);
@@ -1070,7 +1070,8 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions, temp
         );})}
       </div>
 
-      {/* Difficulty picker */}
+      {/* Difficulty picker — hidden for appointments */}
+      {!isAppt && (
       <div style={{marginBottom:20}}>
         <div style={{fontSize:11,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",color:"#bbb",marginBottom:8}}>Difficulty</div>
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
@@ -1095,6 +1096,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions, temp
           )}
         </div>
       </div>
+      )}
 
       {/* Template picker — shown when templates or prev sessions exist */}
       {needsTemplate && (
@@ -1268,7 +1270,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions, temp
             <span style={{fontSize:28}}>📅</span>
             <div>
               <div style={{fontWeight:700,fontSize:15,color:"#7e22ce"}}>Appointment Reminder</div>
-              <div style={{fontSize:12,color:"#9333ea",marginTop:2}}>Appears on the athlete's training week as a reminder</div>
+              <div style={{fontSize:12,color:"#9333ea",marginTop:2}}>Time auto-converts to each athlete's local timezone</div>
             </div>
           </div>
           <div>
@@ -1277,12 +1279,28 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions, temp
               placeholder="e.g. Pool session at Blue Hole, Video call, Ocean dive day..."
               style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",boxSizing:"border-box"}} />
           </div>
-          <div>
-            <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Time</div>
-            <input value={plan.apptTime||""} onChange={e=>setPlan(p=>({...p,apptTime:e.target.value}))}
-              placeholder="e.g. 9:00 AM, 14:30..."
-              style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",boxSizing:"border-box"}} />
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Time</div>
+              <input type="time" value={plan.apptTime||""} onChange={e=>setPlan(p=>({...p,apptTime:e.target.value}))}
+                style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",boxSizing:"border-box",cursor:"pointer"}} />
+            </div>
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Your timezone</div>
+              <select value={plan.apptTz||coachTimezone||Intl.DateTimeFormat().resolvedOptions().timeZone}
+                onChange={e=>setPlan(p=>({...p,apptTz:e.target.value}))}
+                style={{width:"100%",padding:"10px 8px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:12,fontFamily:"inherit",outline:"none",color:"#1a1a1a",background:"#fff",cursor:"pointer",boxSizing:"border-box"}}>
+                {Intl.supportedValuesOf("timeZone").map(tz=>(
+                  <option key={tz} value={tz}>{tz.replace(/_/g," ")}</option>
+                ))}
+              </select>
+            </div>
           </div>
+          {plan.apptTime && (
+            <div style={{background:"#f0f7ff",borderRadius:9,padding:"10px 14px",fontSize:12,color:"#005fa3"}}>
+              💡 Athletes will see this time automatically converted to their local timezone
+            </div>
+          )}
           <div>
             <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Notes</div>
             <textarea value={plan.apptNotes||""} onChange={e=>setPlan(p=>({...p,apptNotes:e.target.value}))}
@@ -1292,7 +1310,8 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions, temp
           </div>
           <button onClick={async()=>{
             setSaving(true);
-            await onSave({method:"appointment", plan:{gymData:{title:plan.apptTitle||"", time:plan.apptTime||"", notes:plan.apptNotes||""}}});
+            const tz = plan.apptTz||coachTimezone||Intl.DateTimeFormat().resolvedOptions().timeZone;
+            await onSave({method:"appointment", plan:{gymData:{title:plan.apptTitle||"", localTime:plan.apptTime||"", timezone:tz, notes:plan.apptNotes||""}}});
             setSaving(false);
           }} disabled={saving}
             style={{background:"#7e22ce",color:"#fff",border:"none",padding:"12px",borderRadius:9,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:saving?0.6:1}}>
@@ -3297,7 +3316,7 @@ export default function ApneaCoach() {
         )}
       </div>
 
-      {assignModal&&activeClient&&<AssignModal date={assignModal} clientName={activeClient.name} onClose={()=>setAssignModal(null)} onSave={handleAssignSave} existingSessions={sessions.filter(s=>s.clientId===activeClient.id&&s.plan?.gymData)} templates={templates} onSaveTemplate={saveTemplate} onDeleteTemplate={deleteTemplate} onOfferTemplate={t=>setPendingTemplate(t)} />}
+      {assignModal&&activeClient&&<AssignModal date={assignModal} clientName={activeClient.name} onClose={()=>setAssignModal(null)} onSave={handleAssignSave} existingSessions={sessions.filter(s=>s.clientId===activeClient.id&&s.plan?.gymData)} templates={templates} onSaveTemplate={saveTemplate} onDeleteTemplate={deleteTemplate} onOfferTemplate={t=>setPendingTemplate(t)} coachTimezone={coachTimezone} />}
             {/* Clipboard banner */}
       {clipboard && view==="coachWeek" && (
         <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#1a1a1a",color:"#fff",padding:"12px 20px",borderRadius:12,fontSize:13,fontWeight:500,zIndex:400,display:"flex",alignItems:"center",gap:14,boxShadow:"0 8px 24px rgba(0,0,0,.2)"}}>
