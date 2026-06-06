@@ -367,76 +367,65 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
   if (isAppointment) {
     const appt = session.plan?.gymData || {};
     const [apptTitle, setApptTitle] = useState(appt.title || "");
-    const [apptTime,  setApptTime]  = useState(appt.time  || "");
+    const [apptTime,  setApptTime]  = useState(appt.localTime || appt.time || "");
+    const [apptTz,    setApptTz]    = useState(appt.timezone || coachTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
     const [apptNotes, setApptNotes] = useState(appt.notes || "");
     const [apptSaving, setApptSaving] = useState(false);
+    const athleteTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    function parseToDate(timeStr, dateStr) {
+      if (!timeStr || !dateStr) return null;
+      try {
+        const t = timeStr.trim().toLowerCase();
+        let hour = 0, min = 0;
+        const ampm = t.includes("am") || t.includes("pm");
+        const nums = t.replace(/[^0-9:]/g,"");
+        const [h, m="0"] = nums.split(":");
+        hour = parseInt(h)||0; min = parseInt(m)||0;
+        if (ampm && t.includes("pm") && hour !== 12) hour += 12;
+        if (ampm && t.includes("am") && hour === 12) hour = 0;
+        return new Date(`${dateStr}T${String(hour).padStart(2,"0")}:${String(min).padStart(2,"0")}:00`);
+      } catch { return null; }
+    }
+
+    function fmtInTz(d, tz) {
+      if (!d) return null;
+      return new Intl.DateTimeFormat("en-US",{hour:"numeric",minute:"2-digit",hour12:true,timeZone:tz,timeZoneName:"short"}).format(d);
+    }
+
+    function openGoogleCalendar() {
+      const d = parseToDate(apptTime, session.date);
+      if (!d) return;
+      const end = new Date(d.getTime()+3600000);
+      const fmt = dt => dt.toISOString().replace(/[-:]/g,"").split(".")[0];
+      const params = new URLSearchParams({action:"TEMPLATE",text:apptTitle||"Appointment",dates:`${fmt(d)}/${fmt(end)}`,ctz:apptTz,details:[apptNotes,"Added via ApneaCoach"].filter(Boolean).join("\n")});
+      window.open(`https://calendar.google.com/calendar/render?${params}`,"_blank");
+    }
+
+    function downloadICS() {
+      const d = parseToDate(apptTime, session.date);
+      if (!d) return;
+      const end = new Date(d.getTime()+3600000);
+      const fmt = dt => dt.toISOString().replace(/[-:]/g,"").split(".")[0];
+      const uid = `apneacoach-${session.id}@apnea-coach-pi.vercel.app`;
+      const ics = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//ApneaCoach//EN","CALSCALE:GREGORIAN","METHOD:PUBLISH",`X-WR-TIMEZONE:${apptTz}`,"BEGIN:VEVENT",`UID:${uid}`,`DTSTART;TZID=${apptTz}:${fmt(d)}`,`DTEND;TZID=${apptTz}:${fmt(end)}`,`SUMMARY:${(apptTitle||"Appointment").replace(/\n/g," ")}`,apptNotes?`DESCRIPTION:${apptNotes.replace(/\n/g,"\\n")}`:"",`CREATED:${new Date().toISOString().replace(/[-:]/g,"").split(".")[0]}Z`,"STATUS:CONFIRMED","END:VEVENT","END:VCALENDAR"].filter(Boolean).join("\r\n");
+      const blob = new Blob([ics],{type:"text/calendar;charset=utf-8"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href=url; a.download=`${(apptTitle||"appointment").replace(/\s+/g,"-")}.ics`; a.click();
+      URL.revokeObjectURL(url);
+    }
 
     async function saveAppt() {
       setApptSaving(true);
-      await onSave({ gymData: { title:apptTitle, time:apptTime, notes:apptNotes } });
+      await onSave({ gymData: { title:apptTitle, localTime:apptTime, timezone:apptTz, notes:apptNotes } });
       setApptSaving(false);
       onClose();
     }
 
-    // Build datetime string from session.date + appt.time
-    function buildDateTime(dateStr, timeStr, durationHours=1) {
-      const d = new Date(dateStr + "T12:00:00"); // base date
-      // Try to parse time like "9:00 AM", "14:30", "9am", "09:00"
-      if (timeStr) {
-        const t = timeStr.trim().toLowerCase();
-        const ampm = t.includes("am") || t.includes("pm");
-        const nums = t.replace(/[^0-9:]/g,"");
-        const [h,min=0] = nums.split(":").map(Number);
-        let hour = h;
-        if (ampm && t.includes("pm") && h !== 12) hour += 12;
-        if (ampm && t.includes("am") && h === 12) hour = 0;
-        d.setHours(hour, Number(min), 0, 0);
-      }
-      const end = new Date(d.getTime() + durationHours * 3600000);
-      const fmt = dt => dt.toISOString().replace(/[-:]/g,"").split(".")[0];
-      return { start: fmt(d), end: fmt(end) };
-    }
-
-    function openGoogleCalendar() {
-      const { start, end } = buildDateTime(session.date, appt.time);
-      const params = new URLSearchParams({
-        action: "TEMPLATE",
-        text: appt.title || "Appointment",
-        dates: `${start}/${end}`,
-        details: [appt.notes, "Added via ApneaCoach"].filter(Boolean).join("\n"),
-      });
-      window.open(`https://calendar.google.com/calendar/render?${params}`, "_blank");
-    }
-
-    function downloadICS() {
-      const { start, end } = buildDateTime(session.date, appt.time);
-      const uid = `apneacoach-${session.id}@apnea-coach-pi.vercel.app`;
-      const ics = [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "PRODID:-//ApneaCoach//EN",
-        "CALSCALE:GREGORIAN",
-        "METHOD:PUBLISH",
-        "BEGIN:VEVENT",
-        `UID:${uid}`,
-        `DTSTART:${start}`,
-        `DTEND:${end}`,
-        `SUMMARY:${(appt.title||"Appointment").replace(/\n/g," ")}`,
-        appt.notes ? `DESCRIPTION:${appt.notes.replace(/\n/g,"\\n")}` : "",
-        `CREATED:${new Date().toISOString().replace(/[-:]/g,"").split(".")[0]}Z`,
-        "STATUS:CONFIRMED",
-        "END:VEVENT",
-        "END:VCALENDAR",
-      ].filter(Boolean).join("\r\n");
-
-      const blob = new Blob([ics], { type:"text/calendar;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${(appt.title||"appointment").replace(/\s+/g,"-")}.ics`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
+    const d = parseToDate(apptTime, session.date);
+    const coachFormatted = d ? fmtInTz(d, apptTz) : null;
+    const athleteFormatted = d ? fmtInTz(d, athleteTz) : null;
+    const tzDifferent = apptTz !== athleteTz;
 
     return (
       <Modal onClose={onClose}>
@@ -447,111 +436,83 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
         <div style={{fontWeight:700,fontSize:19,letterSpacing:"-.02em",marginBottom:20}}>{fmtFull(session.date)}</div>
 
         {isClient ? (
-          // Athlete sees read-only reminder + calendar buttons
           <div>
             <div style={{background:"#f3e8ff",border:"2px solid #c084fc",borderRadius:14,padding:"20px 22px",marginBottom:16}}>
               <div style={{fontSize:24,marginBottom:8}}>📅</div>
-              <div style={{fontWeight:700,fontSize:18,color:"#7e22ce",marginBottom:6}}>
-                {appt.title || "Appointment"}
-              </div>
-              {appt.time && (
-                <div style={{fontSize:14,color:"#9333ea",fontWeight:600,marginBottom:4}}>🕐 {appt.time}</div>
+              <div style={{fontWeight:700,fontSize:18,color:"#7e22ce",marginBottom:8}}>{appt.title||"Appointment"}</div>
+              {appt.localTime && d && (
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",background:"#ede9fe",borderRadius:8}}>
+                    <span style={{fontSize:14}}>🕐</span>
+                    <div>
+                      <div style={{fontSize:12,color:"#7e22ce",fontWeight:600}}>{coachFormatted}</div>
+                      <div style={{fontSize:11,color:"#a855f7"}}>Coach's time</div>
+                    </div>
+                  </div>
+                  {tzDifferent && athleteFormatted && (
+                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",background:"#f0fdf4",borderRadius:8,border:"1px solid #86efac"}}>
+                      <span style={{fontSize:14}}>🌍</span>
+                      <div>
+                        <div style={{fontSize:12,color:"#166534",fontWeight:600}}>{athleteFormatted}</div>
+                        <div style={{fontSize:11,color:"#16a34a"}}>Your time ({athleteTz.replace(/_/g," ")})</div>
+                      </div>
+                    </div>
+                  )}
+                  {!tzDifferent && <div style={{fontSize:11,color:"#a855f7",marginLeft:4}}>Same timezone as coach ✓</div>}
+                </div>
               )}
-              {/* Timezone reminder */}
-              <div style={{fontSize:11,color:"#a855f7",background:"#ede9fe",borderRadius:6,padding:"4px 10px",display:"inline-block",marginBottom:8}}>
-                🌍 Your timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}
-              </div>
-              {appt.notes && (
-                <div style={{fontSize:14,color:"#555",lineHeight:1.7,borderTop:"1px solid #e9d5ff",paddingTop:10,marginTop:8}}>{appt.notes}</div>
-              )}
-              {!appt.title && !appt.notes && (
-                <div style={{fontSize:14,color:"#aaa"}}>No details added yet.</div>
-              )}
+              {appt.notes && <div style={{fontSize:14,color:"#555",lineHeight:1.7,borderTop:"1px solid #e9d5ff",paddingTop:10,marginTop:10}}>{appt.notes}</div>}
             </div>
-
-            {/* Calendar export buttons — always shown */}
-            <div style={{marginBottom:8}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#888",letterSpacing:".06em",textTransform:"uppercase",marginBottom:10}}>📲 Add to your calendar</div>
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                <button onClick={openGoogleCalendar}
-                  style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",borderRadius:10,border:"1.5px solid #4285f4",background:"#f0f6ff",cursor:"pointer",fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}
-                  onMouseEnter={e=>e.currentTarget.style.background="#dbeeff"}
-                  onMouseLeave={e=>e.currentTarget.style.background="#f0f6ff"}>
-                  <span style={{fontSize:22}}>📆</span>
-                  <div style={{flex:1}}>
-                    <div style={{fontWeight:700,fontSize:14,color:"#1a1a1a"}}>Google Calendar</div>
-                    <div style={{fontSize:12,color:"#888"}}>Opens in your browser — sign in and click Save</div>
-                  </div>
-                  <span style={{fontSize:16,color:"#4285f4"}}>→</span>
-                </button>
-                <button onClick={downloadICS}
-                  style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",borderRadius:10,border:"1.5px solid #555",background:"#f8f8f6",cursor:"pointer",fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}
-                  onMouseEnter={e=>e.currentTarget.style.background="#efefed"}
-                  onMouseLeave={e=>e.currentTarget.style.background="#f8f8f6"}>
-                  <span style={{fontSize:22}}>🗓</span>
-                  <div style={{flex:1}}>
-                    <div style={{fontWeight:700,fontSize:14,color:"#1a1a1a"}}>Apple Calendar / Outlook</div>
-                    <div style={{fontSize:12,color:"#888"}}>Downloads a .ics file — tap to open in your calendar</div>
-                  </div>
-                  <span style={{fontSize:16,color:"#555"}}>↓</span>
-                </button>
-              </div>
-              <div style={{fontSize:11,color:"#bbb",marginTop:8,textAlign:"center"}}>
-                Times are saved in your local timezone ({Intl.DateTimeFormat().resolvedOptions().timeZone})
-              </div>
+            <div style={{fontSize:12,fontWeight:700,color:"#888",letterSpacing:".06em",textTransform:"uppercase",marginBottom:10}}>📲 Add to your calendar</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
+              <button onClick={openGoogleCalendar} style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",borderRadius:10,border:"1.5px solid #4285f4",background:"#f0f6ff",cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
+                <span style={{fontSize:22}}>📆</span>
+                <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14,color:"#1a1a1a"}}>Google Calendar</div><div style={{fontSize:12,color:"#888"}}>Opens in browser — sign in and click Save</div></div>
+                <span style={{fontSize:16,color:"#4285f4"}}>→</span>
+              </button>
+              <button onClick={downloadICS} style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",borderRadius:10,border:"1.5px solid #555",background:"#f8f8f6",cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
+                <span style={{fontSize:22}}>🗓</span>
+                <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14,color:"#1a1a1a"}}>Apple Calendar / Outlook</div><div style={{fontSize:12,color:"#888"}}>Downloads a .ics file</div></div>
+                <span style={{fontSize:16,color:"#555"}}>↓</span>
+              </button>
             </div>
           </div>
         ) : (
-          // Coach can edit appointment details + also export
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
-            <div>
-              <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Title</div>
-              <input value={apptTitle} onChange={e=>setApptTitle(e.target.value)}
-                placeholder="e.g. Pool session, Video call, Ocean dive day..."
-                style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",boxSizing:"border-box"}} />
+            <div><div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Title</div>
+              <input value={apptTitle} onChange={e=>setApptTitle(e.target.value)} placeholder="e.g. Pool session, Video call..." style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",boxSizing:"border-box"}} />
             </div>
-            <div>
-              <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Time <span style={{fontWeight:400,color:"#aaa",fontSize:11}}>— your local timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}</span></div>
-              <input value={apptTime} onChange={e=>setApptTime(e.target.value)}
-                placeholder="e.g. 9:00 AM, 14:30..."
-                style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",boxSizing:"border-box"}} />
-              <div style={{fontSize:11,color:"#bbb",marginTop:4}}>💡 Tip: include timezone if your athlete is in a different location, e.g. "9:00 AM Bali time (WITA)"</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div><div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Time</div>
+                <input value={apptTime} onChange={e=>setApptTime(e.target.value)} placeholder="e.g. 9:00 AM, 14:30..." style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",boxSizing:"border-box"}} />
+              </div>
+              <div><div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Your timezone</div>
+                <select value={apptTz} onChange={e=>setApptTz(e.target.value)} style={{width:"100%",padding:"10px 8px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:12,fontFamily:"inherit",outline:"none",color:"#1a1a1a",background:"#fff",cursor:"pointer",boxSizing:"border-box"}}>
+                  {Intl.supportedValuesOf("timeZone").map(tz=><option key={tz} value={tz}>{tz.replace(/_/g," ")}</option>)}
+                </select>
+              </div>
             </div>
-            <div>
-              <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Notes</div>
-              <textarea value={apptNotes} onChange={e=>setApptNotes(e.target.value)}
-                placeholder="Location, what to bring, preparation notes..."
-                rows={3}
-                style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",resize:"vertical",boxSizing:"border-box"}} />
+            {d && coachFormatted && (
+              <div style={{background:"#f0f7ff",borderRadius:9,padding:"10px 14px",fontSize:12,color:"#005fa3"}}>
+                💡 Your athletes will see this as <strong>{coachFormatted}</strong> in your timezone, auto-converted to theirs
+              </div>
+            )}
+            <div><div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Notes</div>
+              <textarea value={apptNotes} onChange={e=>setApptNotes(e.target.value)} placeholder="Location, what to bring..." rows={3} style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:14,fontFamily:"inherit",outline:"none",color:"#1a1a1a",resize:"vertical",boxSizing:"border-box"}} />
             </div>
-            <button onClick={saveAppt} disabled={apptSaving}
-              style={{background:"#7e22ce",color:"#fff",border:"none",padding:"12px",borderRadius:9,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:apptSaving?0.6:1}}>
-              {apptSaving ? "Saving..." : "💾 Save Appointment"}
+            <button onClick={saveAppt} disabled={apptSaving} style={{background:"#7e22ce",color:"#fff",border:"none",padding:"12px",borderRadius:9,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:apptSaving?0.6:1}}>
+              {apptSaving?"Saving...":"💾 Save Appointment"}
             </button>
-
-            {/* Calendar export for coach too */}
-            {hasExistingPlan && appt.title && (
+            {hasExistingPlan && d && (
               <div style={{borderTop:"1px solid #f0f0f0",paddingTop:14}}>
                 <div style={{fontSize:12,fontWeight:700,color:"#888",letterSpacing:".06em",textTransform:"uppercase",marginBottom:8}}>Add to your calendar</div>
                 <div style={{display:"flex",gap:8}}>
-                  <button onClick={openGoogleCalendar}
-                    style={{flex:1,padding:"9px",borderRadius:8,border:"1.5px solid #e0e0e0",background:"#fff",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",color:"#555"}}>
-                    📆 Google Calendar
-                  </button>
-                  <button onClick={downloadICS}
-                    style={{flex:1,padding:"9px",borderRadius:8,border:"1.5px solid #e0e0e0",background:"#fff",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",color:"#555"}}>
-                    🗓 iCal / Outlook
-                  </button>
+                  <button onClick={openGoogleCalendar} style={{flex:1,padding:"9px",borderRadius:8,border:"1.5px solid #4285f4",background:"#f0f6ff",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",color:"#1a6fc4"}}>📆 Google Calendar</button>
+                  <button onClick={downloadICS} style={{flex:1,padding:"9px",borderRadius:8,border:"1.5px solid #555",background:"#f8f8f6",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",color:"#333"}}>🗓 iCal / Outlook</button>
                 </div>
               </div>
             )}
-
-            {hasExistingPlan && (
-              <button onClick={()=>{ supabase.from("sessions").delete().eq("id",session.id); onClose(); }}
-                style={{background:"transparent",color:"#ef5350",border:"none",fontSize:12,cursor:"pointer",fontFamily:"inherit",padding:"4px"}}>
-                Delete appointment
-              </button>
-            )}
+            {hasExistingPlan && <button onClick={()=>{supabase.from("sessions").delete().eq("id",session.id);onClose();}} style={{background:"transparent",color:"#ef5350",border:"none",fontSize:12,cursor:"pointer",fontFamily:"inherit",padding:"4px"}}>Delete appointment</button>}
           </div>
         )}
       </Modal>
@@ -1993,6 +1954,7 @@ export default function ApneaCoach() {
     try { return localStorage.getItem("apnea_lastSeen") || new Date(0).toISOString(); } catch { return new Date(0).toISOString(); }
   });
   const [welcomeMessage, setWelcomeMessage] = useState(""); // coach's global welcome message
+  const [coachTimezone, setCoachTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone); // coach's timezone
   const [editingWelcome, setEditingWelcome] = useState(false);
   const [savingWelcome, setSavingWelcome] = useState(false);
 
@@ -2034,6 +1996,7 @@ export default function ApneaCoach() {
     const {data} = await supabase.from("profiles").select("*").eq("id",u.id).single();
     setProfile(data);
     if (data?.welcome_message) setWelcomeMessage(data.welcome_message);
+    if (data?.timezone) setCoachTimezone(data.timezone);
     await loadAll(data, u);
     if (u.email === ADMIN_EMAIL) await loadAdminData();
     else if (data?.role === "coach") {
@@ -2104,6 +2067,12 @@ export default function ApneaCoach() {
     const coachName = (profile?.email||"").split("@")[0].replace(/[._]/g," ").replace(/\b\w/g,c=>c.toUpperCase());
     const msg = welcomeMessage || DEFAULT_WELCOME;
     return msg.replace(/\{\{athlete_name\}\}/g, athleteName?.split(" ")[0]||"").replace(/\{\{coach_name\}\}/g, coachName);
+  }
+
+  async function saveTimezone(tz) {
+    setCoachTimezone(tz);
+    await supabase.from("profiles").update({ timezone: tz }).eq("id", user.id);
+    flash("Timezone saved!");
   }
 
   async function saveWelcomeMessage(msg) {
@@ -2701,6 +2670,27 @@ export default function ApneaCoach() {
                 </div>
               </div>
             )}
+
+            {/* Timezone setting */}
+            <div style={{marginTop:24,padding:"16px 18px",background:"#fff",borderRadius:12,border:"1px solid #ebebeb"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>🌍 Your timezone</div>
+                  <div style={{fontSize:11,color:"#aaa",marginTop:2}}>Used for appointments — athletes see times converted to their local timezone</div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <select value={coachTimezone} onChange={e=>saveTimezone(e.target.value)}
+                    style={{padding:"7px 10px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",color:"#1a1a1a",background:"#fff",cursor:"pointer",maxWidth:260}}>
+                    {Intl.supportedValuesOf("timeZone").map(tz=>(
+                      <option key={tz} value={tz}>{tz.replace(/_/g," ")} ({new Intl.DateTimeFormat("en",{timeZoneName:"short",timeZone:tz}).formatToParts(new Date()).find(p=>p.type==="timeZoneName")?.value})</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div style={{fontSize:11,color:"#3a8ef4",marginTop:8}}>
+                Currently: {new Date().toLocaleString("en",{timeZone:coachTimezone,weekday:"long",hour:"2-digit",minute:"2-digit",timeZoneName:"short"})}
+              </div>
+            </div>
 
             {/* Welcome message editor */}
             <div style={{marginTop:32}}>
