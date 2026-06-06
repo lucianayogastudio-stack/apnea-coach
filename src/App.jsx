@@ -380,18 +380,42 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
     const [apptSaving, setApptSaving] = useState(false);
     const athleteTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-    function parseToDate(timeStr, dateStr) {
+    function parseToDate(timeStr, dateStr, tz) {
       if (!timeStr || !dateStr) return null;
       try {
-        const t = timeStr.trim().toLowerCase();
+        // Handle both "HH:MM" (from time input) and "9:00 AM" (legacy text)
+        const t = timeStr.trim();
         let hour = 0, min = 0;
-        const ampm = t.includes("am") || t.includes("pm");
-        const nums = t.replace(/[^0-9:]/g,"");
-        const [h, m="0"] = nums.split(":");
-        hour = parseInt(h)||0; min = parseInt(m)||0;
-        if (ampm && t.includes("pm") && hour !== 12) hour += 12;
-        if (ampm && t.includes("am") && hour === 12) hour = 0;
-        return new Date(`${dateStr}T${String(hour).padStart(2,"0")}:${String(min).padStart(2,"0")}:00`);
+        if (/^\d{1,2}:\d{2}$/.test(t)) {
+          // 24h format from <input type="time">: "09:00" or "14:30"
+          [hour, min] = t.split(":").map(Number);
+        } else {
+          // Legacy AM/PM text format
+          const lower = t.toLowerCase();
+          const ampm = lower.includes("am") || lower.includes("pm");
+          const nums = lower.replace(/[^0-9:]/g,"");
+          const [h, m="0"] = nums.split(":");
+          hour = parseInt(h)||0; min = parseInt(m)||0;
+          if (ampm && lower.includes("pm") && hour !== 12) hour += 12;
+          if (ampm && lower.includes("am") && hour === 12) hour = 0;
+        }
+        // Build ISO string and interpret in the given timezone using Intl
+        const isoLocal = `${dateStr}T${String(hour).padStart(2,"0")}:${String(min).padStart(2,"0")}:00`;
+        // Convert local time in tz to UTC
+        if (tz) {
+          const formatter = new Intl.DateTimeFormat("en-CA", {
+            timeZone: tz, year:"numeric", month:"2-digit", day:"2-digit",
+            hour:"2-digit", minute:"2-digit", second:"2-digit", hour12: false
+          });
+          // Get offset by comparing what the tz reads vs UTC
+          const d = new Date(isoLocal);
+          const parts = formatter.formatToParts(d);
+          const get = type => parts.find(p=>p.type===type)?.value;
+          const tzDate = new Date(`${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}`);
+          const offset = d - tzDate;
+          return new Date(d.getTime() + offset);
+        }
+        return new Date(isoLocal);
       } catch { return null; }
     }
 
@@ -401,7 +425,7 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
     }
 
     function openGoogleCalendar() {
-      const d = parseToDate(apptTime, session.date);
+      const d = parseToDate(apptTime, session.date, apptTz);
       if (!d) return;
       const end = new Date(d.getTime()+3600000);
       const fmt = dt => dt.toISOString().replace(/[-:]/g,"").split(".")[0];
@@ -410,7 +434,7 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
     }
 
     function downloadICS() {
-      const d = parseToDate(apptTime, session.date);
+      const d = parseToDate(apptTime, session.date, apptTz);
       if (!d) return;
       const end = new Date(d.getTime()+3600000);
       const fmt = dt => dt.toISOString().replace(/[-:]/g,"").split(".")[0];
@@ -429,7 +453,7 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
       onClose();
     }
 
-    const d = parseToDate(apptTime, session.date);
+    const d = parseToDate(apptTime, session.date, apptTz);
     const coachFormatted = d ? fmtInTz(d, apptTz) : null;
     const athleteFormatted = d ? fmtInTz(d, athleteTz) : null;
     const tzDifferent = apptTz !== athleteTz;
