@@ -1,4 +1,11 @@
 import { useState, useEffect, useRef } from "react";
+
+// Safe timezone list fallback for browsers that don't support Intl.supportedValuesOf
+const TZ_LIST = (() => {
+  try { return Intl.supportedValuesOf('timeZone'); }
+  catch { return ['Pacific/Honolulu','America/Los_Angeles','America/Denver','America/Chicago','America/New_York','America/Sao_Paulo','America/Argentina/Buenos_Aires','Atlantic/Azores','Europe/London','Europe/Paris','Europe/Berlin','Africa/Cairo','Europe/Moscow','Asia/Dubai','Asia/Kolkata','Asia/Bangkok','Asia/Jakarta','Asia/Singapore','Asia/Tokyo','Australia/Sydney','Pacific/Auckland']; }
+})();
+
 import { supabase } from "./supabase";
 import CompletedSessionView from "./CompletedSessionView";
 import GymStrengthBuilder from "./GymStrengthBuilder";
@@ -195,7 +202,7 @@ function Spinner() {
 }
 
 // ── Day Modal ─────────────────────────────────────────────────────────────────
-function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOfferTemplate }) {
+function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOfferTemplate, coachTimezone }) {
   const m = gm(session.method);
   const isGym    = session.method==="gym-strength";
   const isStatic = session.method==="static";
@@ -488,7 +495,7 @@ function DayModal({ session, role, onClose, onSave, onEdit, onSaveTemplate, onOf
               </div>
               <div><div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>Your timezone</div>
                 <select value={apptTz} onChange={e=>setApptTz(e.target.value)} style={{width:"100%",padding:"10px 8px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:12,fontFamily:"inherit",outline:"none",color:"#1a1a1a",background:"#fff",cursor:"pointer",boxSizing:"border-box"}}>
-                  {Intl.supportedValuesOf("timeZone").map(tz=><option key={tz} value={tz}>{tz.replace(/_/g," ")}</option>)}
+                  {TZ_LIST.map(tz=><option key={tz} value={tz}>{tz.replace(/_/g," ")}</option>)}
                 </select>
               </div>
             </div>
@@ -1290,7 +1297,7 @@ function AssignModal({ date, clientName, onClose, onSave, existingSessions, temp
               <select value={plan.apptTz||coachTimezone||Intl.DateTimeFormat().resolvedOptions().timeZone}
                 onChange={e=>setPlan(p=>({...p,apptTz:e.target.value}))}
                 style={{width:"100%",padding:"10px 8px",border:"1.5px solid #e0e0e0",borderRadius:9,fontSize:12,fontFamily:"inherit",outline:"none",color:"#1a1a1a",background:"#fff",cursor:"pointer",boxSizing:"border-box"}}>
-                {Intl.supportedValuesOf("timeZone").map(tz=>(
+                {TZ_LIST.map(tz=>(
                   <option key={tz} value={tz}>{tz.replace(/_/g," ")}</option>
                 ))}
               </select>
@@ -2700,7 +2707,7 @@ export default function ApneaCoach() {
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
                   <select value={coachTimezone} onChange={e=>saveTimezone(e.target.value)}
                     style={{padding:"7px 10px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",color:"#1a1a1a",background:"#fff",cursor:"pointer",maxWidth:260}}>
-                    {Intl.supportedValuesOf("timeZone").map(tz=>(
+                    {TZ_LIST.map(tz=>(
                       <option key={tz} value={tz}>{tz.replace(/_/g," ")} ({new Intl.DateTimeFormat("en",{timeZoneName:"short",timeZone:tz}).formatToParts(new Date()).find(p=>p.type==="timeZoneName")?.value})</option>
                     ))}
                   </select>
@@ -3325,7 +3332,7 @@ export default function ApneaCoach() {
         </div>
       )}
 
-      {dayModal&&<DayModal session={sessions.find(s=>s.id===dayModal.session.id)||dayModal.session} role={dayModal.role} onClose={()=>setDayModal(null)} onSave={fb=>handleFeedbackSave(dayModal.session.id,fb)} onEdit={s=>setEditModal(s)} onSaveTemplate={saveTemplate} onOfferTemplate={t=>setPendingTemplate(t)} />}
+      {dayModal&&<DayModal session={sessions.find(s=>s.id===dayModal.session.id)||dayModal.session} role={dayModal.role} onClose={()=>setDayModal(null)} onSave={fb=>handleFeedbackSave(dayModal.session.id,fb)} onEdit={s=>setEditModal(s)} onSaveTemplate={saveTemplate} onOfferTemplate={t=>setPendingTemplate(t)} coachTimezone={coachTimezone} />}
       {editClientModal&&(
         <AddClientModal
           onClose={()=>setEditClientModal(null)}
