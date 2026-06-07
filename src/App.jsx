@@ -2003,6 +2003,212 @@ function WeekGrid({ weekDates, clientId, sessions, onClickSession, onClickAdd, o
 const ADMIN_EMAIL = "lucianafreediver@gmail.com"; // only this user can create coaches
 const DEFAULT_WELCOME = "Hi {{athlete_name}}, welcome to your training hub! I will plan your sessions here each week. You'll see your workouts on the calendar above — tap any session to open it, log your results, and leave notes for me. Your progress charts will build up over time. Any questions, I'm just a message away. Let's go!\n\n— {{coach_name}}";
 
+const VIDEO_CATEGORIES = ["General","Depth","Pool","Static","Dry Eq","Gym","Mobility"];
+
+// Extract YouTube/Vimeo thumbnail
+function getVideoThumb(url) {
+  try {
+    if (url.includes("youtube.com") || url.includes("youtu.be")) {
+      const id = url.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/)?.[1];
+      return id ? `https://img.youtube.com/vi/${id}/mqdefault.jpg` : null;
+    }
+    if (url.includes("vimeo.com")) {
+      const id = url.match(/vimeo\.com\/(\d+)/)?.[1];
+      return id ? `https://vumbnail.com/${id}.jpg` : null;
+    }
+    return null;
+  } catch { return null; }
+}
+
+function getVideoEmbedUrl(url) {
+  try {
+    if (url.includes("youtu.be/")) {
+      const id = url.split("youtu.be/")[1]?.split("?")[0];
+      return id ? `https://www.youtube.com/watch?v=${id}` : url;
+    }
+    return url;
+  } catch { return url; }
+}
+
+function VideoLibraryView({ videos, onAdd, onDelete, onUpdate }) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newUrl, setNewUrl] = useState("");
+  const [newCat, setNewCat] = useState("General");
+  const [newDesc, setNewDesc] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [filterCat, setFilterCat] = useState("All");
+  const [editingId, setEditingId] = useState(null);
+  const [editData, setEditData] = useState({});
+  const [search, setSearch] = useState("");
+
+  async function handleAdd() {
+    if (!newTitle.trim() || !newUrl.trim()) return;
+    setSaving(true);
+    await onAdd({ title:newTitle.trim(), url:newUrl.trim(), category:newCat, description:newDesc.trim() });
+    setNewTitle(""); setNewUrl(""); setNewCat("General"); setNewDesc("");
+    setShowAdd(false); setSaving(false);
+  }
+
+  const filtered = videos.filter(v => {
+    const matchCat = filterCat === "All" || v.category === filterCat;
+    const matchQ = !search || v.title.toLowerCase().includes(search.toLowerCase()) || (v.description||"").toLowerCase().includes(search.toLowerCase());
+    return matchCat && matchQ;
+  });
+
+  return (
+    <div style={{maxWidth:780,margin:"0 auto",padding:"0 0 40px"}}>
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24,flexWrap:"wrap",gap:12}}>
+        <div>
+          <div style={{fontSize:22,fontWeight:700,letterSpacing:"-.02em",color:"#1a1a1a"}}>🎬 Video Library</div>
+          <div style={{fontSize:13,color:"#aaa",marginTop:2}}>{videos.length} video{videos.length!==1?"s":""} · only you can see this</div>
+        </div>
+        <button onClick={()=>setShowAdd(s=>!s)}
+          style={{background:"#1a1a1a",color:"#fff",border:"none",borderRadius:9,padding:"10px 18px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+          {showAdd ? "✕ Cancel" : "+ Add Video"}
+        </button>
+      </div>
+
+      {/* Add video form */}
+      {showAdd && (
+        <div style={{background:"#fff",borderRadius:14,border:"1.5px solid #e0e0e0",padding:"20px 22px",marginBottom:24,boxShadow:"0 4px 20px rgba(0,0,0,.06)"}}>
+          <div style={{fontWeight:700,fontSize:15,marginBottom:16}}>Add a video</div>
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:5}}>Title *</div>
+              <input value={newTitle} onChange={e=>setNewTitle(e.target.value)}
+                placeholder="e.g. Mouthfill technique - wall drill"
+                style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,fontFamily:"inherit",outline:"none",boxSizing:"border-box"}} />
+            </div>
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:5}}>YouTube or Vimeo URL *</div>
+              <input value={newUrl} onChange={e=>setNewUrl(e.target.value)}
+                placeholder="https://www.youtube.com/watch?v=..."
+                style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:14,fontFamily:"inherit",outline:"none",boxSizing:"border-box"}} />
+              {newUrl && getVideoThumb(newUrl) && (
+                <img src={getVideoThumb(newUrl)} alt="preview"
+                  style={{width:"100%",maxWidth:280,borderRadius:8,marginTop:8,border:"1px solid #e0e0e0"}} />
+              )}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div>
+                <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:5}}>Category</div>
+                <select value={newCat} onChange={e=>setNewCat(e.target.value)}
+                  style={{width:"100%",padding:"10px 10px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",background:"#fff",cursor:"pointer"}}>
+                  {VIDEO_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:5}}>Description <span style={{fontWeight:400,color:"#bbb"}}>(optional)</span></div>
+              <textarea value={newDesc} onChange={e=>setNewDesc(e.target.value)}
+                placeholder="What should the athlete focus on? Key technique points..."
+                rows={3}
+                style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",resize:"vertical",boxSizing:"border-box"}} />
+            </div>
+            <button onClick={handleAdd} disabled={!newTitle.trim()||!newUrl.trim()||saving}
+              style={{background:"#1a1a1a",color:"#fff",border:"none",padding:"11px",borderRadius:8,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:(!newTitle.trim()||!newUrl.trim()||saving)?0.5:1}}>
+              {saving?"Saving...":"💾 Save Video"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      {videos.length > 0 && (
+        <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap",alignItems:"center"}}>
+          <div style={{position:"relative",flex:1,minWidth:180}}>
+            <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"#bbb",fontSize:14}}>🔍</span>
+            <input value={search} onChange={e=>setSearch(e.target.value)}
+              placeholder="Search videos..."
+              style={{width:"100%",padding:"8px 12px 8px 32px",border:"1.5px solid #e0e0e0",borderRadius:8,fontSize:13,fontFamily:"inherit",outline:"none",boxSizing:"border-box"}} />
+          </div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {["All",...VIDEO_CATEGORIES].map(c=>(
+              <button key={c} onClick={()=>setFilterCat(c)}
+                style={{padding:"6px 12px",borderRadius:20,border:`1.5px solid ${filterCat===c?"#1a1a1a":"#e0e0e0"}`,background:filterCat===c?"#1a1a1a":"#fff",color:filterCat===c?"#fff":"#888",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+                {c}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Video grid */}
+      {filtered.length === 0 && videos.length === 0 && (
+        <div style={{background:"#fafaf8",border:"1.5px dashed #ddd",borderRadius:14,padding:"48px 32px",textAlign:"center"}}>
+          <div style={{fontSize:36,marginBottom:12}}>🎬</div>
+          <div style={{fontSize:16,fontWeight:600,color:"#555",marginBottom:8}}>No videos yet</div>
+          <div style={{fontSize:13,color:"#aaa",lineHeight:1.6}}>Add YouTube or Vimeo links to build your library.<br/>Attach them to session exercises when planning.</div>
+        </div>
+      )}
+      {filtered.length === 0 && videos.length > 0 && (
+        <div style={{textAlign:"center",color:"#bbb",fontSize:14,padding:"32px"}}>No videos match your search</div>
+      )}
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:16}}>
+        {filtered.map(v => {
+          const thumb = getVideoThumb(v.url);
+          const isEditing = editingId === v.id;
+          return (
+            <div key={v.id} style={{background:"#fff",borderRadius:12,border:"1.5px solid #e8e8e4",overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.05)"}}>
+              {/* Thumbnail */}
+              <a href={getVideoEmbedUrl(v.url)} target="_blank" rel="noopener noreferrer" style={{display:"block",position:"relative"}}>
+                {thumb ? (
+                  <img src={thumb} alt={v.title} style={{width:"100%",aspectRatio:"16/9",objectFit:"cover",display:"block"}} />
+                ) : (
+                  <div style={{width:"100%",aspectRatio:"16/9",background:"#1a1a1a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>▶️</div>
+                )}
+                <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.2)",opacity:0,transition:"opacity .2s"}}
+                  onMouseEnter={e=>e.currentTarget.style.opacity="1"} onMouseLeave={e=>e.currentTarget.style.opacity="0"}>
+                  <div style={{background:"rgba(0,0,0,0.7)",borderRadius:"50%",width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:"#fff"}}>▶</div>
+                </div>
+              </a>
+              {/* Info */}
+              <div style={{padding:"12px 14px"}}>
+                {isEditing ? (
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    <input value={editData.title||""} onChange={e=>setEditData(d=>({...d,title:e.target.value}))}
+                      style={{width:"100%",padding:"7px 9px",border:"1.5px solid #e0e0e0",borderRadius:7,fontSize:13,fontFamily:"inherit",outline:"none",boxSizing:"border-box"}} />
+                    <select value={editData.category||"General"} onChange={e=>setEditData(d=>({...d,category:e.target.value}))}
+                      style={{width:"100%",padding:"7px 9px",border:"1.5px solid #e0e0e0",borderRadius:7,fontSize:12,fontFamily:"inherit",outline:"none",background:"#fff"}}>
+                      {VIDEO_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <textarea value={editData.description||""} onChange={e=>setEditData(d=>({...d,description:e.target.value}))}
+                      placeholder="Description (optional)..." rows={2}
+                      style={{width:"100%",padding:"7px 9px",border:"1.5px solid #e0e0e0",borderRadius:7,fontSize:12,fontFamily:"inherit",outline:"none",resize:"vertical",boxSizing:"border-box"}} />
+                    <div style={{display:"flex",gap:6}}>
+                      <button onClick={async()=>{ await onUpdate(v.id,{title:editData.title,category:editData.category,description:editData.description}); setEditingId(null); }}
+                        style={{flex:1,padding:"7px",borderRadius:7,border:"none",background:"#1a1a1a",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Save</button>
+                      <button onClick={()=>setEditingId(null)}
+                        style={{padding:"7px 10px",borderRadius:7,border:"1.5px solid #e0e0e0",background:"#fff",fontSize:12,cursor:"pointer",fontFamily:"inherit",color:"#888"}}>✕</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{fontWeight:700,fontSize:13,color:"#1a1a1a",marginBottom:4,lineHeight:1.4}}>{v.title}</div>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:v.description?6:0}}>
+                      <span style={{fontSize:11,background:"#f0f0ec",color:"#666",borderRadius:20,padding:"2px 8px",fontWeight:600}}>{v.category}</span>
+                      <div style={{display:"flex",gap:6}}>
+                        <button onClick={()=>{ setEditingId(v.id); setEditData({title:v.title,category:v.category,description:v.description||""}); }}
+                          style={{background:"none",border:"none",fontSize:13,cursor:"pointer",color:"#bbb",padding:0}} title="Edit">✏️</button>
+                        <button onClick={()=>{ if(window.confirm(`Delete "${v.title}"?`)) onDelete(v.id); }}
+                          style={{background:"none",border:"none",fontSize:13,cursor:"pointer",color:"#bbb",padding:0}} title="Delete">🗑️</button>
+                      </div>
+                    </div>
+                    {v.description && <div style={{fontSize:11,color:"#888",lineHeight:1.5,marginTop:4}}>{v.description}</div>}
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function ApneaCoach() {
   const [user,     setUser]     = useState(null);
   const [profile,  setProfile]  = useState(null);
@@ -2105,6 +2311,8 @@ export default function ApneaCoach() {
       // Load templates
       const {data:tr} = await supabase.from("session_templates").select("*").eq("coach_id",currentUser.id).order("created_at",{ascending:false});
       if (tr) setTemplates(tr.map(t=>({id:t.id,name:t.name,method:t.method,gymData:t.gym_data,createdAt:t.created_at})));
+      const {data:vr} = await supabase.from("coach_videos").select("*").eq("coach_id",currentUser.id).order("created_at",{ascending:false});
+      if (vr) setCoachVideos(vr);
       // Load coach notes from client records
       const notesMap = {};
       (cr||[]).forEach(c=>{ if(c.coach_notes) notesMap[c.id]=c.coach_notes; });
@@ -2138,7 +2346,25 @@ export default function ApneaCoach() {
     flash("Template deleted");
   }
 
-  // ── Welcome message ──
+  // ── Video Library ──
+  async function addVideo(v) {
+    const {data,error} = await supabase.from("coach_videos").insert({
+      coach_id:user.id, title:v.title, url:v.url, category:v.category||"General", description:v.description||null
+    }).select().single();
+    if (!error && data) { setCoachVideos(prev=>[data,...prev]); flash("Video added!"); }
+    else flash("Error: " + error?.message);
+  }
+  async function deleteVideo(id) {
+    await supabase.from("coach_videos").delete().eq("id",id);
+    setCoachVideos(prev=>prev.filter(v=>v.id!==id));
+    flash("Video removed");
+  }
+  async function updateVideo(id, updates) {
+    await supabase.from("coach_videos").update(updates).eq("id",id);
+    setCoachVideos(prev=>prev.map(v=>v.id===id?{...v,...updates}:v));
+  }
+
+  // ── Video Library ──
   function resolveWelcome(athleteName) {
     const coachName = (profile?.email||"").split("@")[0].replace(/[._]/g," ").replace(/\b\w/g,c=>c.toUpperCase());
     const msg = welcomeMessage || DEFAULT_WELCOME;
@@ -2336,7 +2562,8 @@ export default function ApneaCoach() {
   const [coachPBNotifs, setCoachPBNotifs] = useState(() => {
     try { return JSON.parse(localStorage.getItem("apnea_coachPBNotifs")||"[]"); } catch { return []; }
   }); // [{athleteName, pbs, seenAt}]
-  const [templates, setTemplates] = useState([]); // coach's saved session templates
+  const [templates, setTemplates] = useState([]);
+  const [coachVideos, setCoachVideos] = useState([]); // coach video library // coach's saved session templates
   const [clientSearch, setClientSearch] = useState(""); // search query for client list
   const [clientSort, setClientSort] = useState("name"); // name | pending | done
   // App-level template save dialog — rendered outside all modals to avoid overflow clipping
@@ -2556,6 +2783,7 @@ export default function ApneaCoach() {
                 return [
                   {key:"dashboard", emoji:"📋", label: profile?.role==="client" ? "Dashboard" : "Dashboard", badge: isCoach && newCompletions > 0 ? newCompletions : 0},
                   ...(isAdmin?[{key:"adminView", emoji:"👑", label:"Admin", badge:0}]:[]),
+                  ...(isCoach?[{key:"videoLibrary", emoji:"🎬", label:"Videos", badge:0}]:[]),
                   ...(isCoach&&activeClient?[{key:"coachWeek", emoji:"📅", label:`${activeClient.name.split(" ")[0]}'s Week`, badge:0},{key:"clientWeek", emoji:"🏊", label:"Client View", badge:0}]:[]),
                   ...(profile?.role==="client"?[{key:"clientWeek", emoji:"📅", label:"My Week", badge:0}]:[])
                 ].map(t=>(
@@ -2589,6 +2817,16 @@ export default function ApneaCoach() {
       <div className="main-content" style={{maxWidth:1040,margin:"0 auto",padding:"28px 24px"}}>
 
         {/* DASHBOARD */}
+        {/* ── VIDEO LIBRARY ── */}
+        {view==="videoLibrary" && isCoach && (
+          <VideoLibraryView
+            videos={coachVideos}
+            onAdd={addVideo}
+            onDelete={deleteVideo}
+            onUpdate={updateVideo}
+          />
+        )}
+
         {view==="dashboard"&&(isCoach||isAdmin)&&(
           <div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,marginBottom:24}}>
